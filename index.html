@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Life Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geologica:wght@500;600&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-screen app, a hub mark on top, three views behind a bottom tab bar; each app owns a colour dot that follows its data everywhere. */
+:root {
+  --bg: #f1f3f6; --surface: #ffffff; --ink: #121821; --muted: #5a6574; --line: #dce1e8;
+  --accent: #0a7fa3; --on-accent: #ffffff; --danger: #c23b36;
+  --c-lang: #3461d9; --c-books: #b2740a; --c-money: #1d8a55; --c-plan: #6c49cc; --c-health: #cc4540; --c-ideas: #b03f7b;
+  --font-display: "Geologica", "Golos Text", system-ui, sans-serif;
+  --font-body: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace; /* Latin and digits only: it lacks several Kazakh letters */
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1116; --surface: #161b22; --ink: #e5e9ef; --muted: #96a1af; --line: #272e38;
+    --accent: #3cb4d6; --on-accent: #06222c; --danger: #ff7a73;
+    --c-lang: #6f95ff; --c-books: #e3a63c; --c-money: #45c486; --c-plan: #a68cff; --c-health: #ff7c74; --c-ideas: #ef7fba;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d1116; --surface: #161b22; --ink: #e5e9ef; --muted: #96a1af; --line: #272e38;
+  --accent: #3cb4d6; --on-accent: #06222c; --danger: #ff7a73;
+  --c-lang: #6f95ff; --c-books: #e3a63c; --c-money: #45c486; --c-plan: #a68cff; --c-health: #ff7c74; --c-ideas: #ef7fba;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--font-body); -webkit-text-size-adjust: 100%; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1, h2 { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; text-wrap: balance; margin: 0; }
+h2 { font-size: 15px; }
+
+.app { height: 100%; max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; }
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+.top { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: max(12px, env(safe-area-inset-top, 0px)); padding-bottom: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 600; font-size: 17px; }
+.mark { width: 30px; height: 30px; flex: none; }
+.who { font: 12px var(--font-mono); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+.view { flex: 1; min-height: 0; overflow-y: auto; padding-block: 8px 20px; }
+.chat { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+
+/* Login */
+.login { display: grid; align-content: center; gap: 20px; }
+.login h1 { font-size: 26px; }
+.login p { margin: 0; color: var(--muted); }
+.form { display: grid; gap: 10px; max-width: 380px; width: 100%; }
+label { font-size: 13px; font-weight: 500; color: var(--muted); }
+input, textarea { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; }
+input:focus, textarea:focus { border-color: var(--accent); outline: none; }
+.msg-line { min-height: 1.5em; margin: 0; font-size: 14px; color: var(--muted); }
+
+.btn { border: 0; border-radius: 12px; padding: 11px 16px; font-weight: 600; background: var(--accent); color: var(--on-accent); }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); font-weight: 500; }
+.btn.link { background: none; color: var(--accent); padding: 4px 0; font-weight: 500; justify-self: start; }
+.btn:disabled { opacity: .5; cursor: default; }
+
+/* Chat */
+.log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-block: 8px 16px; }
+.msg { max-width: 86%; padding: 10px 14px; border-radius: 18px; display: grid; gap: 8px; min-width: 0; }
+.msg .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.user { align-self: flex-end; background: var(--ink); color: var(--bg); border-bottom-right-radius: 6px; }
+.msg.assistant { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 6px; }
+.msg.err { align-self: flex-start; background: var(--surface); border: 1px solid var(--danger); color: var(--danger); font-size: 14px; }
+.meta { font: 11px var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+.acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px 3px 9px; font-size: 13px; background: var(--bg); }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--dot, var(--muted)); }
+.chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip.bad { border-color: var(--danger); color: var(--danger); text-decoration: line-through; }
+.typing { display: inline-flex; gap: 5px; padding: 14px 16px; }
+.typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite both; }
+.typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+.empty { flex: 1; overflow-y: auto; display: grid; align-content: center; gap: 18px; padding-block: 12px; }
+.empty .orbit { width: 88px; height: 88px; }
+.empty h1 { font-size: 22px; }
+.empty p { margin: 0; color: var(--muted); max-width: 52ch; }
+.apps-line { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
+.apps-line span { display: inline-flex; align-items: center; gap: 6px; }
+.apps-line span::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dot); }
+.suggest { display: grid; gap: 8px; }
+.suggest button { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.suggest button:hover { border-color: var(--accent); }
+
+.composer { flex: none; display: flex; align-items: flex-end; gap: 8px; padding-block: 8px 10px; }
+.composer textarea { resize: none; max-height: 160px; border-radius: 20px; padding: 11px 16px; line-height: 1.4; }
+.send { flex: none; width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; }
+.send:disabled { opacity: .45; cursor: default; }
+
+/* Apps */
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 560px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.tile { display: grid; gap: 4px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px; min-width: 0; }
+.tile:hover { border-color: var(--dot); }
+.tile .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--dot); margin-bottom: 6px; }
+.tile b { font-family: var(--font-display); font-weight: 500; font-size: 15px; }
+.tile small { color: var(--muted); font-size: 13px; }
+.tile .count { font: 500 22px var(--font-mono); font-variant-numeric: tabular-nums; margin-top: 6px; }
+
+.detail-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.detail-head h2 { display: flex; align-items: center; gap: 8px; font-size: 18px; }
+.detail-head h2::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--dot); }
+.summary { font-size: 14px; color: var(--muted); margin: 0 0 6px; font-variant-numeric: tabular-nums; }
+.rows { list-style: none; margin: 0; padding: 0; }
+.row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: start; gap: 4px 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.row.plain { grid-template-columns: minmax(0, 1fr) auto auto; }
+.row input[type="checkbox"] { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--dot); }
+.row-title { font-weight: 500; overflow-wrap: anywhere; }
+.row.done .row-title { text-decoration: line-through; color: var(--muted); }
+.row-sub { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.row time { font: 12px var(--font-mono); color: var(--muted); padding-top: 3px; }
+.del { background: none; border: 1px solid transparent; border-radius: 8px; color: var(--muted); padding: 2px 8px; font-size: 13px; }
+.del.armed { border-color: var(--danger); color: var(--danger); }
+.note { color: var(--muted); padding: 16px 0; }
+
+/* Settings */
+.settings { display: grid; gap: 28px; align-content: start; }
+.settings section { display: grid; gap: 10px; }
+.hint { margin: 0; color: var(--muted); font-size: 14px; max-width: 60ch; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { font: 12px var(--font-mono); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 5px 10px; overflow-wrap: anywhere; text-align: left; }
+.chips button:hover { border-color: var(--accent); }
+.stat { margin: 0; font-variant-numeric: tabular-nums; white-space: pre-line; }
+
+/* Tabs */
+.tabs { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); background: var(--surface); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.tabs button { background: none; border: 0; padding: 12px 4px 13px; font-size: 14px; font-weight: 500; color: var(--muted); }
+.tabs button[aria-current="page"] { color: var(--ink); box-shadow: inset 0 2px 0 var(--accent); }
+
+@media (prefers-reduced-motion: reduce) { .typing i { animation: none; opacity: .6; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="hub" viewBox="0 0 32 32">
+    <circle cx="16" cy="16" r="12" fill="none" stroke="var(--line)" stroke-width="1.2"/>
+    <circle cx="16" cy="16" r="4.6" fill="var(--ink)"/>
+    <circle cx="16" cy="4" r="2.6" fill="var(--c-lang)"/>
+    <circle cx="26.4" cy="10" r="2.6" fill="var(--c-books)"/>
+    <circle cx="26.4" cy="22" r="2.6" fill="var(--c-money)"/>
+    <circle cx="16" cy="28" r="2.6" fill="var(--c-plan)"/>
+    <circle cx="5.6" cy="22" r="2.6" fill="var(--c-health)"/>
+    <circle cx="5.6" cy="10" r="2.6" fill="var(--c-ideas)"/>
+  </symbol>
+</svg>
+
+<div class="app">
+  <header class="top gutter">
+    <div class="brand"><svg class="mark" aria-hidden="true"><use href="#hub"/></svg>Life Hub</div>
+    <span class="who" id="who"></span>
+  </header>
+
+  <main id="login" class="view login gutter" hidden>
+    <svg class="mark" style="width:56px;height:56px" aria-hidden="true"><use href="#hub"/></svg>
+    <div style="display:grid;gap:6px">
+      <h1>Life Hub</h1>
+      <p>Барлық қосымшаларыңның басқару орталығы.</p>
+    </div>
+    <form id="login-form" class="form">
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" required>
+      <label for="password">Құпиясөз</label>
+      <input id="password" type="password" autocomplete="current-password" minlength="6" required>
+      <button id="login-btn" class="btn" type="submit">Кіру</button>
+      <button id="mode-btn" class="btn link" type="button">Аккаунт жоқ па? Тіркелу</button>
+      <p id="login-msg" class="msg-line" role="status"></p>
+    </form>
+  </main>
+
+  <main id="chat" class="view chat gutter" hidden>
+    <div id="empty" class="empty">
+      <svg class="orbit" aria-hidden="true"><use href="#hub"/></svg>
+      <h1>Сәлем! Не істейміз?</h1>
+      <p>Маған кез келген тапсырманы жаз — мен оны керекті қосымшаға өзім жіберемін.</p>
+      <div class="apps-line" id="apps-line"></div>
+      <div class="suggest" id="suggest"></div>
+    </div>
+    <div id="log" class="log" aria-live="polite"></div>
+    <form id="composer" class="composer">
+      <textarea id="input" rows="1" placeholder="Hub-қа жаз…" aria-label="Хабарлама"></textarea>
+      <button id="send" class="send" type="submit" aria-label="Жіберу">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      </button>
+    </form>
+  </main>
+
+  <main id="apps" class="view gutter" hidden>
+    <div id="grid" class="grid"></div>
+    <div id="detail" hidden>
+      <div class="detail-head">
+        <button id="back" class="btn ghost" type="button">← Артқа</button>
+        <h2 id="detail-title"></h2>
+      </div>
+      <p id="summary" class="summary" hidden></p>
+      <ul id="rows" class="rows"></ul>
+    </div>
+  </main>
+
+  <main id="settings" class="view settings gutter" hidden>
+    <section>
+      <h2>Модельдер</h2>
+      <p class="hint">Hub модельдерді осы ретпен сынайды: біреуі жауап бермесе немесе лимиті бітсе, келесісіне ауысады. Тізімнің соңына OpenRouter-дің тегін модельдері өзі қосылады, сондықтан бос қалдыруға да болады.</p>
+      <label for="models">Менің модельдерім, әр жолға біреу</label>
+      <textarea id="models" rows="4" placeholder="провайдер/модель-атауы"></textarea>
+      <div class="actions">
+        <button id="save-models" class="btn" type="button">Сақтау</button>
+        <button id="show-free" class="btn ghost" type="button">Тегін модельдерді көрсету</button>
+      </div>
+      <p id="models-msg" class="msg-line" role="status"></p>
+      <div id="free-list" class="chips"></div>
+    </section>
+    <section>
+      <h2>Бүгінгі лимит</h2>
+      <p id="quota" class="stat">Тексерілмеді</p>
+      <div class="actions"><button id="check-quota" class="btn ghost" type="button">Тексеру</button></div>
+    </section>
+    <section>
+      <h2>Аккаунт</h2>
+      <p id="acct" class="hint"></p>
+      <div class="actions"><button id="logout" class="btn ghost" type="button">Шығу</button></div>
+    </section>
+  </main>
+
+  <nav id="tabs" class="tabs" hidden>
+    <button type="button" data-view="chat">Ассистент</button>
+    <button type="button" data-view="apps">Қосымшалар</button>
+    <button type="button" data-view="settings">Баптаулар</button>
+  </nav>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script>
+// Publishable key: safe to ship in the page; every row is protected by row-level security.
+const sb = supabase.createClient("https://lcmnkcpkbkrktediyvpo.supabase.co", "sb_publishable_Z0BZxemzhkUPo_lfgxMAbA_9TkVXL2q");
+
+const money = (n) => new Intl.NumberFormat("kk-KZ").format(Number(n) || 0);
+const cur = (c) => (!c || c === "KZT" ? "₸" : c);
+const STATUS = { want: "оқимын деп жүрмін", reading: "оқып жатырмын", done: "оқыдым" };
+const HEALTH = { meal: "Тамақ", water: "Су", workout: "Жаттығу", sleep: "Ұйқы", weight: "Салмақ" };
+const join = (...xs) => xs.filter(Boolean).join(" · ");
+
+// Display side of the app registry; the assistant's side lives in the server function (core.ts).
+const APPS = {
+  lang:   { name: "Тіл", sub: "Сөздік", tool: "add_word", hint: "ubiquitous сөзін сөздікке қос", title: (d) => d.word, detail: (d) => join(d.translation, d.example) },
+  books:  { name: "Кітап", sub: "Оқу тізімі", tool: "add_book", hint: "«Абай жолы» кітабын оқып жатырмын", title: (d) => d.title, detail: (d) => join(d.author, STATUS[d.status]) },
+  money:  { name: "Қаржы", sub: "Шығын мен кіріс", tool: "add_transaction", hint: "Түскі асқа 2500 теңге жұмсадым", title: (d) => `${d.kind === "income" ? "+" : "−"}${money(d.amount)} ${cur(d.currency)}`, detail: (d) => join(d.category, d.note) },
+  plan:   { name: "Жоспар", sub: "Тапсырмалар", tool: "add_task", hint: "Жұмада 7B сыныбымен сынып сағаты", title: (d) => d.title, detail: (d) => join(d.due, d.note), check: true },
+  health: { name: "Денсаулық", sub: "Тамақ, су, спорт", tool: "add_health_log", hint: "Бүгін 30 минут жүгірдім", title: (d) => join(HEALTH[d.type] || d.type, d.value), detail: (d) => d.note },
+  ideas:  { name: "Ойлар", sub: "Ойлар мен зерттеулер", tool: "add_note", hint: "Идея: олимпиада есептерінің банкі", title: (d) => d.text, detail: (d) => (d.tags || []).map((t) => "#" + t).join(" ") },
+};
+const TOOL_APP = Object.fromEntries(Object.entries(APPS).map(([id, a]) => [a.tool, id]));
+const SUGGEST = ["serendipity сөзін сөздікке қос", "Кофеге 1500 теңге жұмсадым", "Ертең 18:00-де ата-аналар жиналысы", "Бұл айда қанша жұмсадым?"];
+
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage off: keep working in memory */ } },
+};
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+let chat = store.get("hub.chat", []);
+let busy = false;
+let view = "chat";
+
+/* ---------- views ---------- */
+function show(next) {
+  view = next;
+  for (const v of ["login", "chat", "apps", "settings"]) $(v).hidden = v !== next;
+  $("tabs").hidden = next === "login";
+  for (const b of $("tabs").children) b.setAttribute("aria-current", b.dataset.view === next ? "page" : "false");
+  if (next === "apps") loadGrid();
+  if (next === "chat") renderChat();
+}
+for (const b of $("tabs").children) b.onclick = () => show(b.dataset.view);
+
+/* ---------- auth ---------- */
+let signup = false;
+$("mode-btn").onclick = () => {
+  signup = !signup;
+  $("login-btn").textContent = signup ? "Тіркелу" : "Кіру";
+  $("mode-btn").textContent = signup ? "Аккаунт бар ма? Кіру" : "Аккаунт жоқ па? Тіркелу";
+  $("password").autocomplete = signup ? "new-password" : "current-password";
+};
+$("login-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const email = $("email").value.trim(), password = $("password").value;
+  $("login-btn").disabled = true;
+  $("login-msg").textContent = "Күте тұр…";
+  const { data, error } = signup ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
+  $("login-btn").disabled = false;
+  if (error) {
+    const known = { "Invalid login credentials": "Email немесе құпиясөз қате.", "Email not confirmed": "Алдымен поштаңдағы растау сілтемесін бас." };
+    $("login-msg").textContent = known[error.message] || error.message;
+  } else if (signup && !data.session) {
+    $("login-msg").textContent = "Поштаңа растау хаты жіберілді. Сілтемені бас та, осында қайта кір.";
+  } else {
+    $("login-msg").textContent = "";
+  }
+};
+sb.auth.onAuthStateChange((_event, session) => {
+  const email = session?.user?.email ?? "";
+  $("who").textContent = email;
+  $("acct").textContent = email ? `Кірген: ${email}` : "";
+  show(session ? (view === "login" ? "chat" : view) : "login");
+});
+$("logout").onclick = async () => {
+  chat = [];
+  store.set("hub.chat", chat);
+  await sb.auth.signOut();
+};
+
+/* ---------- chat ---------- */
+function chip(a) {
+  const id = TOOL_APP[a.tool] ?? a.args?.app;
+  const c = el("span", "chip" + (a.ok ? "" : " bad"));
+  if (id && APPS[id]) c.style.setProperty("--dot", `var(--c-${id})`);
+  const label = TOOL_APP[a.tool] ? `${APPS[id].name} · ${APPS[id].title(a.args || {}) ?? ""}`
+    : a.tool === "list_items" ? `${APPS[id]?.name ?? "Қосымша"} · қаралды`
+    : a.tool === "update_item" ? "Жазба жаңартылды" : a.tool;
+  c.append(el("span", "", label));
+  if (!a.ok) c.title = a.error || "Сақталмады";
+  return c;
+}
+function bubble(m) {
+  const b = el("div", "msg " + (m.error ? "err" : m.role));
+  if (m.content) { const t = el("div", "text"); t.innerHTML = esc(m.content).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"); b.append(t); }
+  if (m.actions?.length) { const row = el("div", "acts"); row.append(...m.actions.map(chip)); b.append(row); }
+  if (m.model) b.append(el("div", "meta", m.model));
+  return b;
+}
+function renderChat() {
+  $("empty").hidden = chat.length > 0 || busy;
+  $("log").hidden = !$("empty").hidden;
+  $("log").replaceChildren(...chat.map(bubble));
+  if (busy) { const t = el("div", "msg assistant typing"); t.setAttribute("aria-label", "Hub ойланып жатыр"); t.innerHTML = "<i></i><i></i><i></i>"; $("log").append(t); }
+  $("log").scrollTop = $("log").scrollHeight;
+  $("send").disabled = busy;
+}
+function localNow() {
+  const d = new Date(), p = (n) => String(n).padStart(2, "0");
+  const day = ["жексенбі", "дүйсенбі", "сейсенбі", "сәрсенбі", "бейсенбі", "жұма", "сенбі"][d.getDay()];
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}, ${day}`;
+}
+async function errorText(error) {
+  try { return (await error.context.json()).error || error.message; } catch { return "Байланыс қатесі: " + error.message; }
+}
+async function send(text) {
+  text = text.trim();
+  if (!text || busy) return;
+  chat.push({ role: "user", content: text });
+  busy = true;
+  renderChat();
+  const history = chat.filter((m) => !m.error && m.content).map(({ role, content }) => ({ role, content }));
+  const { data, error } = await sb.functions.invoke("assistant", { body: { messages: history, models: store.get("hub.models", []), now: localNow() } });
+  busy = false;
+  if (error) chat.push({ role: "assistant", error: true, content: await errorText(error) });
+  else chat.push({ role: "assistant", content: data.reply || (data.actions?.length ? "Дайын." : "…"), actions: data.actions, model: data.model });
+  chat = chat.slice(-40);
+  store.set("hub.chat", chat);
+  renderChat();
+}
+$("composer").onsubmit = (e) => { e.preventDefault(); const t = $("input").value; $("input").value = ""; grow(); send(t); };
+$("input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("composer").requestSubmit(); } });
+const grow = () => { const t = $("input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160) + "px"; };
+$("input").addEventListener("input", grow);
+$("apps-line").append(...Object.entries(APPS).map(([id, a]) => { const s = el("span", "", a.name); s.style.setProperty("--dot", `var(--c-${id})`); return s; }));
+$("suggest").append(...SUGGEST.map((s) => { const b = el("button", "", s); b.type = "button"; b.onclick = () => send(s); return b; }));
+
+/* ---------- apps ---------- */
+async function loadGrid() {
+  $("detail").hidden = true;
+  $("grid").hidden = false;
+  const counts = await Promise.all(Object.keys(APPS).map((id) => sb.from("items").select("id", { count: "exact", head: true }).eq("app", id)));
+  $("grid").replaceChildren(...Object.entries(APPS).map(([id, a], i) => {
+    const t = el("button", "tile");
+    t.type = "button";
+    t.style.setProperty("--dot", `var(--c-${id})`);
+    t.append(el("span", "dot"), el("b", "", a.name), el("small", "", a.sub), el("span", "count", counts[i].error ? "–" : String(counts[i].count ?? 0)));
+    t.onclick = () => openApp(id);
+    return t;
+  }));
+}
+async function openApp(id) {
+  const a = APPS[id];
+  $("grid").hidden = true;
+  $("detail").hidden = false;
+  $("detail").style.setProperty("--dot", `var(--c-${id})`);
+  $("detail-title").textContent = a.name;
+  $("summary").hidden = true;
+  $("rows").replaceChildren(el("li", "note", "Жүктеліп жатыр…"));
+  const { data, error } = await sb.from("items").select("id, data, done, created_at").eq("app", id).order("created_at", { ascending: false }).limit(200);
+  if (error) return $("rows").replaceChildren(el("li", "note", "Жүктелмеді: " + error.message));
+  if (!data.length) return $("rows").replaceChildren(el("li", "note", `Әзірге бос. Ассистентке жазып көр: «${a.hint}»`));
+  if (id === "money") {
+    const month = localNow().slice(0, 7);
+    const sum = (kind) => data.filter((r) => r.created_at.slice(0, 7) === month && (r.data.kind === "income") === (kind === "income")).reduce((t, r) => t + (Number(r.data.amount) || 0), 0);
+    $("summary").textContent = `Осы ай: шығын ${money(sum("expense"))} ₸ · кіріс ${money(sum("income"))} ₸`;
+    $("summary").hidden = false;
+  }
+  $("rows").replaceChildren(...data.map((r) => row(id, r)));
+}
+function row(id, r) {
+  const a = APPS[id];
+  const li = el("li", "row" + (a.check ? "" : " plain") + (r.done ? " done" : ""));
+  if (a.check) {
+    const box = el("input");
+    box.type = "checkbox";
+    box.checked = r.done;
+    box.setAttribute("aria-label", "Орындалды");
+    box.onchange = async () => {
+      li.classList.toggle("done", box.checked);
+      const { error } = await sb.from("items").update({ done: box.checked }).eq("id", r.id);
+      if (error) { box.checked = !box.checked; li.classList.toggle("done", box.checked); }
+    };
+    li.append(box);
+  }
+  const main = el("div");
+  main.append(el("div", "row-title", a.title(r.data) || "—"));
+  const sub = a.detail(r.data);
+  if (sub) main.append(el("div", "row-sub", sub));
+  const del = el("button", "del", "Жою");
+  del.type = "button";
+  del.onclick = async () => {
+    if (!del.classList.contains("armed")) {
+      del.classList.add("armed");
+      del.textContent = "Иә, жою";
+      setTimeout(() => { del.classList.remove("armed"); del.textContent = "Жою"; }, 3000);
+      return;
+    }
+    const { error } = await sb.from("items").delete().eq("id", r.id);
+    if (!error) li.remove();
+  };
+  const time = el("time", "", new Date(r.created_at).toLocaleDateString("kk-KZ", { day: "2-digit", month: "2-digit" }));
+  time.dateTime = r.created_at;
+  li.append(main, time, del);
+  return li;
+}
+$("back").onclick = loadGrid;
+
+/* ---------- settings ---------- */
+$("models").value = store.get("hub.models", []).join("\n");
+$("save-models").onclick = () => {
+  const list = $("models").value.split("\n").map((s) => s.trim()).filter(Boolean);
+  store.set("hub.models", list);
+  $("models-msg").textContent = list.length ? `Сақталды: ${list.length} модель` : "Сақталды: тек тегін модельдер қолданылады";
+};
+$("show-free").onclick = async () => {
+  $("models-msg").textContent = "Жүктеліп жатыр…";
+  const { data, error } = await sb.functions.invoke("assistant", { body: { action: "models" } });
+  if (error) return ($("models-msg").textContent = await errorText(error));
+  $("models-msg").textContent = `Құрал шақыра алатын тегін модельдер: ${data.models.length}. Тізімге қосу үшін бас.`;
+  $("free-list").replaceChildren(...data.models.map((m) => {
+    const b = el("button", "", m);
+    b.type = "button";
+    b.onclick = () => { $("models").value = ($("models").value.trim() + "\n" + m).trim(); };
+    return b;
+  }));
+};
+$("check-quota").onclick = async () => {
+  $("quota").textContent = "Тексеріліп жатыр…";
+  const { data, error } = await sb.functions.invoke("assistant", { body: { action: "status" } });
+  if (error) return ($("quota").textContent = await errorText(error));
+  if (!data.ok) return ($("quota").textContent = "OpenRouter кілті жарамсыз сияқты.");
+  const f = data.free;
+  const lines = [f ? `Тегін сұраныстар: ${f.used} / ${f.limit} (қалды ${f.remaining})` : "Тегін сұраныстар туралы дерек жоқ"];
+  if (data.usage_daily != null) lines.push(`Бүгінгі шығын: $${Number(data.usage_daily).toFixed(4)}`);
+  $("quota").textContent = lines.join("\n");
+};
+</script>
+</body>
+</html>
