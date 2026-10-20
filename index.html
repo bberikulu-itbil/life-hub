@@ -488,6 +488,13 @@ async function loadGrid() {
     t.onclick = () => openApp(id);
     return t;
   }));
+  // Pages that are tools rather than assistant apps: plain links.
+  const b = el("a", "tile");
+  b.href = "broadcast/";
+  b.style.setProperty("--dot", "var(--c-money)");
+  b.style.textDecoration = "none";
+  b.append(el("span", "dot"), el("b", "", "Ата-аналар"), el("small", "", "WhatsApp хабарлары"), el("span", "count", "→"));
+  $("grid").append(b);
 }
 async function openApp(id) {
   const a = APPS[id];

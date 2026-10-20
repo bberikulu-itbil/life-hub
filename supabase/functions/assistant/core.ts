@@ -193,13 +193,13 @@ export async function runLoop(
 const OPENROUTER = "https://openrouter.ai/api/v1";
 
 // Tries the chain three models per request (OpenRouter falls back inside each request), next three on failure.
-export async function callOpenRouter(key: string, chain: string[], messages: any[], fetcher: typeof fetch = fetch) {
+export async function callOpenRouter(key: string, chain: string[], messages: any[], fetcher: typeof fetch = fetch, tools: unknown[] = TOOLS) {
   let last = "no models configured";
   for (let i = 0; i < chain.length; i += 3) {
     const res = await fetcher(`${OPENROUTER}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "X-Title": "Life Hub" },
-      body: JSON.stringify({ models: chain.slice(i, i + 3), messages, tools: TOOLS, provider: { require_parameters: true } }),
+      body: JSON.stringify({ models: chain.slice(i, i + 3), messages, ...(tools.length ? { tools, provider: { require_parameters: true } } : {}) }),
     });
     const body: any = await res.json().catch(() => ({}));
     const message = body.choices?.[0]?.message;
@@ -234,4 +234,24 @@ export function cleanHistory(messages: unknown) {
     .filter((m: any) => (m?.role === "user" || m?.role === "assistant") && typeof m.content === "string" && m.content.trim())
     .slice(-20)
     .map((m: any) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+}
+
+// Parents broadcast: turns general class information into one WhatsApp message with name placeholders.
+// Only the class information reaches the model; names and phones are filled in on the teacher's device.
+export function templateMessages(info: string, signature: string) {
+  return [
+    { role: "system", content: [
+      "You write WhatsApp messages from a school class teacher to the parents of the class.",
+      "Write in the language of the information (Kazakh by default), polite and warm, short and clear.",
+      "Start with: Құрметті {ата_ана}! (or the same greeting in the information's language).",
+      "Mention the child as {оқушы} once where it fits naturally, for example 'Сіздің балаңыз {оқушы}…'.",
+      "Use only these two placeholders, exactly as written. Do not add any other placeholders or blanks.",
+      "Keep every fact exactly: dates, times, places, amounts, requirements. Never invent facts.",
+      "Plain text with short paragraphs; WhatsApp *bold* is allowed for the key date or deadline. No emojis spam: at most one.",
+      "At most 900 characters.",
+      signature ? `End with this signature on its own line: ${signature}` : "End with: Сынып жетекшісі",
+      "Return only the message text.",
+    ].join("\n") },
+    { role: "user", content: info.slice(0, 6000) },
+  ];
 }

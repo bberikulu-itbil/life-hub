@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ата-аналарға хабар</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geologica:wght@500;600&family=Golos+Text:wght@400;500;600;700&display=swap">
+<!-- Shared design system of the ecosystem (same origin: bberikulu-itbil.github.io) -->
+<link rel="stylesheet" href="/til/tokens.css">
+<link rel="stylesheet" href="/til/ui.css">
+<style>
+/* Shell: header, a three-step flow (information → template → sending), parents list as a second tab. */
+html, body { height: 100%; }
+.app { height: 100%; max-width: var(--max-width); margin: 0 auto; display: flex; flex-direction: column; }
+.gutter { padding-left: max(var(--gutter), env(safe-area-inset-left, 0px)); padding-right: max(var(--gutter), env(safe-area-inset-right, 0px)); }
+.top { flex: none; min-height: var(--header); display: flex; align-items: center; gap: var(--space-3); padding-top: env(safe-area-inset-top, 0px); }
+.brand { font: 600 var(--fs-lg)/var(--lh-lg) var(--font-display); display: flex; align-items: center; gap: var(--space-2); }
+.brand::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--success); }
+.top .spacer { flex: 1; }
+.hub { color: var(--accent); text-decoration: none; font-weight: 500; font-size: var(--fs-sm); padding: var(--space-2); }
+.view { flex: 1; min-height: 0; overflow-y: auto; padding-block: var(--space-2) var(--space-6); display: grid; gap: var(--space-5); align-content: start; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+.steps span { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); border-top: 3px solid var(--border); padding-top: var(--space-2); }
+.steps span.on { color: var(--text); border-color: var(--accent); }
+.preview { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); border-radius: var(--radius-md); padding: var(--space-4); }
+.warn { color: var(--warning); font-size: var(--fs-sm); margin: 0; }
+.send-row { grid-template-columns: minmax(0, 1fr) auto; cursor: default; }
+.send-row.sent { opacity: .65; }
+.send-row .btn { text-decoration: none; }
+.parent-row { grid-template-columns: minmax(0, 1fr) auto; cursor: default; }
+.mono { font-variant-numeric: tabular-nums; }
+.file-label { cursor: pointer; }
+.file-label input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top gutter">
+    <span class="brand">Ата-аналарға хабар</span>
+    <span class="spacer"></span>
+    <a class="hub" href="../">Hub</a>
+  </header>
+
+  <main id="login" class="view gutter" hidden>
+    <h1 class="t-xl">Ата-аналарға хабар</h1>
+    <p class="muted">Life Hub аккаунтыңмен кір.</p>
+    <form id="login-form" class="stack" style="max-width:380px">
+      <div class="field"><label for="email">Email</label><input id="email" class="input" type="email" autocomplete="email" required></div>
+      <div class="field"><label for="password">Құпиясөз</label><input id="password" class="input" type="password" autocomplete="current-password" required></div>
+      <button id="login-btn" class="btn" type="submit">Кіру</button>
+      <p id="login-msg" class="t-sm muted" role="status"></p>
+    </form>
+  </main>
+
+  <!-- Messages: list + the three steps -->
+  <main id="messages" class="view gutter" hidden>
+    <div id="list-view" class="stack">
+      <button id="new-msg" class="btn lg block" type="button">Жаңа хабар</button>
+      <div id="no-parents" class="card empty" hidden>
+        <h2 class="t-lg">Алдымен ата-аналар тізімі керек</h2>
+        <p>Оқушы, ата-ана және телефон. Excel-ден немесе жазбадан көшіріп қоюға болады.</p>
+        <button id="to-parents" class="btn secondary" type="button">Тізімді қосу</button>
+      </div>
+      <h2 class="eyebrow">Бұрынғы хабарлар</h2>
+      <div id="history" class="list"></div>
+    </div>
+
+    <div id="flow" class="stack" hidden>
+      <div class="row" style="justify-content:space-between"><button id="flow-back" class="btn ghost sm" type="button">← Тізімге</button><span id="flow-saved" class="t-xs muted" role="status"></span></div>
+      <div class="steps" aria-hidden="true"><span id="st1">1. Ақпарат</span><span id="st2">2. Шаблон</span><span id="st3">3. Жіберу</span></div>
+
+      <!-- Step 1 -->
+      <section id="step1" class="stack" aria-labelledby="s1h">
+        <h1 id="s1h" class="t-lg">Сынып ақпараты</h1>
+        <p class="t-sm muted">Жалпы ақпаратты жаз немесе құжатты (.docx, .txt) жүкте. Оқушылардың аты мен телефондары ЖИ-ге жіберілмейді: олар шаблонға осы құрылғыда қойылады.</p>
+        <div class="field"><label for="info">Ақпарат</label><textarea id="info" class="input" placeholder="Мысалы: 24 қазанда 18:00-де 204 кабинетте ата-аналар жиналысы. Күн тәртібі: бірінші тоқсан қорытындысы, экскурсия."></textarea></div>
+        <div class="row">
+          <label class="btn secondary sm file-label">Құжатты жүктеу<input id="file" type="file" accept=".docx,.txt,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
+          <span id="file-msg" class="t-sm muted" role="status"></span>
+        </div>
+        <div class="field"><label for="signature">Қолтаңба</label><input id="signature" class="input" placeholder="7B сынып жетекшісі, аты-жөнің"></div>
+        <button id="make" class="btn" type="button">Шаблон жасау</button>
+        <p id="make-msg" class="t-sm muted" role="status"></p>
+      </section>
+
+      <!-- Step 2 -->
+      <section id="step2" class="stack" aria-labelledby="s2h" hidden>
+        <h1 id="s2h" class="t-lg">Шаблонды тексер</h1>
+        <p class="t-sm muted"><b>{ата_ана}</b> мен <b>{оқушы}</b> әр отбасына өз атымен ауысады. Мәтінді түзете аласың.</p>
+        <div class="field"><label for="template">Шаблон</label><textarea id="template" class="input" style="min-height:240px"></textarea></div>
+        <div class="row">
+          <button class="btn secondary sm" type="button" data-insert="{ата_ана}">+ {ата_ана}</button>
+          <button class="btn secondary sm" type="button" data-insert="{оқушы}">+ {оқушы}</button>
+          <span id="chars" class="t-xs muted mono"></span>
+        </div>
+        <p id="tpl-warn" class="warn" hidden></p>
+        <h2 class="eyebrow" id="preview-h">Алдын ала көру</h2>
+        <div id="preview" class="preview" aria-labelledby="preview-h"></div>
+        <div class="row">
+          <button id="approve" class="btn" type="button">Мақұлдау</button>
+          <button id="remake" class="btn secondary" type="button">Қайта жасау</button>
+        </div>
+      </section>
+
+      <!-- Step 3 -->
+      <section id="step3" class="stack" aria-labelledby="s3h" hidden>
+        <h1 id="s3h" class="t-lg">Жіберу</h1>
+        <div class="bar" aria-hidden="true"><i id="send-bar" style="width:0"></i></div>
+        <p id="send-count" class="t-sm muted mono" role="status"></p>
+        <a id="send-next" class="btn lg block" target="_blank" rel="noopener">Келесіге жіберу</a>
+        <p class="t-xs muted">Әр басқан сайын WhatsApp ашылады, мәтін дайын тұрады. WhatsApp-та «Жіберу» бас та, осында қайт.</p>
+        <div id="send-list" class="list"></div>
+        <button id="edit-tpl" class="btn ghost" type="button">Шаблонды өзгерту</button>
+      </section>
+    </div>
+  </main>
+
+  <!-- Parents -->
+  <main id="parents" class="view gutter" hidden>
+    <h1 class="t-xl">Ата-аналар</h1>
+    <form id="paste-form" class="card stack">
+      <div class="field">
+        <label for="paste">Тізімді қою: әр жолға бір отбасы</label>
+        <textarea id="paste" class="input" placeholder="Оқушының аты-жөні; Ата-ананың аты; +7 701 123 45 67"></textarea>
+      </div>
+      <button class="btn" type="submit" style="justify-self:start">Қосу</button>
+      <p id="paste-msg" class="t-sm muted" role="status"></p>
+    </form>
+    <div id="parent-list" class="list"></div>
+  </main>
+
+  <nav id="tabbar" class="tabbar" aria-label="Негізгі мәзір" hidden>
+    <button type="button" data-view="messages">Хабарлар</button>
+    <button type="button" data-view="parents">Ата-аналар</button>
+  </nav>
+</div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script type="module">
+import { parseList, fill, unknownPlaceholders, waLink } from "./lib.js";
+
+const sb = supabase.createClient("https://lcmnkcpkbkrktediyvpo.supabase.co", "sb_publishable_Z0BZxemzhkUPo_lfgxMAbA_9TkVXL2q");
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage off */ } } };
+
+let parents = [], broadcasts = [], current = null, view = "messages";
+
+let toastTimer;
+function toast(text, error) {
+  const t = $("toast"); t.textContent = text; t.className = "toast" + (error ? " error" : ""); t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 3000);
+}
+async function fnError(error) { try { return (await error.context.json()).error || error.message; } catch { return error.message; } }
+
+/* ---------- data (items table, owner-only by row level security) ---------- */
+async function load() {
+  const [p, b] = await Promise.all([
+    sb.from("items").select("id, data").eq("app", "parent").order("created_at"),
+    sb.from("items").select("id, data, created_at").eq("app", "broadcast").order("created_at", { ascending: false }).limit(50),
+  ]);
+  if (p.error || b.error) return toast("Жүктелмеді: " + (p.error || b.error).message, true);
+  parents = p.data.sort((x, y) => x.data.student.localeCompare(y.data.student, "kk"));
+  broadcasts = b.data;
+}
+async function saveCurrent() {
+  const { error } = await sb.from("items").update({ data: current.data }).eq("id", current.id);
+  $("flow-saved").textContent = error ? "Сақталмады" : "Сақталды";
+  if (error) toast("Сақталмады: " + error.message, true);
+  return !error;
+}
+
+/* ---------- views ---------- */
+function show(next) {
+  view = next;
+  for (const v of ["login", "messages", "parents"]) $(v).hidden = v !== next;
+  $("tabbar").hidden = next === "login";
+  for (const b of $("tabbar").children) b.setAttribute("aria-current", b.dataset.view === next ? "page" : "false");
+  if (next === "messages" && !current) renderList();
+  if (next === "parents") renderParents();
+}
+for (const b of $("tabbar").children) b.onclick = () => show(b.dataset.view);
+$("to-parents").onclick = () => show("parents");
+
+function renderList() {
+  $("flow").hidden = true; $("list-view").hidden = false;
+  $("no-parents").hidden = parents.length > 0;
+  if (!broadcasts.length) return $("history").replaceChildren(el("p", "empty", "Әзірге хабар жоқ."));
+  $("history").replaceChildren(...broadcasts.map((b) => {
+    const sent = Object.keys(b.data.sent || {}).length;
+    const row = el("button", "list-row"); row.type = "button"; row.style.gridTemplateColumns = "minmax(0,1fr) auto";
+    const t = el("span", "", b.data.title || "Хабар");
+    t.append(el("small", "", `${new Date(b.created_at).toLocaleDateString("kk-KZ")} · ${b.data.status === "approved" ? `жіберілді ${sent} / ${parents.length}` : "жоба"}`));
+    row.append(t, el("span", "chev", "›"));
+    row.onclick = () => openFlow(b);
+    return row;
+  }));
+}
+
+/* ---------- flow ---------- */
+function step(n) {
+  for (const i of [1, 2, 3]) { $("step" + i).hidden = i !== n; $("st" + i).classList.toggle("on", i <= n); }
+  if (n === 2) renderTemplate();
+  if (n === 3) renderSend();
+}
+function openFlow(b) {
+  current = b;
+  $("list-view").hidden = true; $("flow").hidden = false; $("flow-saved").textContent = "";
+  $("info").value = b.data.info || "";
+  $("template").value = b.data.template || "";
+  step(b.data.status === "approved" ? 3 : b.data.template ? 2 : 1);
+}
+$("new-msg").onclick = async () => {
+  if (!parents.length) return show("parents");
+  const { data, error } = await sb.from("items").insert({ app: "broadcast", data: { status: "draft", sent: {} } }).select("id, data, created_at").single();
+  if (error) return toast("Хабар ашылмады: " + error.message, true);
+  broadcasts.unshift(data);
+  openFlow(data);
+};
+$("flow-back").onclick = () => { current = null; renderList(); };
+
+// Step 1: information and document
+$("signature").value = store.get("broadcast.signature", "");
+$("signature").onchange = () => store.set("broadcast.signature", $("signature").value.trim());
+$("file").onchange = async () => {
+  const f = $("file").files[0];
+  if (!f) return;
+  $("file-msg").textContent = "Оқылып жатыр…";
+  try {
+    let text;
+    if (f.name.toLowerCase().endsWith(".docx")) {
+      if (!window.mammoth) await new Promise((ok, fail) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/mammoth@1.11.0/mammoth.browser.min.js"; s.onload = ok; s.onerror = () => fail(new Error("кітапхана жүктелмеді")); document.head.append(s); });
+      text = (await mammoth.extractRawText({ arrayBuffer: await f.arrayBuffer() })).value;
+    } else if (f.name.toLowerCase().endsWith(".txt") || f.type.startsWith("text/")) {
+      text = await f.text();
+    } else throw new Error("тек .docx немесе .txt");
+    $("info").value = [$("info").value.trim(), text.trim()].filter(Boolean).join("\n\n");
+    $("file-msg").textContent = `«${f.name}» қосылды.`;
+  } catch (e) { $("file-msg").textContent = "Құжат оқылмады: " + e.message; }
+  $("file").value = "";
+};
+async function makeTemplate() {
+  const info = $("info").value.trim();
+  if (info.length < 10) return toast("Ақпаратты толығырақ жаз.", true);
+  $("make").setAttribute("aria-busy", "true"); $("make").disabled = true; $("remake").disabled = true;
+  $("make-msg").textContent = "ЖИ шаблон жазып жатыр…";
+  const { data, error } = await sb.functions.invoke("assistant", { body: { action: "template", info, signature: $("signature").value.trim(), models: store.get("hub.models", []) } });
+  $("make").removeAttribute("aria-busy"); $("make").disabled = false; $("remake").disabled = false;
+  if (error) { $("make-msg").textContent = ""; return toast(await fnError(error), true); }
+  $("make-msg").textContent = "";
+  current.data = { ...current.data, info, template: data.template, model: data.model, title: info.split("\n")[0].slice(0, 70), status: "draft" };
+  $("template").value = data.template;
+  await saveCurrent();
+  step(2);
+}
+$("make").onclick = makeTemplate;
+$("remake").onclick = () => step(1);
+
+// Step 2: review the template
+function renderTemplate() {
+  const t = $("template").value, first = parents[0]?.data || { parent: "Гүлнар", student: "Аружан" };
+  $("preview").textContent = fill(t, first);
+  $("chars").textContent = `${t.length} таңба`;
+  const unknown = unknownPlaceholders(t), warns = [];
+  if (unknown.length) warns.push(`Бұл белгілер ауыспайды: ${unknown.join(", ")}. Оларды өшір немесе мәтінге айналдыр.`);
+  if (!t.includes("{оқушы}") && !t.includes("{ата_ана}")) warns.push("Шаблонда есім жоқ: барлығына бірдей мәтін кетеді.");
+  if (t.length > 1500) warns.push("Хабар ұзын: WhatsApp сілтемесі кейбір телефондарда толық ашылмауы мүмкін.");
+  $("tpl-warn").textContent = warns.join(" "); $("tpl-warn").hidden = !warns.length;
+  $("approve").disabled = !t.trim() || unknown.length > 0;
+}
+$("template").oninput = renderTemplate;
+for (const b of document.querySelectorAll("[data-insert]")) b.onclick = () => {
+  const ta = $("template"), s = ta.selectionStart ?? ta.value.length;
+  ta.setRangeText(b.dataset.insert, s, ta.selectionEnd ?? s, "end"); ta.focus(); renderTemplate();
+};
+$("approve").onclick = async () => {
+  current.data = { ...current.data, template: $("template").value, status: "approved", approved_at: new Date().toISOString() };
+  if (await saveCurrent()) step(3);
+};
+$("edit-tpl").onclick = () => {
+  current.data = { ...current.data, status: "draft" };
+  saveCurrent(); step(2);
+};
+
+// Step 3: one tap per family
+function renderSend() {
+  const sent = current.data.sent || {}, done = parents.filter((p) => sent[p.id]).length;
+  $("send-bar").style.width = parents.length ? `${(done / parents.length) * 100}%` : "0";
+  $("send-count").textContent = `Жіберілді: ${done} / ${parents.length}`;
+  const next = parents.find((p) => !sent[p.id]);
+  $("send-next").hidden = !next;
+  if (next) { $("send-next").href = waLink(next.data.phone, fill(current.data.template, next.data)); $("send-next").textContent = `Келесіге жіберу: ${next.data.student}`; $("send-next").dataset.id = next.id; }
+  $("send-list").replaceChildren(...parents.map((p) => {
+    const row = el("div", "list-row send-row" + (sent[p.id] ? " sent" : ""));
+    const t = el("span", "", p.data.student); t.append(el("small", "", `${p.data.parent || "Ата-ана"} · +${p.data.phone}${sent[p.id] ? " · жіберілді" : ""}`));
+    const a = el("a", "btn sm " + (sent[p.id] ? "ghost" : "secondary"), sent[p.id] ? "Қайта" : "Жіберу");
+    a.href = waLink(p.data.phone, fill(current.data.template, p.data)); a.target = "_blank"; a.rel = "noopener";
+    a.setAttribute("aria-label", `${p.data.student}: WhatsApp-та ашу`);
+    a.onclick = () => setTimeout(() => markSent(p.id)); // after the browser has followed this link
+    row.append(t, a);
+    return row;
+  }));
+}
+// Marked when the teacher opens WhatsApp; the page cannot see whether "Send" was pressed there.
+async function markSent(id) {
+  current.data = { ...current.data, sent: { ...(current.data.sent || {}), [id]: new Date().toISOString() } };
+  renderSend();
+  await saveCurrent();
+}
+$("send-next").onclick = () => { const id = $("send-next").dataset.id; setTimeout(() => markSent(id)); }; // re-render only after the link opened
+
+/* ---------- parents ---------- */
+function renderParents() {
+  if (!parents.length) return $("parent-list").replaceChildren(el("p", "empty", "Тізім бос."));
+  $("parent-list").replaceChildren(...parents.map((p) => {
+    const row = el("div", "list-row parent-row");
+    const t = el("span", "", p.data.student); t.append(el("small", "", `${p.data.parent || "—"} · +${p.data.phone}`));
+    const del = el("button", "btn ghost sm", "Жою"); del.type = "button";
+    del.onclick = async () => {
+      if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.textContent = "Иә, жою"; setTimeout(() => { del.dataset.armed = ""; del.textContent = "Жою"; }, 3000); return; }
+      const { error } = await sb.from("items").delete().eq("id", p.id);
+      if (error) return toast("Жойылмады: " + error.message, true);
+      parents = parents.filter((x) => x !== p); renderParents();
+    };
+    row.append(t, del);
+    return row;
+  }));
+}
+$("paste-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const { ok, bad } = parseList($("paste").value);
+  const known = new Set(parents.map((p) => p.data.phone + p.data.student));
+  const fresh = ok.filter((p) => !known.has(p.phone + p.student));
+  if (fresh.length) {
+    const { error } = await sb.from("items").insert(fresh.map((d) => ({ app: "parent", data: d })));
+    if (error) return toast("Қосылмады: " + error.message, true);
+  }
+  $("paste-msg").textContent = [`Қосылды: ${fresh.length}.`, ok.length > fresh.length ? `Тізімде бұрыннан бар: ${ok.length - fresh.length}.` : "", bad.length ? `Телефон табылмаған жолдар: ${bad.map((b) => b.line).join(", ")}.` : ""].filter(Boolean).join(" ");
+  if (!bad.length) $("paste").value = "";
+  await load(); renderParents();
+};
+
+/* ---------- auth ---------- */
+$("login-form").onsubmit = async (e) => {
+  e.preventDefault();
+  $("login-btn").disabled = true;
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+  $("login-btn").disabled = false;
+  $("login-msg").textContent = error ? (error.message === "Invalid login credentials" ? "Email немесе құпиясөз қате." : error.message) : "";
+};
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") return;
+  if (!session) return show("login");
+  setTimeout(async () => { await load(); show(view === "login" ? "messages" : view); });
+});
+</script>
+</body>
+</html>

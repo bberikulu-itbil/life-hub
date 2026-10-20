@@ -1,7 +1,7 @@
 // Run: node --test test/core.test.ts   (Node 22.18+ strips the TypeScript types itself)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { APPS, buildChain, callOpenRouter, cleanHistory, cleanRecord, runLoop, runTool, totals } from "../supabase/functions/assistant/core.ts";
+import { APPS, buildChain, callOpenRouter, cleanHistory, cleanRecord, runLoop, runTool, totals, templateMessages } from "../supabase/functions/assistant/core.ts";
 
 test("cleanRecord coerces numbers, checks enums and required fields", () => {
   assert.deepEqual(cleanRecord(APPS.money, { amount: "1 500,5", kind: "expense", category: "тамақ", junk: 1 }),
@@ -76,4 +76,13 @@ test("update_item keeps fields the tool schema does not know", async () => {
   }) };
   assert.deepEqual(await runTool(db, "update_item", { id: "r1", changes: { translation: "в" } }), { updated: true });
   assert.deepEqual(patch.data, { word: "a", translation: "в", srs: { box: 3 } });
+});
+
+test("template calls send no tools and keep the placeholders in the instructions", async () => {
+  let body: any = null;
+  const fake = (async (_u: string, init: any) => { body = JSON.parse(init.body); return new Response(JSON.stringify({ model: "m", choices: [{ message: { content: "ok" } }] })); }) as typeof fetch;
+  await callOpenRouter("k", ["a"], templateMessages("Ертең 18:00-де жиналыс, 204 кабинет.", "Бағдәулет"), fake, []);
+  assert.equal(body.tools, undefined);
+  assert.match(body.messages[0].content, /\{ата_ана\}/);
+  assert.match(body.messages[0].content, /Бағдәулет/);
 });

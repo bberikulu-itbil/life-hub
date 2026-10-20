@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.117.2";
-import { buildChain, callOpenRouter, cleanHistory, freeToolModels, runLoop, runTool, systemPrompt } from "./core.ts";
+import { buildChain, callOpenRouter, cleanHistory, freeToolModels, runLoop, runTool, systemPrompt, templateMessages } from "./core.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -34,6 +34,20 @@ Deno.serve(async (req) => {
     return json({ ok: res.ok, free: d.free_model_daily_requests ?? null, usage_daily: d.usage_daily ?? null, limit_remaining: d.limit_remaining ?? null });
   }
   if (body.action === "models") return json({ models: await freeToolModels() });
+
+  if (body.action === "template") {
+    const info = String(body.info ?? "").trim();
+    if (info.length < 10) return json({ error: "Сынып ақпараты тым қысқа." }, 400);
+    // Template writing needs no tools; it uses the same model chain as the chat.
+    const chain = buildChain(body.models, await freeToolModels().catch(() => []));
+    try {
+      const { message, model } = await callOpenRouter(key, chain, templateMessages(info, String(body.signature ?? "").slice(0, 120)), fetch, []);
+      const text = String(message.content ?? "").trim();
+      return text ? json({ template: text, model }) : json({ error: "Модель бос жауап берді, қайта көр." }, 502);
+    } catch (e) {
+      return json({ error: `Модельдер жауап бермеді: ${(e as Error).message}` }, 502);
+    }
+  }
 
   const history = cleanHistory(body.messages);
   if (history.at(-1)?.role !== "user") return json({ error: "Хабарлама бос." }, 400);
