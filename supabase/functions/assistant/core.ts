@@ -151,7 +151,7 @@ export async function runTool(db: any, name: string, args: any): Promise<any> {
     if (args.changes && typeof args.changes === "object" && APPS[row.app]) {
       const data = cleanRecord(APPS[row.app], { ...row.data, ...args.changes });
       if (typeof data === "string") return { error: data };
-      patch.data = data;
+      patch.data = { ...row.data, ...data }; // keep fields other apps add, e.g. the Til app's review state (srs)
     }
     if (!Object.keys(patch).length) return { error: "nothing to change" };
     const { error: e2 } = await db.from("items").update(patch).eq("id", args.id);
@@ -175,13 +175,17 @@ export async function runLoop(
     const calls = res.message.tool_calls ?? [];
     messages.push({ role: "assistant", content: res.message.content ?? "", ...(calls.length ? { tool_calls: calls } : {}) });
     if (!calls.length) return { reply: String(res.message.content ?? "").trim(), actions, model };
+    let allSaved = true;
     for (const c of calls) {
       let args: any = null;
       try { args = JSON.parse(c.function?.arguments || "{}"); } catch { /* reported to the model below */ }
       const result = args && typeof args === "object" ? await exec(c.function.name, args) : { error: "arguments are not valid JSON" };
       actions.push({ tool: c.function.name, args, ok: !result.error, ...(result.error ? { error: String(result.error) } : {}) });
       messages.push({ role: "tool", tool_call_id: c.id, content: JSON.stringify(result) });
+      if (!result.saved) allSaved = false;
     }
+    // Plain saves need no confirming model call (the client shows what was saved): one request per message instead of two.
+    if (allSaved) return { reply: String(res.message.content ?? "").trim(), actions, model };
   }
   return { reply: "", actions, model };
 }

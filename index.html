@@ -102,6 +102,15 @@ input:focus, textarea:focus { border-color: var(--accent); outline: none; }
 .composer textarea { resize: none; max-height: 160px; border-radius: 20px; padding: 11px 16px; line-height: 1.4; }
 .send { flex: none; width: 46px; height: 46px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; }
 .send:disabled { opacity: .45; cursor: default; }
+.lang-btn, .mic { flex: none; height: 46px; border-radius: 23px; border: 1px solid var(--line); background: var(--surface); }
+.lang-btn { min-width: 52px; padding: 0 10px; font-size: 13px; font-weight: 600; letter-spacing: .04em; }
+.mic { width: 46px; display: grid; place-items: center; }
+.mic.on { background: var(--danger); border-color: var(--danger); color: var(--surface); animation: pulse 1.4s infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--danger) 25%, transparent); } }
+.voice-msg { flex: none; margin: 0; font-size: 13px; color: var(--muted); }
+.check { display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--ink); }
+.check input { width: 20px; height: 20px; accent-color: var(--accent); }
+.open-app { margin-left: auto; color: var(--accent); font-weight: 500; text-decoration: none; }
 
 /* Apps */
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -144,7 +153,7 @@ input:focus, textarea:focus { border-color: var(--accent); outline: none; }
 .tabs button { background: none; border: 0; padding: 12px 4px 13px; font-size: 14px; font-weight: 500; color: var(--muted); }
 .tabs button[aria-current="page"] { color: var(--ink); box-shadow: inset 0 2px 0 var(--accent); }
 
-@media (prefers-reduced-motion: reduce) { .typing i { animation: none; opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { .typing i, .mic.on { animation: none; } }
 </style>
 </head>
 <body>
@@ -193,8 +202,13 @@ input:focus, textarea:focus { border-color: var(--accent); outline: none; }
       <div class="suggest" id="suggest"></div>
     </div>
     <div id="log" class="log" aria-live="polite"></div>
+    <p id="voice-msg" class="voice-msg" role="status" hidden></p>
     <form id="composer" class="composer">
+      <button id="lang" class="lang-btn" type="button" aria-label="Сөйлеу тілін ауыстыру">ҚАЗ</button>
       <textarea id="input" rows="1" placeholder="Hub-қа жаз…" aria-label="Хабарлама"></textarea>
+      <button id="mic" class="mic" type="button" aria-label="Дауыспен айту" hidden>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      </button>
       <button id="send" class="send" type="submit" aria-label="Жіберу">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
       </button>
@@ -207,6 +221,7 @@ input:focus, textarea:focus { border-color: var(--accent); outline: none; }
       <div class="detail-head">
         <button id="back" class="btn ghost" type="button">← Артқа</button>
         <h2 id="detail-title"></h2>
+        <a id="open-app" class="open-app" hidden>Қосымшаны ашу →</a>
       </div>
       <p id="summary" class="summary" hidden></p>
       <ul id="rows" class="rows"></ul>
@@ -225,6 +240,11 @@ input:focus, textarea:focus { border-color: var(--accent); outline: none; }
       </div>
       <p id="models-msg" class="msg-line" role="status"></p>
       <div id="free-list" class="chips"></div>
+    </section>
+    <section>
+      <h2>Дауыс</h2>
+      <label class="check"><input id="speak" type="checkbox"> Жауаптарды дауыстап оқу</label>
+      <p id="voice-info" class="hint"></p>
     </section>
     <section>
       <h2>Бүгінгі лимит</h2>
@@ -258,7 +278,7 @@ const join = (...xs) => xs.filter(Boolean).join(" · ");
 
 // Display side of the app registry; the assistant's side lives in the server function (core.ts).
 const APPS = {
-  lang:   { name: "Тіл", sub: "Сөздік", tool: "add_word", hint: "ubiquitous сөзін сөздікке қос", title: (d) => d.word, detail: (d) => join(d.translation, d.example) },
+  lang:   { name: "Тіл", sub: "Сөздік", tool: "add_word", url: "../til/", hint: "ubiquitous сөзін сөздікке қос", title: (d) => d.word, detail: (d) => join(d.translation, d.example) },
   books:  { name: "Кітап", sub: "Оқу тізімі", tool: "add_book", hint: "«Абай жолы» кітабын оқып жатырмын", title: (d) => d.title, detail: (d) => join(d.author, STATUS[d.status]) },
   money:  { name: "Қаржы", sub: "Шығын мен кіріс", tool: "add_transaction", hint: "Түскі асқа 2500 теңге жұмсадым", title: (d) => `${d.kind === "income" ? "+" : "−"}${money(d.amount)} ${cur(d.currency)}`, detail: (d) => join(d.category, d.note) },
   plan:   { name: "Жоспар", sub: "Тапсырмалар", tool: "add_task", hint: "Жұмада 7B сыныбымен сынып сағаты", title: (d) => d.title, detail: (d) => join(d.due, d.note), check: true },
@@ -372,17 +392,88 @@ async function send(text) {
   const { data, error } = await sb.functions.invoke("assistant", { body: { messages: history, models: store.get("hub.models", []), now: localNow() } });
   busy = false;
   if (error) chat.push({ role: "assistant", error: true, content: await errorText(error) });
-  else chat.push({ role: "assistant", content: data.reply || (data.actions?.length ? "Дайын." : "…"), actions: data.actions, model: data.model });
+  else chat.push({ role: "assistant", content: data.reply || (data.actions?.length ? "Сақталды." : "…"), actions: data.actions, model: data.model });
+  if (!error) speak(chat.at(-1).content);
   chat = chat.slice(-40);
   store.set("hub.chat", chat);
   renderChat();
 }
-$("composer").onsubmit = (e) => { e.preventDefault(); const t = $("input").value; $("input").value = ""; grow(); send(t); };
+$("composer").onsubmit = (e) => { e.preventDefault(); unlockSpeech(); const t = $("input").value; $("input").value = ""; grow(); send(t); };
 $("input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("composer").requestSubmit(); } });
 const grow = () => { const t = $("input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160) + "px"; };
 $("input").addEventListener("input", grow);
 $("apps-line").append(...Object.entries(APPS).map(([id, a]) => { const s = el("span", "", a.name); s.style.setProperty("--dot", `var(--c-${id})`); return s; }));
 $("suggest").append(...SUGGEST.map((s) => { const b = el("button", "", s); b.type = "button"; b.onclick = () => send(s); return b; }));
+
+/* ---------- voice ---------- */
+// Browser speech: recognition goes to the browser maker's service (Google in Chrome, Apple in Safari); no server code needed.
+const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+const LANGS = { "kk-KZ": "ҚАЗ", "en-US": "ENG" };
+let voiceLang = store.get("hub.lang", "kk-KZ");
+let speakOn = store.get("hub.speak", false);
+let rec = null;
+const say = (t) => { $("voice-msg").textContent = t; $("voice-msg").hidden = !t; };
+const showLang = () => { $("lang").textContent = LANGS[voiceLang]; $("input").lang = voiceLang.slice(0, 2); };
+$("lang").onclick = () => { voiceLang = voiceLang === "kk-KZ" ? "en-US" : "kk-KZ"; store.set("hub.lang", voiceLang); showLang(); };
+showLang();
+
+$("mic").hidden = !Rec;
+$("mic").onclick = () => {
+  unlockSpeech();
+  if (rec) return rec.stop();
+  rec = new Rec();
+  rec.lang = voiceLang;
+  rec.interimResults = true;
+  const base = $("input").value.trim();
+  let heard = false;
+  rec.onresult = (e) => {
+    $("input").value = [base, [...e.results].map((r) => r[0].transcript).join("")].filter(Boolean).join(" ");
+    heard = e.results[e.results.length - 1].isFinal;
+    grow();
+  };
+  rec.onerror = (e) => say({
+    "not-allowed": "Микрофонға рұқсат берілмеді. Браузер баптауынан рұқсат бер.",
+    "language-not-supported": "Бұл браузер бұл тілді танымайды. Chrome-да көр немесе тілді ауыстыр.",
+    "no-speech": "Дауыс естілмеді, қайта көр.",
+  }[e.error] || "Дауыс танылмады: " + e.error);
+  rec.onend = () => {
+    rec = null;
+    $("mic").classList.remove("on");
+    if (heard) $("composer").requestSubmit();
+  };
+  say("");
+  rec.start();
+  $("mic").classList.add("on");
+};
+
+const voiceFor = (lang) => speechSynthesis.getVoices().find((v) => v.lang.toLowerCase().startsWith(lang));
+function speak(text) {
+  if (!speakOn || !text || !("speechSynthesis" in window)) return;
+  const kk = /[а-яәғқңөұүһі]/i.test(text); // Cyrillic reply: read with a Kazakh voice, or Russian if the device has none
+  const v = kk ? voiceFor("kk") || voiceFor("ru") : voiceFor("en");
+  const u = new SpeechSynthesisUtterance(text.replace(/\*\*/g, ""));
+  u.lang = v?.lang || (kk ? "kk-KZ" : "en-US");
+  if (v) u.voice = v;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
+// iPhone Safari only speaks after speech was started inside a tap, so start a silent one on each tap.
+function unlockSpeech() { if (speakOn && "speechSynthesis" in window) speechSynthesis.speak(new SpeechSynthesisUtterance("")); }
+
+function voiceInfo() {
+  if (!("speechSynthesis" in window)) return ($("voice-info").textContent = "Бұл браузер дауыстап оқи алмайды.");
+  const kk = voiceFor("kk"), ru = voiceFor("ru"), en = voiceFor("en");
+  $("voice-info").textContent = [
+    Rec ? "Микрофон: бар (ҚАЗ/ENG батырмасымен тілді таңда)." : "Микрофон: бұл браузерде жоқ. Телефон пернетақтасындағы микрофонды қолдан.",
+    "Қазақша дауыс: " + (kk ? kk.name : ru ? `табылмады, орысша дауыспен оқиды (${ru.name})` : "табылмады"),
+    "Ағылшынша дауыс: " + (en ? en.name : "табылмады"),
+  ].join("\n");
+}
+$("voice-info").style.whiteSpace = "pre-line";
+$("speak").checked = speakOn;
+$("speak").onchange = () => { speakOn = $("speak").checked; store.set("hub.speak", speakOn); if (!speakOn) window.speechSynthesis?.cancel(); };
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = voiceInfo;
+voiceInfo();
 
 /* ---------- apps ---------- */
 async function loadGrid() {
@@ -404,6 +495,8 @@ async function openApp(id) {
   $("detail").hidden = false;
   $("detail").style.setProperty("--dot", `var(--c-${id})`);
   $("detail-title").textContent = a.name;
+  $("open-app").hidden = !a.url;
+  if (a.url) $("open-app").href = a.url;
   $("summary").hidden = true;
   $("rows").replaceChildren(el("li", "note", "Жүктеліп жатыр…"));
   const { data, error } = await sb.from("items").select("id, data, done, created_at").eq("app", id).order("created_at", { ascending: false }).limit(200);

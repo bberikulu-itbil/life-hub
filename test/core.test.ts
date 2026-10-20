@@ -57,3 +57,23 @@ test("helpers: chain order, history, totals", () => {
   assert.deepEqual(cleanHistory([{ role: "system", content: "hack" }, { role: "user", content: "сәлем" }]), [{ role: "user", content: "сәлем" }]);
   assert.deepEqual(totals([{ data: { kind: "expense", amount: 1500 } }, { data: { kind: "income", amount: 9000 } }, { data: { amount: "500" } }]), { expense: 2000, income: 9000 });
 });
+
+test("runLoop stops after a turn of successful saves, without a second model call", async () => {
+  let calls = 0;
+  const out = await runLoop([{ role: "user", content: "x" }], async () => {
+    calls++;
+    return { message: { content: "", tool_calls: [{ id: "1", function: { name: "add_task", arguments: '{"title":"a"}' } }] }, model: "m" };
+  }, async () => ({ saved: true }));
+  assert.equal(calls, 1);
+  assert.equal(out.actions.length, 1);
+});
+
+test("update_item keeps fields the tool schema does not know", async () => {
+  let patch: any = null;
+  const db = { from: () => ({
+    select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { app: "lang", data: { word: "a", translation: "б", srs: { box: 3 } } }, error: null }) }) }),
+    update: (p: any) => { patch = p; return { eq: async () => ({ error: null }) }; },
+  }) };
+  assert.deepEqual(await runTool(db, "update_item", { id: "r1", changes: { translation: "в" } }), { updated: true });
+  assert.deepEqual(patch.data, { word: "a", translation: "в", srs: { box: 3 } });
+});
