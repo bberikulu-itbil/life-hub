@@ -20,16 +20,21 @@ html, body { height: 100%; }
 .brand::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--success); }
 .top .spacer { flex: 1; }
 .hub { color: var(--accent); text-decoration: none; font-weight: 500; font-size: var(--fs-sm); padding: var(--space-2); }
-.view { flex: 1; min-height: 0; overflow-y: auto; padding-block: var(--space-2) var(--space-6); display: grid; gap: var(--space-5); align-content: start; }
+.view { flex: 1; min-height: 0; overflow-y: auto; padding-block: var(--space-2) var(--space-6); display: grid; grid-auto-rows: max-content; gap: var(--space-5); align-content: start; }
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
 .steps span { font-size: var(--fs-xs); font-weight: 600; color: var(--text-muted); border-top: 3px solid var(--border); padding-top: var(--space-2); }
 .steps span.on { color: var(--text); border-color: var(--accent); }
 .preview { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-2); border-radius: var(--radius-md); padding: var(--space-4); }
 .warn { color: var(--warning); font-size: var(--fs-sm); margin: 0; }
-.send-row { grid-template-columns: minmax(0, 1fr) auto; cursor: default; }
+.send-row { grid-template-columns: auto minmax(0, 1fr) auto; cursor: default; }
+.send-row input { width: 22px; height: 22px; accent-color: var(--accent); }
+.send-row.off span { color: var(--text-muted); text-decoration: line-through; }
+.group-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); padding: var(--space-3) var(--space-4); background: var(--surface-2); font-weight: 600; }
+.contact-row { grid-template-columns: minmax(0, 1fr) auto auto; cursor: default; }
+.contact-row .role { font-size: var(--fs-xs); font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
 .send-row.sent { opacity: .65; }
-.send-row .btn { text-decoration: none; }
-.parent-row { grid-template-columns: minmax(0, 1fr) auto; cursor: default; }
+a.btn { text-decoration: none; }
+#audience { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: var(--radius-lg); } /* 2×2 so all four fit on a phone */
 .mono { font-variant-numeric: tabular-nums; }
 .file-label { cursor: pointer; }
 .file-label input { position: absolute; width: 1px; height: 1px; opacity: 0; }
@@ -107,6 +112,14 @@ html, body { height: 100%; }
       <!-- Step 3 -->
       <section id="step3" class="stack" aria-labelledby="s3h" hidden>
         <h1 id="s3h" class="t-lg">Жіберу</h1>
+        <span id="aud-label" class="t-sm muted">Кімге жібереміз?</span>
+        <div id="audience" class="segmented" role="radiogroup" aria-labelledby="aud-label">
+          <button type="button" role="radio" data-aud="all">Барлығы</button>
+          <button type="button" role="radio" data-aud="ана">Аналары</button>
+          <button type="button" role="radio" data-aud="әке">Әкелері</button>
+          <button type="button" role="radio" data-aud="жауапты">Жауаптылар</button>
+        </div>
+        <p class="t-xs muted">Тізімнен біреуін алып тастау үшін оның белгісін ал.</p>
         <div class="bar" aria-hidden="true"><i id="send-bar" style="width:0"></i></div>
         <p id="send-count" class="t-sm muted mono" role="status"></p>
         <a id="send-next" class="btn lg block" target="_blank" rel="noopener">Келесіге жіберу</a>
@@ -119,8 +132,23 @@ html, body { height: 100%; }
 
   <!-- Parents -->
   <main id="parents" class="view gutter" hidden>
-    <h1 class="t-xl">Ата-аналар</h1>
-    <form id="paste-form" class="card stack">
+    <div class="row" style="justify-content:space-between"><h1 class="t-xl">Ата-аналар</h1><span id="parents-sum" class="t-sm muted"></span></div>
+    <div class="row">
+      <button id="add-contact" class="btn" type="button">+ Байланыс қосу</button>
+      <button id="toggle-paste" class="btn secondary" type="button" aria-expanded="false" aria-controls="paste-form">Excel-ден қою</button>
+    </div>
+    <form id="contact-form" class="card stack" hidden>
+      <h2 id="contact-h" class="t-lg">Жаңа байланыс</h2>
+      <div class="field"><label for="c-student">Оқушы</label><input id="c-student" class="input" list="students-dl" autocomplete="off" required></div>
+      <div class="field"><label for="c-role">Кім</label>
+        <select id="c-role" class="input"><option value="ана">Анасы</option><option value="әке">Әкесі</option><option value="жауапты">Қаладағы жауаптысы</option></select></div>
+      <div class="field"><label for="c-name">Аты-жөні</label><input id="c-name" class="input" autocomplete="off" placeholder="Тегі Аты Әкесінің аты"></div>
+      <div class="field"><label for="c-phone">Телефон</label><input id="c-phone" class="input" type="tel" inputmode="tel" autocomplete="off" placeholder="+7 701 123 45 67" required></div>
+      <p id="c-msg" class="t-sm" style="color:var(--danger);margin:0" role="alert"></p>
+      <div class="row"><button class="btn" type="submit">Сақтау</button><button id="c-cancel" class="btn secondary" type="button">Болдырмау</button></div>
+    </form>
+    <datalist id="students-dl"></datalist>
+    <form id="paste-form" class="card stack" hidden>
       <div class="field">
         <label for="paste">Тізімді қою: Excel кестесін тұтасымен көшір</label>
         <textarea id="paste" class="input" placeholder="Аты жөні | Анасы | Анасының нөмірі | Әкесі | Әкесінің нөмірі&#10;немесе әр жолға: Оқушы; Ата-ана; +7 701 123 45 67"></textarea>
@@ -129,7 +157,8 @@ html, body { height: 100%; }
       <button class="btn" type="submit" style="justify-self:start">Қосу</button>
       <p id="paste-msg" class="t-sm muted" role="status"></p>
     </form>
-    <div id="parent-list" class="list"></div>
+    <input id="p-search" class="input" type="search" placeholder="Іздеу: оқушы, ата-ана, нөмір" aria-label="Тізімнен іздеу">
+    <div id="parent-list" class="stack"></div>
   </main>
 
   <nav id="tabbar" class="tabbar" aria-label="Негізгі мәзір" hidden>
@@ -141,8 +170,12 @@ html, body { height: 100%; }
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script type="module">
-import { parseList, fill, unknownPlaceholders, waLink, recipients, firstName, joinNames } from "./lib.js";
-const ROLE = { "ана": "Анасы", "әке": "Әкесі" };
+import { parseList, fill, unknownPlaceholders, waLink, recipients, firstName, joinNames, normalizePhone } from "./lib.js";
+const ROLE = { "ана": "Анасы", "әке": "Әкесі", "жауапты": "Жауаптысы" };
+// Who a broadcast goes to: an audience (all, mothers, fathers, guardians) minus the families switched off by hand.
+const audienceOf = (b) => b.data.audience || "all";
+const targets = (b) => recipients(parents.filter((p) => audienceOf(b) === "all" || p.data.role === audienceOf(b)));
+const chosen = (b) => targets(b).filter((r) => !(b.data.excluded || {})[r.phone]);
 
 const sb = supabase.createClient("https://lcmnkcpkbkrktediyvpo.supabase.co", "sb_publishable_Z0BZxemzhkUPo_lfgxMAbA_9TkVXL2q");
 const $ = (id) => document.getElementById(id);
@@ -195,7 +228,7 @@ function renderList() {
     const sent = Object.keys(b.data.sent || {}).length;
     const row = el("button", "list-row"); row.type = "button"; row.style.gridTemplateColumns = "minmax(0,1fr) auto";
     const t = el("span", "", b.data.title || "Хабар");
-    t.append(el("small", "", `${new Date(b.created_at).toLocaleDateString("kk-KZ")} · ${b.data.status === "approved" ? `жіберілді ${sent} / ${recipients(parents).length}` : "жоба"}`));
+    t.append(el("small", "", `${new Date(b.created_at).toLocaleDateString("kk-KZ")} · ${b.data.status === "approved" ? `жіберілді ${sent} / ${chosen(b).length}` : "жоба"}`));
     row.append(t, el("span", "chev", "›"));
     row.onclick = () => openFlow(b);
     return row;
@@ -290,24 +323,38 @@ $("edit-tpl").onclick = () => {
 // Step 3: one tap per family
 // One message per phone number; sent marks are kept by phone, so siblings' parents get one message.
 function renderSend() {
-  const sent = current.data.sent || {}, list = recipients(parents), done = list.filter((r) => sent[r.phone]).length;
-  $("send-bar").style.width = list.length ? `${(done / list.length) * 100}%` : "0";
-  $("send-count").textContent = `Жіберілді: ${done} / ${list.length}`;
+  const sent = current.data.sent || {}, excluded = current.data.excluded || {};
+  const aud = audienceOf(current), list = targets(current), picked = chosen(current);
+  for (const b of $("audience").children) {
+    const n = b.dataset.aud === "all" ? recipients(parents).length : recipients(parents.filter((p) => p.data.role === b.dataset.aud)).length;
+    b.setAttribute("aria-checked", String(b.dataset.aud === aud));
+    b.textContent = `${{ all: "Барлығы", "ана": "Аналары", "әке": "Әкелері", "жауапты": "Жауаптылар" }[b.dataset.aud]} (${n})`;
+    b.disabled = !n;
+  }
+  const done = picked.filter((r) => sent[r.phone]).length;
+  $("send-bar").style.width = picked.length ? `${(done / picked.length) * 100}%` : "0";
+  $("send-count").textContent = `Жіберілді: ${done} / ${picked.length}`;
   const label = (r) => joinNames(r.students.map(firstName)) + (r.role ? ` (${ROLE[r.role].toLowerCase()})` : "");
-  const next = list.find((r) => !sent[r.phone]);
+  const next = picked.find((r) => !sent[r.phone]);
   $("send-next").hidden = !next;
   if (next) { $("send-next").href = waLink(next.phone, fill(current.data.template, next)); $("send-next").textContent = `Келесіге жіберу: ${label(next)}`; $("send-next").dataset.phone = next.phone; }
+  if (!list.length) return $("send-list").replaceChildren(el("p", "empty", "Бұл топта нөмірі бар ешкім жоқ. Ата-аналар бөлімінен қос."));
   $("send-list").replaceChildren(...list.map((r) => {
-    const row = el("div", "list-row send-row" + (sent[r.phone] ? " sent" : ""));
+    const off = !!excluded[r.phone];
+    const row = el("div", "list-row send-row" + (sent[r.phone] ? " sent" : "") + (off ? " off" : ""));
+    const box = el("input"); box.type = "checkbox"; box.checked = !off; box.setAttribute("aria-label", `${label(r)}: жіберу тізімінде`);
+    box.onchange = () => { current.data = { ...current.data, excluded: { ...excluded, [r.phone]: !box.checked } }; renderSend(); saveCurrent(); };
     const t = el("span", "", label(r)); t.append(el("small", "", `${r.parent || "Ата-ана"} · +${r.phone}${sent[r.phone] ? " · жіберілді" : ""}`));
     const a = el("a", "btn sm " + (sent[r.phone] ? "ghost" : "secondary"), sent[r.phone] ? "Қайта" : "Жіберу");
     a.href = waLink(r.phone, fill(current.data.template, r)); a.target = "_blank"; a.rel = "noopener";
     a.setAttribute("aria-label", `${label(r)}: WhatsApp-та ашу`);
+    a.hidden = off;
     a.onclick = () => setTimeout(() => markSent(r.phone)); // after the browser has followed this link
-    row.append(t, a);
+    row.append(box, t, a);
     return row;
   }));
 }
+for (const b of $("audience").children) b.onclick = () => { current.data = { ...current.data, audience: b.dataset.aud }; renderSend(); saveCurrent(); };
 // Marked when the teacher opens WhatsApp; the page cannot see whether "Send" was pressed there.
 async function markSent(phone) {
   current.data = { ...current.data, sent: { ...(current.data.sent || {}), [phone]: new Date().toISOString() } };
@@ -317,22 +364,69 @@ async function markSent(phone) {
 $("send-next").onclick = () => { const phone = $("send-next").dataset.phone; setTimeout(() => markSent(phone)); }; // re-render only after the link opened
 
 /* ---------- parents ---------- */
+let editing = null;
 function renderParents() {
-  if (!parents.length) return $("parent-list").replaceChildren(el("p", "empty", "Тізім бос."));
-  $("parent-list").replaceChildren(...parents.map((p) => {
-    const row = el("div", "list-row parent-row");
-    const t = el("span", "", p.data.student); t.append(el("small", "", `${p.data.role ? ROLE[p.data.role] + ": " : ""}${p.data.parent || "—"} · +${p.data.phone}`));
-    const del = el("button", "btn ghost sm", "Жою"); del.type = "button";
-    del.onclick = async () => {
-      if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.textContent = "Иә, жою"; setTimeout(() => { del.dataset.armed = ""; del.textContent = "Жою"; }, 3000); return; }
-      const { error } = await sb.from("items").delete().eq("id", p.id);
-      if (error) return toast("Жойылмады: " + error.message, true);
-      parents = parents.filter((x) => x !== p); renderParents();
-    };
-    row.append(t, del);
-    return row;
+  const students = [...new Set(parents.map((p) => p.data.student))];
+  $("parents-sum").textContent = parents.length ? `${students.length} оқушы · ${parents.length} байланыс` : "";
+  $("students-dl").replaceChildren(...students.map((n) => { const o = el("option"); o.value = n; return o; }));
+  const q = $("p-search").value.trim().toLowerCase();
+  const shown = q ? parents.filter((p) => `${p.data.student} ${p.data.parent} ${p.data.phone}`.toLowerCase().includes(q)) : parents;
+  if (!shown.length) return $("parent-list").replaceChildren(el("p", "empty", parents.length ? "Ештеңе табылмады." : "Тізім бос. «Excel-ден қою» арқылы бүкіл кестені бірден қос."));
+  const groups = new Map();
+  for (const p of shown) groups.set(p.data.student, [...(groups.get(p.data.student) || []), p]);
+  const order = { "ана": 0, "әке": 1, "жауапты": 2 };
+  $("parent-list").replaceChildren(...[...groups].map(([student, list]) => {
+    const box = el("section", "list"); box.setAttribute("aria-label", student);
+    const head = el("div", "group-head"); head.append(el("span", "", student), el("small", "muted", `${list.length} байланыс`));
+    box.append(head, ...list.sort((a, b) => (order[a.data.role] ?? 3) - (order[b.data.role] ?? 3)).map((p) => {
+      const row = el("div", "list-row contact-row");
+      const t = el("span"); t.append(el("span", "role", ROLE[p.data.role] || "Байланыс"), el("span", "", " " + (p.data.parent || "—")), el("small", "", "+" + p.data.phone));
+      const edit = el("button", "btn ghost sm", "Өзгерту"); edit.type = "button"; edit.onclick = () => openContact(p);
+      const del = el("button", "btn ghost sm", "Жою"); del.type = "button";
+      del.onclick = async () => {
+        if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.textContent = "Иә, жою"; setTimeout(() => { del.dataset.armed = ""; del.textContent = "Жою"; }, 3000); return; }
+        const { error } = await sb.from("items").delete().eq("id", p.id);
+        if (error) return toast("Жойылмады: " + error.message, true);
+        parents = parents.filter((x) => x !== p); renderParents(); toast("Жойылды.");
+      };
+      row.append(t, edit, del);
+      return row;
+    }));
+    return box;
   }));
 }
+$("p-search").oninput = renderParents;
+function openContact(p) {
+  editing = p || null;
+  $("paste-form").hidden = true; $("toggle-paste").setAttribute("aria-expanded", "false");
+  $("contact-form").hidden = false;
+  $("contact-h").textContent = p ? "Байланысты өзгерту" : "Жаңа байланыс";
+  $("c-student").value = p?.data.student || ""; $("c-role").value = p?.data.role || "жауапты";
+  $("c-name").value = p?.data.parent || ""; $("c-phone").value = p ? "+" + p.data.phone : ""; $("c-msg").textContent = "";
+  $(p ? "c-name" : "c-student").focus();
+}
+$("add-contact").onclick = () => openContact(null);
+$("c-cancel").onclick = () => { $("contact-form").hidden = true; editing = null; };
+$("toggle-paste").onclick = () => {
+  const open = $("paste-form").hidden;
+  $("paste-form").hidden = !open; $("contact-form").hidden = true;
+  $("toggle-paste").setAttribute("aria-expanded", String(open));
+  if (open) $("paste").focus();
+};
+$("contact-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const data = { student: $("c-student").value.replace(/\s+/g, " ").trim(), parent: $("c-name").value.replace(/\s+/g, " ").trim(), phone: normalizePhone($("c-phone").value), role: $("c-role").value };
+  if (!data.student) return ($("c-msg").textContent = "Оқушының атын жаз.");
+  if (!data.phone) return ($("c-msg").textContent = "Телефон дұрыс емес: +7 7XX XXX XX XX түрінде жаз.");
+  if (parents.some((p) => p !== editing && p.data.phone === data.phone && p.data.student === data.student)) return ($("c-msg").textContent = "Бұл оқушыда бұл нөмір бұрыннан бар.");
+  const { error } = editing
+    ? await sb.from("items").update({ data }).eq("id", editing.id)
+    : await sb.from("items").insert({ app: "parent", data });
+  if (error) return ($("c-msg").textContent = "Сақталмады: " + error.message);
+  toast(editing ? "Өзгертілді." : "Қосылды.");
+  $("contact-form").hidden = true; editing = null;
+  await load(); renderParents();
+};
 $("paste-form").onsubmit = async (e) => {
   e.preventDefault();
   const { ok, bad, skipped } = parseList($("paste").value);
@@ -342,8 +436,8 @@ $("paste-form").onsubmit = async (e) => {
     const { error } = await sb.from("items").insert(fresh.map((d) => ({ app: "parent", data: d })));
     if (error) return toast("Қосылмады: " + error.message, true);
   }
-  $("paste-msg").textContent = [`Қосылды: ${fresh.length}.`, ok.length > fresh.length ? `Тізімде бұрыннан бар: ${ok.length - fresh.length}.` : "", bad.length ? `Телефон табылмаған жолдар: ${bad.map((b) => b.line).join(", ")}.` : "", skipped.length ? `Нөмірі жоқ, сондықтан қосылмады: ${skipped.map((x) => `${firstName(x.student)} (${x.role === "ана" ? "анасы" : x.role === "әке" ? "әкесі" : "ата-анасы"}): ${x.reason}`).join("; ")}.` : ""].filter(Boolean).join(" ");
-  if (!bad.length) $("paste").value = "";
+  $("paste-msg").textContent = [`Қосылды: ${fresh.length}.`, ok.length > fresh.length ? `Тізімде бұрыннан бар (төменде): ${ok.length - fresh.length}.` : "", bad.length ? `Телефон табылмаған жолдар: ${bad.map((b) => b.line).join(", ")}.` : "", skipped.length ? `Нөмірі жоқ, сондықтан қосылмады: ${skipped.map((x) => `${firstName(x.student)} (${x.role === "ана" ? "анасы" : x.role === "әке" ? "әкесі" : "ата-анасы"}): ${x.reason}`).join("; ")}.` : ""].filter(Boolean).join(" ");
+  if (!bad.length) { $("paste").value = ""; $("paste-form").hidden = true; $("toggle-paste").setAttribute("aria-expanded", "false"); }
   await load(); renderParents();
 };
 
