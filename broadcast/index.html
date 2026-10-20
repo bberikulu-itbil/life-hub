@@ -122,8 +122,9 @@ html, body { height: 100%; }
     <h1 class="t-xl">Ата-аналар</h1>
     <form id="paste-form" class="card stack">
       <div class="field">
-        <label for="paste">Тізімді қою: әр жолға бір отбасы</label>
-        <textarea id="paste" class="input" placeholder="Оқушының аты-жөні; Ата-ананың аты; +7 701 123 45 67"></textarea>
+        <label for="paste">Тізімді қою: Excel кестесін тұтасымен көшір</label>
+        <textarea id="paste" class="input" placeholder="Аты жөні | Анасы | Анасының нөмірі | Әкесі | Әкесінің нөмірі&#10;немесе әр жолға: Оқушы; Ата-ана; +7 701 123 45 67"></textarea>
+        <p class="t-xs muted">Анасы немесе әкесі жоқ болса, ол бағанды бос қалдыр. Нөмірі бар әр ата-анаға жеке хабар кетеді; екі баласы бар ата-анаға бір хабар.</p>
       </div>
       <button class="btn" type="submit" style="justify-self:start">Қосу</button>
       <p id="paste-msg" class="t-sm muted" role="status"></p>
@@ -140,7 +141,8 @@ html, body { height: 100%; }
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script type="module">
-import { parseList, fill, unknownPlaceholders, waLink } from "./lib.js";
+import { parseList, fill, unknownPlaceholders, waLink, recipients, firstName, joinNames } from "./lib.js";
+const ROLE = { "ана": "Анасы", "әке": "Әкесі" };
 
 const sb = supabase.createClient("https://lcmnkcpkbkrktediyvpo.supabase.co", "sb_publishable_Z0BZxemzhkUPo_lfgxMAbA_9TkVXL2q");
 const $ = (id) => document.getElementById(id);
@@ -193,7 +195,7 @@ function renderList() {
     const sent = Object.keys(b.data.sent || {}).length;
     const row = el("button", "list-row"); row.type = "button"; row.style.gridTemplateColumns = "minmax(0,1fr) auto";
     const t = el("span", "", b.data.title || "Хабар");
-    t.append(el("small", "", `${new Date(b.created_at).toLocaleDateString("kk-KZ")} · ${b.data.status === "approved" ? `жіберілді ${sent} / ${parents.length}` : "жоба"}`));
+    t.append(el("small", "", `${new Date(b.created_at).toLocaleDateString("kk-KZ")} · ${b.data.status === "approved" ? `жіберілді ${sent} / ${recipients(parents).length}` : "жоба"}`));
     row.append(t, el("span", "chev", "›"));
     row.onclick = () => openFlow(b);
     return row;
@@ -261,7 +263,7 @@ $("remake").onclick = () => step(1);
 
 // Step 2: review the template
 function renderTemplate() {
-  const t = $("template").value, first = parents[0]?.data || { parent: "Гүлнар", student: "Аружан" };
+  const t = $("template").value, first = recipients(parents)[0] || { parent: "Серікова Айжан Боранқызы", students: ["Серіков Ален"] };
   $("preview").textContent = fill(t, first);
   $("chars").textContent = `${t.length} таңба`;
   const unknown = unknownPlaceholders(t), warns = [];
@@ -286,38 +288,40 @@ $("edit-tpl").onclick = () => {
 };
 
 // Step 3: one tap per family
+// One message per phone number; sent marks are kept by phone, so siblings' parents get one message.
 function renderSend() {
-  const sent = current.data.sent || {}, done = parents.filter((p) => sent[p.id]).length;
-  $("send-bar").style.width = parents.length ? `${(done / parents.length) * 100}%` : "0";
-  $("send-count").textContent = `Жіберілді: ${done} / ${parents.length}`;
-  const next = parents.find((p) => !sent[p.id]);
+  const sent = current.data.sent || {}, list = recipients(parents), done = list.filter((r) => sent[r.phone]).length;
+  $("send-bar").style.width = list.length ? `${(done / list.length) * 100}%` : "0";
+  $("send-count").textContent = `Жіберілді: ${done} / ${list.length}`;
+  const label = (r) => joinNames(r.students.map(firstName)) + (r.role ? ` (${ROLE[r.role].toLowerCase()})` : "");
+  const next = list.find((r) => !sent[r.phone]);
   $("send-next").hidden = !next;
-  if (next) { $("send-next").href = waLink(next.data.phone, fill(current.data.template, next.data)); $("send-next").textContent = `Келесіге жіберу: ${next.data.student}`; $("send-next").dataset.id = next.id; }
-  $("send-list").replaceChildren(...parents.map((p) => {
-    const row = el("div", "list-row send-row" + (sent[p.id] ? " sent" : ""));
-    const t = el("span", "", p.data.student); t.append(el("small", "", `${p.data.parent || "Ата-ана"} · +${p.data.phone}${sent[p.id] ? " · жіберілді" : ""}`));
-    const a = el("a", "btn sm " + (sent[p.id] ? "ghost" : "secondary"), sent[p.id] ? "Қайта" : "Жіберу");
-    a.href = waLink(p.data.phone, fill(current.data.template, p.data)); a.target = "_blank"; a.rel = "noopener";
-    a.setAttribute("aria-label", `${p.data.student}: WhatsApp-та ашу`);
-    a.onclick = () => setTimeout(() => markSent(p.id)); // after the browser has followed this link
+  if (next) { $("send-next").href = waLink(next.phone, fill(current.data.template, next)); $("send-next").textContent = `Келесіге жіберу: ${label(next)}`; $("send-next").dataset.phone = next.phone; }
+  $("send-list").replaceChildren(...list.map((r) => {
+    const row = el("div", "list-row send-row" + (sent[r.phone] ? " sent" : ""));
+    const t = el("span", "", label(r)); t.append(el("small", "", `${r.parent || "Ата-ана"} · +${r.phone}${sent[r.phone] ? " · жіберілді" : ""}`));
+    const a = el("a", "btn sm " + (sent[r.phone] ? "ghost" : "secondary"), sent[r.phone] ? "Қайта" : "Жіберу");
+    a.href = waLink(r.phone, fill(current.data.template, r)); a.target = "_blank"; a.rel = "noopener";
+    a.setAttribute("aria-label", `${label(r)}: WhatsApp-та ашу`);
+    a.onclick = () => setTimeout(() => markSent(r.phone)); // after the browser has followed this link
     row.append(t, a);
     return row;
   }));
 }
 // Marked when the teacher opens WhatsApp; the page cannot see whether "Send" was pressed there.
-async function markSent(id) {
-  current.data = { ...current.data, sent: { ...(current.data.sent || {}), [id]: new Date().toISOString() } };
+async function markSent(phone) {
+  current.data = { ...current.data, sent: { ...(current.data.sent || {}), [phone]: new Date().toISOString() } };
   renderSend();
   await saveCurrent();
 }
-$("send-next").onclick = () => { const id = $("send-next").dataset.id; setTimeout(() => markSent(id)); }; // re-render only after the link opened
+$("send-next").onclick = () => { const phone = $("send-next").dataset.phone; setTimeout(() => markSent(phone)); }; // re-render only after the link opened
 
 /* ---------- parents ---------- */
 function renderParents() {
   if (!parents.length) return $("parent-list").replaceChildren(el("p", "empty", "Тізім бос."));
   $("parent-list").replaceChildren(...parents.map((p) => {
     const row = el("div", "list-row parent-row");
-    const t = el("span", "", p.data.student); t.append(el("small", "", `${p.data.parent || "—"} · +${p.data.phone}`));
+    const t = el("span", "", p.data.student); t.append(el("small", "", `${p.data.role ? ROLE[p.data.role] + ": " : ""}${p.data.parent || "—"} · +${p.data.phone}`));
     const del = el("button", "btn ghost sm", "Жою"); del.type = "button";
     del.onclick = async () => {
       if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.textContent = "Иә, жою"; setTimeout(() => { del.dataset.armed = ""; del.textContent = "Жою"; }, 3000); return; }
@@ -331,14 +335,14 @@ function renderParents() {
 }
 $("paste-form").onsubmit = async (e) => {
   e.preventDefault();
-  const { ok, bad } = parseList($("paste").value);
+  const { ok, bad, skipped } = parseList($("paste").value);
   const known = new Set(parents.map((p) => p.data.phone + p.data.student));
   const fresh = ok.filter((p) => !known.has(p.phone + p.student));
   if (fresh.length) {
     const { error } = await sb.from("items").insert(fresh.map((d) => ({ app: "parent", data: d })));
     if (error) return toast("Қосылмады: " + error.message, true);
   }
-  $("paste-msg").textContent = [`Қосылды: ${fresh.length}.`, ok.length > fresh.length ? `Тізімде бұрыннан бар: ${ok.length - fresh.length}.` : "", bad.length ? `Телефон табылмаған жолдар: ${bad.map((b) => b.line).join(", ")}.` : ""].filter(Boolean).join(" ");
+  $("paste-msg").textContent = [`Қосылды: ${fresh.length}.`, ok.length > fresh.length ? `Тізімде бұрыннан бар: ${ok.length - fresh.length}.` : "", bad.length ? `Телефон табылмаған жолдар: ${bad.map((b) => b.line).join(", ")}.` : "", skipped.length ? `Нөмірі жоқ, сондықтан қосылмады: ${skipped.map((x) => `${firstName(x.student)} (${x.role === "ана" ? "анасы" : x.role === "әке" ? "әкесі" : "ата-анасы"}): ${x.reason}`).join("; ")}.` : ""].filter(Boolean).join(" ");
   if (!bad.length) $("paste").value = "";
   await load(); renderParents();
 };
