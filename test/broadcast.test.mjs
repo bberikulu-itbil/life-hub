@@ -1,7 +1,7 @@
 // Run: node --test test/broadcast.test.mjs   (all names and numbers below are made up)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizePhone, parseContacts, parseTable, matchTable, addressName, firstName, genitive, fill, unknownPlaceholders, plan, messagesFor, waLink, BUILTIN_TAGS } from "../broadcast/lib.js";
+import { normalizePhone, parseContacts, columnName, parseTable, matchTable, addressName, firstName, genitive, fill, unknownPlaceholders, plan, messagesFor, waLink, BUILTIN_TAGS } from "../broadcast/lib.js";
 
 const TABLE = [
   "Аты жөні\tАнасы\tАнасының номері\tӘкесі\tӘкесінің номері",
@@ -91,4 +91,17 @@ test("tags, old placeholders, links", () => {
   const { messages } = messagesFor({ contacts: contacts(), template: "Құрметті {Алушы}! {Оқушы аты}", audience: "both" });
   assert.equal(messages.find((x) => x.phone === "77010000006").text, "Құрметті Зере Нұрқызы! Алдияр мен Данияр");
   assert.equal(waLink("77011234567", "a b"), "https://wa.me/77011234567?text=a%20b");
+});
+
+test("group columns: extra Excel columns and their tags", () => {
+  const { contacts: cs, extras, extraColumns } = parseContacts([
+    "Аты жөні\tАнасы\tАнасының номері\tӘкесі\tӘкесінің номері\tБөлме\tТөлем {қарызы}",
+    "Серіков Ален\tСерікова Айжан Боранқызы\t87010000001\t\t\t204\t5000",
+    "Ахметов Тимур\tАхметова Сара Нұрқызы\t87010000002\t\t\t\t",
+  ].join("\n"));
+  assert.deepEqual(extraColumns, ["Бөлме", "Төлем қарызы"]);
+  assert.deepEqual(extras, { "Серіков Ален": { "Бөлме": "204", "Төлем қарызы": "5000" } });
+  const { messages } = messagesFor({ contacts: cs, template: "{Алушы}: {Оқушы аты} — {Бөлме}", fields: extras, columns: extraColumns });
+  assert.deepEqual(messages.map((m) => [m.text, m.empty]), [["Айжан Боранқызы: Ален — 204", []], ["Сара Нұрқызы: Тимур — ", ["Бөлме"]]]);
+  assert.equal(columnName("  Туған {күні}: "), "Туған күні");
 });

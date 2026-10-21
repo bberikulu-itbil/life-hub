@@ -37,15 +37,21 @@ export function rows(text) {
 //   table (5+ columns): Оқушы | Анасы | анасының нөмірі | Әкесі | әкесінің нөмірі   (either parent may be empty)
 //   line:               Оқушы; Ата-ана; телефон   (or "Оқушы — телефон")
 // Parents without a usable number are kept with phone: null, so audiences can fall back and reports can name them.
+// Columns after the fifth become the group's own columns: `extras` holds their values per student.
 export function parseContacts(text) {
-  const contacts = [], bad = [];
+  const contacts = [], bad = [], extras = {};
+  let header = null;
   for (const [i, raw] of rows(String(text)).entries()) {
     const cells = raw.map(clean);
     if (!cells.some(Boolean)) continue;
     const hasPhone = cells.some((c) => normalizePhone(c));
     if (cells.length >= 5) {
-      if (!hasPhone && i === 0) continue; // header row
+      if (!hasPhone && i === 0) { header = cells; continue; } // header row
       if (!cells[0]) { bad.push({ line: i + 1, text: cells.filter(Boolean).join(" · ") }); continue; }
+      cells.slice(5).forEach((v, k) => {
+        const col = columnName(header?.[5 + k] || `Баған ${6 + k}`);
+        if (v && col) (extras[cells[0]] ??= {})[col] = v;
+      });
       for (const [name, phone, role] of [[cells[1], cells[2], "ана"], [cells[3], cells[4], "әке"]]) {
         if (!name && !phone) continue;
         const p = normalizePhone(phone);
@@ -58,8 +64,12 @@ export function parseContacts(text) {
     const names = parts.filter((_, k) => k !== at);
     contacts.push({ student: names[0] || "", parent: names[1] || "", phone: normalizePhone(parts[at]), role: "" });
   }
-  return { contacts, bad };
+  const extraColumns = [...new Set(Object.values(extras).flatMap(Object.keys))];
+  return { contacts, bad, extras, extraColumns };
 }
+
+// A column name that is safe inside {tags}.
+export const columnName = (s) => clean(s).replace(/[{}:]/g, "").slice(0, 40);
 
 /* ---------- data tables (grades, scores…) ---------- */
 
@@ -225,10 +235,12 @@ export function plan(contacts, audience, { perStudent = false } = {}) {
 }
 
 // Every message of a broadcast, filled in and checked: what the teacher previews and sends.
-export function messagesFor({ contacts, template = "", table = null, audience = "mother_first", naming = "name_patronymic" }) {
+// `fields` are the group's own columns: { student: { column: value } }.
+export function messagesFor({ contacts, template = "", table = null, audience = "mother_first", naming = "name_patronymic", fields = {}, columns = [] }) {
   const used = placeholders(template);
   const tableTags = table ? table.headers.filter((h) => used.includes(h)) : [];
-  const { messages, notes } = plan(contacts, audience, { perStudent: tableTags.length > 0 });
+  const fieldTags = columns.filter((c) => used.includes(c));
+  const { messages, notes } = plan(contacts, audience, { perStudent: tableTags.length + fieldTags.length > 0 });
   const match = table ? matchTable(table, [...new Set(contacts.map((c) => c.student))]) : null;
   for (const m of messages) {
     const one = m.students.length === 1 ? m.students[0] : null;
@@ -240,6 +252,7 @@ export function messagesFor({ contacts, template = "", table = null, audience = 
       "Анасы": addressName(rel("ана"), naming, "ана"),
       "Әкесі": addressName(rel("әке"), naming, "әке"),
     };
+    for (const c of columns) if (!(c in values)) values[c] = (one && fields[one]?.[c]) || "";
     const row = one && match?.byStudent.get(one);
     if (table) table.headers.forEach((h, i) => { if (!(h in values)) values[h] = row ? row[i] : ""; });
     m.text = fill(template, values);

@@ -64,6 +64,28 @@ details.card[open] > summary { margin-bottom: var(--space-3); }
 .file-label { cursor: pointer; position: relative; }
 .file-label input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 .mono { font-variant-numeric: tabular-nums; }
+/* Group table: a spreadsheet the teacher can widen with own columns; the student column stays in view. */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.gtable { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: var(--fs-sm); }
+.gtable th, .gtable td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); text-align: left; vertical-align: top; min-width: 160px; }
+.gtable th { background: var(--surface-2); font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
+.gtable th.custom { color: var(--accent); }
+.gtable .stick { position: sticky; left: 0; z-index: 1; background: var(--surface); min-width: 150px; max-width: 190px; }
+.gtable th.stick { background: var(--surface-2); z-index: 2; }
+.gtable tr:last-child td { border-bottom: 0; }
+.person { display: grid; gap: 2px; width: 100%; text-align: left; padding: var(--space-1); margin: calc(var(--space-1) * -1); border: 0; border-radius: var(--radius-sm); background: none; cursor: pointer; font: inherit; color: var(--text); }
+.person + .person { margin-top: var(--space-2); }
+.person:hover { background: var(--surface-2); }
+.person small { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.person small.nophone { color: var(--danger); }
+.person .flag { color: var(--success); font-size: var(--fs-xs); font-weight: 600; }
+.add-person { border: 1px dashed var(--border); border-radius: var(--radius-sm); background: none; color: var(--accent); font-size: var(--fs-xs); padding: 2px var(--space-2); cursor: pointer; margin-top: var(--space-2); }
+.cell-input { width: 100%; min-width: 120px; border: 1px solid transparent; border-radius: var(--radius-sm); background: none; padding: var(--space-1); font: inherit; color: var(--text); }
+.cell-input:hover { border-color: var(--border); }
+.cell-input:focus { border-color: var(--accent); outline: none; background: var(--surface); }
+.col-del, .row-del { border: 0; background: none; color: var(--text-muted); cursor: pointer; font-size: var(--fs-xs); padding: 0 var(--space-1); }
+.col-del.armed, .row-del.armed { color: var(--danger); font-weight: 600; }
+.student-cell { display: flex; justify-content: space-between; align-items: start; gap: var(--space-2); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -71,7 +93,7 @@ details.card[open] > summary { margin-bottom: var(--space-3); }
   <header class="top gutter">
     <span class="brand">Сынып хабарлары</span>
     <span class="spacer"></span>
-    <select id="class-pick" class="input class-pick" aria-label="Сынып" hidden></select>
+    <select id="class-pick" class="input class-pick" aria-label="Топ" hidden></select>
     <a class="hub" href="../">Hub</a>
   </header>
 
@@ -93,7 +115,7 @@ details.card[open] > summary { margin-bottom: var(--space-3); }
       <div id="no-contacts" class="card empty" hidden>
         <h2 class="t-lg">Алдымен сыныптың байланыс тізімі керек</h2>
         <p>Оқушы, анасы мен әкесі, телефондары. Excel кестесін тұтасымен көшіріп қоюға болады.</p>
-        <button id="to-contacts" class="btn secondary" type="button">Тізімді қосу</button>
+        <button id="to-contacts" class="btn secondary" type="button">Топқа қосу</button>
       </div>
       <h2 class="eyebrow" id="history-h">Бұрынғы хабарлар</h2>
       <div id="history" class="list" aria-labelledby="history-h"></div>
@@ -180,62 +202,91 @@ details.card[open] > summary { margin-bottom: var(--space-3); }
     </div>
   </main>
 
-  <!-- ================= Contacts ================= -->
+  <!-- ================= Groups ================= -->
   <main id="contacts" class="view gutter" hidden>
-    <div class="row" style="justify-content:space-between"><h1 class="t-xl">Байланыстар</h1><span id="contacts-sum" class="t-sm muted"></span></div>
-    <div class="row">
-      <button id="add-contact" class="btn" type="button">+ Байланыс</button>
-      <button id="toggle-paste" class="btn secondary" type="button" aria-expanded="false" aria-controls="paste-form">Excel-ден қою</button>
-      <button id="toggle-class" class="btn ghost" type="button" aria-expanded="false" aria-controls="class-form">Сынып атауы</button>
+    <div id="groups-view" class="stack">
+      <h1 class="t-xl">Топтар</h1>
+      <p class="t-sm muted">Әр топ — бір кесте: оқушылар, ата-аналары және өзің қосатын бағандар. Бағандар хабар жазғанда тегке айналады.</p>
+      <div id="group-list" class="list"></div>
+      <form id="new-group" class="card stack">
+        <div class="field"><label for="new-group-name">Жаңа топ</label><input id="new-group-name" class="input" maxlength="20" placeholder="Мысалы: 8A, Робототехника" required></div>
+        <button class="btn secondary" type="submit" style="justify-self:start">Топ құру</button>
+        <p id="new-group-msg" class="t-sm" style="color:var(--danger);margin:0" role="alert"></p>
+      </form>
     </div>
 
-    <form id="class-form" class="card stack" hidden>
-      <div class="field"><label for="class-name">Сынып атауын өзгерту</label><input id="class-name" class="input" maxlength="20" required></div>
-      <div class="row"><button class="btn" type="submit">Сақтау</button><button id="class-cancel" class="btn secondary" type="button">Болдырмау</button></div>
-      <p id="class-msg" class="t-sm muted" role="status"></p>
-    </form>
-
-    <form id="contact-form" class="card stack" hidden>
-      <h2 id="contact-h" class="t-lg">Жаңа байланыс</h2>
-      <div class="field"><label for="c-student">Оқушы</label><input id="c-student" class="input" list="students-dl" autocomplete="off" required></div>
-      <div class="field"><label for="c-role">Кім</label>
-        <select id="c-role" class="input"><option value="ана">Анасы</option><option value="әке">Әкесі</option><option value="туысы">Туысы / басқа жауапты</option></select></div>
-      <div class="field"><label for="c-name">Аты-жөні</label><input id="c-name" class="input" autocomplete="off" placeholder="Тегі Аты Әкесінің аты"></div>
-      <div class="field"><label for="c-phone">Телефон (жоқ болса, бос қалдыр)</label><input id="c-phone" class="input" type="tel" inputmode="tel" autocomplete="off" placeholder="+7 701 123 45 67"></div>
-      <div class="checks">
-        <label><input id="c-primary" type="checkbox"> Негізгі жауаптысы</label>
-        <label><input id="c-nearby" type="checkbox"> Жақын тұрады (қалада)</label>
+    <div id="group-view" class="stack" hidden>
+      <div class="row" style="justify-content:space-between"><button id="group-back" class="btn ghost sm" type="button">← Топтар</button><span id="contacts-sum" class="t-sm muted"></span></div>
+      <h1 id="group-title" class="t-xl"></h1>
+      <div class="row">
+        <button id="add-student" class="btn sm" type="button" aria-expanded="false" aria-controls="student-form">+ Оқушы</button>
+        <button id="add-column" class="btn sm secondary" type="button" aria-expanded="false" aria-controls="column-form">+ Баған</button>
+        <button id="toggle-paste" class="btn sm secondary" type="button" aria-expanded="false" aria-controls="paste-form">Excel-ден қою</button>
+        <button id="toggle-class" class="btn sm ghost" type="button" aria-expanded="false" aria-controls="class-form">Атауы</button>
       </div>
-      <p id="c-msg" class="t-sm" style="color:var(--danger);margin:0" role="alert"></p>
-      <div class="row"><button class="btn" type="submit">Сақтау</button><button id="c-cancel" class="btn secondary" type="button">Болдырмау</button></div>
-    </form>
-    <datalist id="students-dl"></datalist>
 
-    <form id="paste-form" class="card stack" hidden>
-      <div class="field"><label for="paste-class">Сынып</label><input id="paste-class" class="input" maxlength="20" required style="max-width:160px"></div>
-      <div class="field">
-        <label for="paste">Excel кестесін тұтасымен қой</label>
-        <textarea id="paste" class="input" placeholder="Аты жөні | Анасы | Анасының нөмірі | Әкесі | Әкесінің нөмірі"></textarea>
-        <p class="t-xs muted">Анасы немесе әкесі жоқ болса, бағаны бос қалсын. Нөмірі жоқ ата-ана да тізімге түседі: хабар оның орнына екінші ата-анаға кете алады.</p>
-      </div>
-      <button class="btn" type="submit" style="justify-self:start">Қосу</button>
-      <p id="paste-msg" class="t-sm muted" role="status"></p>
-    </form>
+      <form id="student-form" class="card stack" hidden>
+        <div class="field"><label for="student-name">Оқушының аты-жөні</label><input id="student-name" class="input" maxlength="80" required></div>
+        <div class="row"><button class="btn" type="submit">Қосу</button><button class="btn secondary" type="button" data-close>Болдырмау</button></div>
+        <p id="student-msg" class="t-sm" style="color:var(--danger);margin:0" role="alert"></p>
+      </form>
 
-    <input id="c-search" class="input" type="search" placeholder="Іздеу: оқушы, ата-ана, нөмір" aria-label="Тізімнен іздеу">
-    <div id="contact-list" class="stack"></div>
+      <form id="column-form" class="card stack" hidden>
+        <div class="field"><label for="column-name">Баған атауы</label><input id="column-name" class="input" maxlength="40" placeholder="Мысалы: Бөлме, Туған күні, Төлем" required></div>
+        <div class="row"><button class="btn" type="submit">Қосу</button><button class="btn secondary" type="button" data-close>Болдырмау</button></div>
+        <p id="column-msg" class="t-sm" style="color:var(--danger);margin:0" role="alert"></p>
+      </form>
+
+      <form id="class-form" class="card stack" hidden>
+        <div class="field"><label for="class-name">Топ атауын өзгерту</label><input id="class-name" class="input" maxlength="20" required></div>
+        <div class="row"><button class="btn" type="submit">Сақтау</button><button class="btn secondary" type="button" data-close>Болдырмау</button></div>
+        <p id="class-msg" class="t-sm muted" role="status"></p>
+        <hr style="border:0;border-top:1px solid var(--border);width:100%">
+        <button id="delete-group" class="btn danger sm" type="button" style="justify-self:start">Топты жою</button>
+      </form>
+
+      <form id="contact-form" class="card stack" hidden>
+        <h2 id="contact-h" class="t-lg">Жаңа байланыс</h2>
+        <div class="field"><label for="c-student">Оқушы</label><input id="c-student" class="input" list="students-dl" autocomplete="off" required></div>
+        <div class="field"><label for="c-role">Кім</label>
+          <select id="c-role" class="input"><option value="ана">Анасы</option><option value="әке">Әкесі</option><option value="туысы">Туысы / басқа жауапты</option></select></div>
+        <div class="field"><label for="c-name">Аты-жөні</label><input id="c-name" class="input" autocomplete="off" placeholder="Тегі Аты Әкесінің аты"></div>
+        <div class="field"><label for="c-phone">Телефон (жоқ болса, бос қалдыр)</label><input id="c-phone" class="input" type="tel" inputmode="tel" autocomplete="off" placeholder="+7 701 123 45 67"></div>
+        <div class="checks">
+          <label><input id="c-primary" type="checkbox"> Негізгі жауаптысы</label>
+          <label><input id="c-nearby" type="checkbox"> Жақын тұрады (қалада)</label>
+        </div>
+        <p id="c-msg" class="t-sm" style="color:var(--danger);margin:0" role="alert"></p>
+        <div class="row"><button class="btn" type="submit">Сақтау</button><button id="c-cancel" class="btn secondary" type="button">Болдырмау</button><button id="c-delete" class="btn ghost" type="button" hidden>Жою</button></div>
+      </form>
+      <datalist id="students-dl"></datalist>
+
+      <form id="paste-form" class="card stack" hidden>
+        <div class="field">
+          <label for="paste">Excel кестесін тұтасымен қой</label>
+          <textarea id="paste" class="input" placeholder="Аты жөні | Анасы | Анасының нөмірі | Әкесі | Әкесінің нөмірі | (қосымша бағандар…)"></textarea>
+          <p class="t-xs muted">Алғашқы 5 баған: оқушы, анасы, оның нөмірі, әкесі, оның нөмірі. Одан кейінгі бағандар (мысалы «Бөлме») топтың өз бағандарына айналады. Нөмірі жоқ ата-ана да сақталады.</p>
+        </div>
+        <div class="row"><button class="btn" type="submit">Қосу</button><button class="btn secondary" type="button" data-close>Болдырмау</button></div>
+        <p id="paste-msg" class="t-sm muted" role="status"></p>
+      </form>
+
+      <input id="c-search" class="input" type="search" placeholder="Іздеу: оқушы, ата-ана, нөмір" aria-label="Кестеден іздеу">
+      <div class="table-wrap"><table id="group-table" class="gtable"></table></div>
+      <p id="table-empty" class="empty" hidden></p>
+    </div>
   </main>
 
   <nav id="tabbar" class="tabbar" aria-label="Негізгі мәзір" hidden>
     <button type="button" data-view="messages">Хабарлар</button>
-    <button type="button" data-view="contacts">Байланыстар</button>
+    <button type="button" data-view="contacts">Топтар</button>
   </nav>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script type="module">
-import { parseContacts, parseTable, matchTable, normalizePhone, addressName, firstName, joinNames, unknownPlaceholders, messagesFor, waLink, BUILTIN_TAGS, AUDIENCES, NAMING } from "./lib.js";
+import { parseContacts, columnName, parseTable, matchTable, normalizePhone, addressName, firstName, joinNames, unknownPlaceholders, messagesFor, waLink, BUILTIN_TAGS, AUDIENCES, NAMING } from "./lib.js";
 
 const sb = supabase.createClient("https://lcmnkcpkbkrktediyvpo.supabase.co", "sb_publishable_Z0BZxemzhkUPo_lfgxMAbA_9TkVXL2q");
 const $ = (id) => document.getElementById(id);
@@ -246,7 +297,7 @@ const ROLE_OF = { "ана": "анасы", "әке": "әкесі", "туысы": 
 // Contacts saved before classes existed belonged to the owner's own class.
 const DEFAULT_CLASS = "7B";
 
-let contacts = [], broadcasts = [], current = null, view = "messages";
+let contacts = [], broadcasts = [], groups = [], current = null, view = "messages";
 let klass = store.get("broadcast.class", DEFAULT_CLASS);
 
 let toastTimer;
@@ -267,16 +318,21 @@ const normalize = (d) => ({
   phone: d.phone || null,
 });
 async function load() {
-  const [c, b] = await Promise.all([
+  const [c, b, g] = await Promise.all([
     sb.from("items").select("id, data").eq("app", "parent").order("created_at"),
     sb.from("items").select("id, data, created_at").eq("app", "broadcast").order("created_at", { ascending: false }).limit(100),
+    sb.from("items").select("id, data").eq("app", "group").order("created_at"),
   ]);
-  if (c.error || b.error) return toast("Жүктелмеді: " + (c.error || b.error).message, true);
+  if (c.error || b.error || g.error) return toast("Жүктелмеді: " + (c.error || b.error || g.error).message, true);
+  groups = g.data.map((r) => ({ id: r.id, data: { columns: [], values: {}, ...r.data } }));
   contacts = c.data.map((r) => ({ id: r.id, data: normalize(r.data) }));
   broadcasts = b.data.map((r) => ({ ...r, data: { ...r.data, class: r.data.class || DEFAULT_CLASS } }));
   renderClassPicker();
 }
-const classes = () => [...new Set([...contacts.map((c) => c.data.class), ...broadcasts.map((b) => b.data.class)])].sort();
+const classes = () => [...new Set([...groups.map((g) => g.data.name), ...contacts.map((c) => c.data.class), ...broadcasts.map((b) => b.data.class)])].sort();
+// A group's own columns and their values; contacts without a group record (before groups existed) get one on first edit.
+const groupOf = (name) => groups.find((g) => g.data.name === name) || null;
+const fieldsOf = (name) => ({ fields: groupOf(name)?.data.values || {}, columns: groupOf(name)?.data.columns || [] });
 const classContacts = (k = klass) => contacts.filter((c) => c.data.class === k).map((c) => ({ ...c.data, id: c.id }));
 async function saveCurrent() {
   clearTimeout(saveTimer);
@@ -294,7 +350,7 @@ function renderClassPicker() {
   $("class-pick").replaceChildren(...list.map((k) => { const o = el("option", "", k); o.value = k; o.selected = k === klass; return o; }));
   $("class-pick").hidden = list.length < 2;
 }
-$("class-pick").onchange = () => { klass = $("class-pick").value; store.set("broadcast.class", klass); current = null; show(view); };
+$("class-pick").onchange = () => { klass = $("class-pick").value; store.set("broadcast.class", klass); current = null; if (openGroup) openGroup = klass; show(view); };
 
 /* ---------- views ---------- */
 function show(next) {
@@ -306,9 +362,9 @@ function show(next) {
   if (next === "contacts") renderContacts();
 }
 for (const b of $("tabbar").children) b.onclick = () => show(b.dataset.view);
-$("to-contacts").onclick = () => show("contacts");
+$("to-contacts").onclick = () => { openGroup = klass; show("contacts"); };
 
-const build = (b) => messagesFor({ contacts: classContacts(b.data.class), template: b.data.template || "", table: b.data.table || null, audience: b.data.audience || "mother_first", naming: b.data.naming || "name_patronymic" });
+const build = (b) => messagesFor({ contacts: classContacts(b.data.class), template: b.data.template || "", table: b.data.table || null, audience: b.data.audience || "mother_first", naming: b.data.naming || "name_patronymic", ...fieldsOf(b.data.class) });
 const picked = (b, msgs) => msgs.filter((m) => !(b.data.excluded || {})[m.key]);
 
 function renderList() {
@@ -363,7 +419,7 @@ $("new-msg").onclick = async () => {
 $("flow-back").onclick = () => { if (saveTimer) saveCurrent(); current = null; renderList(); };
 
 // Step 1: text, table, tags
-const tagsOf = (b) => [...BUILTIN_TAGS, ...(b.data.table?.headers || [])];
+const tagsOf = (b) => [...BUILTIN_TAGS, ...fieldsOf(b.data.class).columns, ...(b.data.table?.headers || [])];
 function renderStep1() {
   const b = current, table = b.data.table;
   const match = table ? matchTable(table, [...new Set(classContacts(b.data.class).map((c) => c.student))]) : null;
@@ -371,6 +427,7 @@ function renderStep1() {
   $("tags").replaceChildren(
     tagBtn("Алушы", "{Алушы}"), tagBtn("Оқушы аты", "{Оқушы аты}"), tagBtn("Оқушы аты (-ның)", "{Оқушы аты:ның}"),
     tagBtn("Оқушы аты-жөні", "{Оқушы аты-жөні}"), tagBtn("Анасы", "{Анасы}"), tagBtn("Әкесі", "{Әкесі}"),
+    ...fieldsOf(b.data.class).columns.map((c) => tagBtn(c, `{${c}}`, "data")),
     ...(table ? table.headers.filter((_, i) => i !== match.col).map((h) => tagBtn(h, `{${h}}`, "data")) : []),
   );
   if (table) {
@@ -445,7 +502,7 @@ $("make").onclick = async () => {
 function renderStep2() {
   const b = current, cs = classContacts(b.data.class);
   $("audiences").replaceChildren(...Object.entries(AUDIENCES).map(([key, label]) => {
-    const { messages, notes } = messagesFor({ contacts: cs, template: b.data.template, table: b.data.table, audience: key });
+    const { messages, notes } = messagesFor({ contacts: cs, template: b.data.template, table: b.data.table, audience: key, ...fieldsOf(b.data.class) });
     const lab = el("label", "choice");
     const r = el("input"); r.type = "radio"; r.name = "aud"; r.value = key; r.checked = (b.data.audience || "mother_first") === key;
     r.onchange = () => { current.data = { ...current.data, audience: key, excluded: {} }; saveSoon(); };
@@ -540,63 +597,192 @@ async function markSent(key) {
 }
 $("send-next").onclick = () => { const key = $("send-next").dataset.key; setTimeout(() => markSent(key)); }; // re-render only after the link opened
 
-/* ---------- contacts ---------- */
-let editing = null;
+/* ---------- groups ---------- */
+let editing = null, openGroup = null;
+const ORDER = { "ана": 0, "әке": 1, "туысы": 2 };
+const studentsOf = (name) => {
+  const set = new Set([...contacts.filter((c) => c.data.class === name).map((c) => c.data.student), ...Object.keys(groupOf(name)?.data.values || {})]);
+  return [...set].sort((a, b) => a.localeCompare(b, "kk"));
+};
+async function ensureGroup(name) {
+  const g = groupOf(name);
+  if (g) return g;
+  const { data, error } = await sb.from("items").insert({ app: "group", data: { name, columns: [], values: {} } }).select("id, data").single();
+  if (error) { toast("Топ сақталмады: " + error.message, true); return null; }
+  const row = { id: data.id, data: { columns: [], values: {}, ...data.data } };
+  groups.push(row);
+  return row;
+}
+async function saveGroup(g) {
+  const { error } = await sb.from("items").update({ data: g.data }).eq("id", g.id);
+  if (error) toast("Сақталмады: " + error.message, true);
+  return !error;
+}
+let groupTimer;
+const saveGroupSoon = (g) => { clearTimeout(groupTimer); groupTimer = setTimeout(() => saveGroup(g), 700); };
+
 function renderContacts() {
-  const list = contacts.filter((c) => c.data.class === klass);
-  const students = [...new Set(list.map((c) => c.data.student))];
-  $("contacts-sum").textContent = list.length ? `${klass}: ${students.length} оқушы · ${list.filter((c) => c.data.phone).length} нөмір` : klass;
-  $("students-dl").replaceChildren(...students.map((n) => { const o = el("option"); o.value = n; return o; }));
-  const q = $("c-search").value.trim().toLowerCase();
-  const shown = q ? list.filter((c) => `${c.data.student} ${c.data.parent} ${c.data.phone || ""}`.toLowerCase().includes(q)) : list;
-  if (!shown.length) return $("contact-list").replaceChildren(el("p", "empty", list.length ? "Ештеңе табылмады." : `${klass} сыныбының тізімі бос. «Excel-ден қою» арқылы бүкіл кестені бірден қос.`));
-  const groups = new Map();
-  for (const c of shown) groups.set(c.data.student, [...(groups.get(c.data.student) || []), c]);
-  const order = { "ана": 0, "әке": 1, "туысы": 2 };
-  $("contact-list").replaceChildren(...[...groups].sort((a, b) => a[0].localeCompare(b[0], "kk")).map(([student, rows]) => {
-    const box = el("section", "list"); box.setAttribute("aria-label", student);
-    const head = el("div", "group-head"); head.append(el("span", "", student), el("small", "muted", `${rows.length} байланыс`));
-    box.append(head, ...rows.sort((a, b) => order[a.data.role] - order[b.data.role]).map((c) => {
-      const row = el("div", "list-row contact-row");
-      const t = el("span");
-      t.append(el("span", "role", ROLE[c.data.role]), el("span", "", " " + (c.data.parent || "—")));
-      if (c.data.primary) t.append(el("span", "flag", "· негізгі"));
-      if (c.data.nearby) t.append(el("span", "flag", "· жақын тұрады"));
-      t.append(el("small", c.data.phone ? "" : "nophone", c.data.phone ? "+" + c.data.phone : `нөмір жоқ${c.data.note ? ` («${c.data.note}»)` : ""}`));
-      const edit = el("button", "btn ghost sm", "Өзгерту"); edit.type = "button"; edit.onclick = () => openContact(c);
-      const del = el("button", "btn ghost sm", "Жою"); del.type = "button";
-      del.onclick = async () => {
-        if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.textContent = "Иә, жою"; setTimeout(() => { del.dataset.armed = ""; del.textContent = "Жою"; }, 3000); return; }
-        const { error } = await sb.from("items").delete().eq("id", c.id);
-        if (error) return toast("Жойылмады: " + error.message, true);
-        contacts = contacts.filter((x) => x !== c); renderContacts(); toast("Жойылды.");
-      };
-      row.append(t, edit, del);
-      return row;
-    }));
-    return box;
+  if (openGroup) return renderGroup();
+  $("groups-view").hidden = false; $("group-view").hidden = true;
+  const names = classes();
+  if (!names.length) return $("group-list").replaceChildren(el("p", "empty", "Әзірге топ жоқ. Төменнен алғашқысын құр."));
+  $("group-list").replaceChildren(...names.map((name) => {
+    const cs = contacts.filter((c) => c.data.class === name);
+    const row = el("button", "list-row"); row.type = "button"; row.style.gridTemplateColumns = "minmax(0,1fr) auto";
+    const t = el("span", "", name);
+    const cols = groupOf(name)?.data.columns.length || 0;
+    t.append(el("small", "", `${studentsOf(name).length} оқушы · ${cs.filter((c) => c.data.phone).length} нөмір${cols ? ` · ${cols} өз бағаны` : ""}`));
+    row.append(t, el("span", "chev", "›"));
+    row.onclick = () => { klass = name; store.set("broadcast.class", klass); renderClassPicker(); openGroup = name; renderGroup(); };
+    return row;
   }));
 }
-$("c-search").oninput = renderContacts;
-const closeForms = () => { for (const f of ["contact-form", "paste-form", "class-form"]) $(f).hidden = true; $("toggle-paste").setAttribute("aria-expanded", "false"); $("toggle-class").setAttribute("aria-expanded", "false"); };
-function openContact(c) {
+$("new-group").onsubmit = async (e) => {
+  e.preventDefault();
+  const name = $("new-group-name").value.trim();
+  if (!name) return;
+  if (classes().includes(name)) return ($("new-group-msg").textContent = "Мұндай топ бар.");
+  if (!(await ensureGroup(name))) return;
+  $("new-group-name").value = ""; $("new-group-msg").textContent = "";
+  klass = name; store.set("broadcast.class", klass); renderClassPicker();
+  openGroup = name; renderGroup();
+};
+$("group-back").onclick = () => { closeForms(); openGroup = null; renderContacts(); };
+
+function renderGroup() {
+  const name = openGroup, g = groupOf(name), columns = g?.data.columns || [], values = g?.data.values || {};
+  $("groups-view").hidden = true; $("group-view").hidden = false;
+  $("group-title").textContent = name;
+  const cs = contacts.filter((c) => c.data.class === name);
+  const students = studentsOf(name);
+  $("contacts-sum").textContent = `${students.length} оқушы · ${cs.filter((c) => c.data.phone).length} нөмір`;
+  $("students-dl").replaceChildren(...students.map((n) => { const o = el("option"); o.value = n; return o; }));
+  const q = $("c-search").value.trim().toLowerCase();
+  const shown = students.filter((st) => !q || [st, ...cs.filter((c) => c.data.student === st).flatMap((c) => [c.data.parent, c.data.phone || ""]), ...Object.values(values[st] || {})].join(" ").toLowerCase().includes(q));
+  $("table-empty").hidden = shown.length > 0;
+  $("table-empty").textContent = students.length ? "Ештеңе табылмады." : "Топ бос. «Excel-ден қою» арқылы бүкіл кестені бірден қос немесе «+ Оқушы».";
+  $("group-table").parentElement.hidden = !shown.length;
+
+  const head = el("tr");
+  head.append(el("th", "stick", "Оқушы"), el("th", "", "Анасы"), el("th", "", "Әкесі"), el("th", "", "Туыстары / жауаптылар"));
+  for (const col of columns) {
+    const th = el("th", "custom", col + " ");
+    const del = el("button", "col-del", "×"); del.type = "button"; del.setAttribute("aria-label", `«${col}» бағанын жою`);
+    del.onclick = () => armed(del, "жою?", async () => {
+      g.data = { ...g.data, columns: g.data.columns.filter((c) => c !== col), values: Object.fromEntries(Object.entries(g.data.values).map(([st, v]) => { const { [col]: _, ...rest } = v; return [st, rest]; })) };
+      await saveGroup(g); renderGroup(); toast(`«${col}» бағаны жойылды.`);
+    });
+    th.append(del); head.append(th);
+  }
+  const body = shown.map((st, i) => {
+    const tr = el("tr");
+    const first = el("td", "stick"), wrap = el("div", "student-cell");
+    wrap.append(el("span", "", `${i + 1}. ${st}`));
+    const del = el("button", "row-del", "×"); del.type = "button"; del.setAttribute("aria-label", `${st}: жолды жою`);
+    del.onclick = () => armed(del, "жою?", async () => {
+      for (const c of cs.filter((c) => c.data.student === st)) await sb.from("items").delete().eq("id", c.id);
+      if (g && g.data.values[st]) { const { [st]: _, ...rest } = g.data.values; g.data = { ...g.data, values: rest }; await saveGroup(g); }
+      await load(); renderGroup(); toast(`${st} жойылды.`);
+    });
+    wrap.append(del); first.append(wrap); tr.append(first);
+    for (const role of ["ана", "әке", "туысы"]) {
+      const td = el("td");
+      for (const c of cs.filter((c) => c.data.student === st && c.data.role === role)) {
+        const b = el("button", "person"); b.type = "button";
+        b.append(el("span", "", c.data.parent || "Аты жоқ"));
+        b.append(el("small", c.data.phone ? "" : "nophone", c.data.phone ? "+" + c.data.phone : `нөмір жоқ${c.data.note ? ` («${c.data.note}»)` : ""}`));
+        const flags = [c.data.primary && "негізгі", c.data.nearby && "жақын тұрады"].filter(Boolean);
+        if (flags.length) b.append(el("span", "flag", flags.join(" · ")));
+        b.setAttribute("aria-label", `${ROLE[role]}: ${c.data.parent || "аты жоқ"}, өзгерту`);
+        b.onclick = () => openContact(c);
+        td.append(b);
+      }
+      if (role === "туысы" || !cs.some((c) => c.data.student === st && c.data.role === role)) {
+        const add = el("button", "add-person", "+ қосу"); add.type = "button";
+        add.setAttribute("aria-label", `${st}: ${ROLE[role].toLowerCase()} қосу`);
+        add.onclick = () => openContact(null, { student: st, role });
+        td.append(add);
+      }
+      tr.append(td);
+    }
+    for (const col of columns) {
+      const td = el("td"), input = el("input", "cell-input");
+      input.value = values[st]?.[col] || ""; input.setAttribute("aria-label", `${st}: ${col}`);
+      input.oninput = () => { g.data.values = { ...g.data.values, [st]: { ...(g.data.values[st] || {}), [col]: input.value.trim() } }; saveGroupSoon(g); };
+      td.append(input); tr.append(td);
+    }
+    return tr;
+  });
+  const thead = el("thead"), tbody = el("tbody");
+  thead.append(head); tbody.append(...body);
+  $("group-table").replaceChildren(thead, tbody);
+}
+// Two taps for anything destructive: the first arms the button for three seconds.
+function armed(btn, label, action) {
+  if (btn.classList.contains("armed")) return action();
+  const old = btn.textContent;
+  btn.classList.add("armed"); btn.textContent = label;
+  setTimeout(() => { btn.classList.remove("armed"); btn.textContent = old; }, 3000);
+}
+$("c-search").oninput = renderGroup;
+
+const FORMS = { "student-form": "add-student", "column-form": "add-column", "paste-form": "toggle-paste", "class-form": "toggle-class", "contact-form": null };
+function closeForms() {
+  for (const [f, btn] of Object.entries(FORMS)) { $(f).hidden = true; if (btn) $(btn).setAttribute("aria-expanded", "false"); }
+}
+function toggleForm(form, focus) {
+  const open = $(form).hidden;
+  closeForms();
+  $(form).hidden = !open;
+  if (FORMS[form]) $(FORMS[form]).setAttribute("aria-expanded", String(open));
+  if (open && focus) focus();
+}
+for (const b of document.querySelectorAll("#group-view [data-close]")) b.onclick = closeForms;
+$("add-student").onclick = () => toggleForm("student-form", () => { $("student-name").value = ""; $("student-msg").textContent = ""; $("student-name").focus(); });
+$("add-column").onclick = () => toggleForm("column-form", () => { $("column-name").value = ""; $("column-msg").textContent = ""; $("column-name").focus(); });
+$("toggle-paste").onclick = () => toggleForm("paste-form", () => $("paste").focus());
+$("toggle-class").onclick = () => toggleForm("class-form", () => { $("class-name").value = openGroup; $("class-msg").textContent = ""; $("class-name").focus(); });
+
+$("student-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const name = $("student-name").value.replace(/\s+/g, " ").trim();
+  if (!name) return;
+  if (studentsOf(openGroup).some((s) => s.toLowerCase() === name.toLowerCase())) return ($("student-msg").textContent = "Бұл оқушы топта бар.");
+  const g = await ensureGroup(openGroup); if (!g) return;
+  g.data = { ...g.data, values: { ...g.data.values, [name]: {} } };
+  if (await saveGroup(g)) { closeForms(); renderGroup(); toast(`${name} қосылды. Енді ата-анасын қос.`); }
+};
+$("column-form").onsubmit = async (e) => {
+  e.preventDefault();
+  const col = columnName($("column-name").value);
+  if (!col) return;
+  const g = await ensureGroup(openGroup); if (!g) return;
+  if (g.data.columns.includes(col) || [...BUILTIN_TAGS, "ата_ана", "оқушы"].includes(col)) return ($("column-msg").textContent = "Мұндай баған немесе тег бар.");
+  g.data = { ...g.data, columns: [...g.data.columns, col] };
+  if (await saveGroup(g)) { closeForms(); renderGroup(); toast(`«${col}» бағаны қосылды: хабарда {${col}} тегі ретінде де шығады.`); }
+};
+
+function openContact(c, preset = {}) {
   editing = c || null;
   closeForms(); $("contact-form").hidden = false;
-  $("contact-h").textContent = c ? "Байланысты өзгерту" : `Жаңа байланыс · ${klass}`;
-  $("c-student").value = c?.data.student || ""; $("c-role").value = c?.data.role || "ана";
+  $("contact-h").textContent = c ? "Байланысты өзгерту" : "Жаңа байланыс";
+  $("c-student").value = c?.data.student || preset.student || ""; $("c-role").value = c?.data.role || preset.role || "ана";
   $("c-name").value = c?.data.parent || ""; $("c-phone").value = c?.data.phone ? "+" + c.data.phone : "";
   $("c-primary").checked = !!c?.data.primary; $("c-nearby").checked = !!c?.data.nearby; $("c-msg").textContent = "";
-  $(c ? "c-name" : "c-student").focus();
+  $("c-delete").hidden = !c; $("c-delete").textContent = "Жою"; $("c-delete").classList.remove("armed");
+  $("contact-form").scrollIntoView({ block: "nearest" });
+  $(c || preset.student ? "c-name" : "c-student").focus();
 }
-$("add-contact").onclick = () => openContact(null);
 $("c-cancel").onclick = () => { closeForms(); editing = null; };
-$("toggle-paste").onclick = () => { const open = $("paste-form").hidden; closeForms(); $("paste-form").hidden = !open; $("toggle-paste").setAttribute("aria-expanded", String(open)); if (open) { $("paste-class").value = klass; $("paste").focus(); } };
-$("toggle-class").onclick = () => { const open = $("class-form").hidden; closeForms(); $("class-form").hidden = !open; $("toggle-class").setAttribute("aria-expanded", String(open)); if (open) { $("class-name").value = klass; $("class-name").focus(); } };
-$("class-cancel").onclick = closeForms;
+$("c-delete").onclick = () => armed($("c-delete"), "Иә, жою", async () => {
+  const { error } = await sb.from("items").delete().eq("id", editing.id);
+  if (error) return toast("Жойылмады: " + error.message, true);
+  closeForms(); editing = null; await load(); renderGroup(); toast("Жойылды.");
+});
 $("contact-form").onsubmit = async (e) => {
   e.preventDefault();
   const phoneText = $("c-phone").value.trim();
-  const data = { class: editing?.data.class || klass, student: $("c-student").value.replace(/\s+/g, " ").trim(), parent: $("c-name").value.replace(/\s+/g, " ").trim(),
+  const data = { class: editing?.data.class || openGroup || klass, student: $("c-student").value.replace(/\s+/g, " ").trim(), parent: $("c-name").value.replace(/\s+/g, " ").trim(),
     phone: phoneText ? normalizePhone(phoneText) : null, role: $("c-role").value, primary: $("c-primary").checked, nearby: $("c-nearby").checked };
   if (!data.student) return ($("c-msg").textContent = "Оқушының атын жаз.");
   if (phoneText && !data.phone) return ($("c-msg").textContent = "Телефон дұрыс емес: +7 7XX XXX XX XX түрінде жаз немесе бос қалдыр.");
@@ -608,12 +794,12 @@ $("contact-form").onsubmit = async (e) => {
   for (const o of others) await sb.from("items").update({ data: { ...o.data, primary: false } }).eq("id", o.id);
   toast(editing ? "Өзгертілді." : "Қосылды.");
   closeForms(); editing = null;
-  await load(); renderContacts();
+  await load(); renderGroup();
 };
 $("paste-form").onsubmit = async (e) => {
   e.preventDefault();
-  const target = $("paste-class").value.trim() || klass;
-  const { contacts: found, bad } = parseContacts($("paste").value);
+  const target = openGroup;
+  const { contacts: found, bad, extras, extraColumns } = parseContacts($("paste").value);
   const key = (c) => `${c.student}|${c.role || "туысы"}|${c.parent}|${c.phone}`;
   const known = new Set(contacts.filter((c) => c.data.class === target).map((c) => key(c.data)));
   const fresh = found.filter((c) => !known.has(key(c))).map((c) => ({ ...c, role: c.role || "туысы", class: target }));
@@ -621,25 +807,43 @@ $("paste-form").onsubmit = async (e) => {
     const { error } = await sb.from("items").insert(fresh.map((d) => ({ app: "parent", data: d })));
     if (error) return toast("Қосылмады: " + error.message, true);
   }
+  if (extraColumns.length) {
+    const g = await ensureGroup(target); if (!g) return;
+    const values = { ...g.data.values };
+    for (const [st, v] of Object.entries(extras)) values[st] = { ...(values[st] || {}), ...v };
+    g.data = { ...g.data, columns: [...new Set([...g.data.columns, ...extraColumns])], values };
+    await saveGroup(g);
+  }
   const noPhone = fresh.filter((c) => !c.phone).length;
-  $("paste-msg").textContent = [`${target}: қосылды ${fresh.length}.`, found.length > fresh.length ? `Бұрыннан бар: ${found.length - fresh.length}.` : "", noPhone ? `Оның ішінде нөмірі жоқ: ${noPhone} (тізімде қызылмен көрінеді, кейін нөмірін қосуға болады).` : "", bad.length ? `Танылмаған жолдар: ${bad.map((b) => b.line).join(", ")}.` : ""].filter(Boolean).join(" ");
-  if (!bad.length) { $("paste").value = ""; $("paste-form").hidden = true; $("toggle-paste").setAttribute("aria-expanded", "false"); }
-  klass = target; store.set("broadcast.class", klass);
-  await load(); renderContacts();
+  $("paste-msg").textContent = [`Қосылды: ${fresh.length}.`, found.length > fresh.length ? `Бұрыннан бар: ${found.length - fresh.length}.` : "", noPhone ? `Нөмірі жоқ: ${noPhone} (кестеде қызылмен).` : "", extraColumns.length ? `Өз бағандары: ${extraColumns.join(", ")}.` : "", bad.length ? `Танылмаған жолдар: ${bad.map((b) => b.line).join(", ")}.` : ""].filter(Boolean).join(" ");
+  if (!bad.length) { $("paste").value = ""; }
+  await load(); renderGroup();
 };
 $("class-form").onsubmit = async (e) => {
   e.preventDefault();
-  const name = $("class-name").value.trim();
-  if (!name || name === klass) return closeForms();
-  if (classes().includes(name)) return ($("class-msg").textContent = "Мұндай сынып бұрыннан бар.");
+  const name = $("class-name").value.trim(), old = openGroup;
+  if (!name || name === old) return closeForms();
+  if (classes().includes(name)) return ($("class-msg").textContent = "Мұндай топ бар.");
   $("class-msg").textContent = "Өзгертіліп жатыр…";
-  const rows = [...contacts.filter((c) => c.data.class === klass), ...broadcasts.filter((b) => b.data.class === klass)];
+  const rows = [...contacts.filter((c) => c.data.class === old), ...broadcasts.filter((b) => b.data.class === old)];
   for (const r of rows) {
     const { error } = await sb.from("items").update({ data: { ...r.data, class: name } }).eq("id", r.id);
     if (error) return ($("class-msg").textContent = "Тоқтады: " + error.message);
   }
-  klass = name; store.set("broadcast.class", klass); $("class-msg").textContent = "";
-  closeForms(); await load(); renderContacts(); toast(`Сынып атауы: ${name}`);
+  const g = groupOf(old);
+  if (g) { g.data = { ...g.data, name }; await saveGroup(g); }
+  klass = name; openGroup = name; store.set("broadcast.class", klass); $("class-msg").textContent = "";
+  closeForms(); await load(); renderGroup(); toast(`Топ атауы: ${name}`);
+};
+$("delete-group").onclick = () => {
+  const cs = contacts.filter((c) => c.data.class === openGroup);
+  armed($("delete-group"), `Иә, ${cs.length} байланысымен жою`, async () => {
+    for (const c of cs) await sb.from("items").delete().eq("id", c.id);
+    const g = groupOf(openGroup);
+    if (g) await sb.from("items").delete().eq("id", g.id);
+    toast(`«${openGroup}» тобы жойылды.`);
+    openGroup = null; closeForms(); await load(); renderContacts();
+  });
 };
 
 /* ---------- auth ---------- */
