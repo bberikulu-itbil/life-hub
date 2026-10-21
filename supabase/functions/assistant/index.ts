@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
     // Template writing needs no tools; it uses the same model chain as the chat.
     const chain = buildChain(body.models, await freeToolModels().catch(() => []));
     try {
-      const { message, model } = await callOpenRouter(key, chain, templateMessages(info, String(body.signature ?? "").slice(0, 120)), fetch, []);
+      const { message, model } = await callOpenRouter(key, chain, templateMessages(info, String(body.signature ?? "").slice(0, 120), Array.isArray(body.tags) ? body.tags : []), fetch, []);
       const text = String(message.content ?? "").trim();
       return text ? json({ template: text, model }) : json({ error: "Модель бос жауап берді, қайта көр." }, 502);
     } catch (e) {

@@ -1,64 +1,94 @@
 // Run: node --test test/broadcast.test.mjs   (all names and numbers below are made up)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizePhone, parseList, fill, unknownPlaceholders, waLink, callName, firstName, recipients } from "../broadcast/lib.js";
+import { normalizePhone, parseContacts, parseTable, matchTable, addressName, firstName, genitive, fill, unknownPlaceholders, plan, messagesFor, waLink, BUILTIN_TAGS } from "../broadcast/lib.js";
 
-test("phones become 7XXXXXXXXXX", () => {
+const TABLE = [
+  "Аты жөні\tАнасы\tАнасының номері\tӘкесі\tӘкесінің номері",
+  "Серіков Ален\tСерікова Айжан Боранқызы\t87010000001\t\t",
+  '"Ахметов Тимур \n"\tАхметова Сара Нұрқызы\t87010000002\tАхметов Ерлан Болатұлы\t87010000003',
+  "Омаров Сұлтан\tОмарова Дина Маратовна\t\tОмаров Бауыржан Ерікұлы\t87010000004",
+  "Нұрланұлы Әли\tЖақсыбаева Гүл Сериковна\t87010000005\tНұрлан Асқар\tмұғалім",
+  "Қайрат Алдияр\tҚайратова Зере Нұрқызы\t87010000006\tҚайратов Нұр Асанұлы\t87010000007",
+  "Қайрат Данияр\tҚайратова Зере Нұрқызы\t87010000006\tҚайратов Нұр Асанұлы\t87010000007",
+].join("\n");
+const contacts = () => parseContacts(TABLE).contacts;
+
+test("phones", () => {
   assert.equal(normalizePhone("+7 (701) 123-45-67"), "77011234567");
   assert.equal(normalizePhone("87011234567"), "77011234567");
-  assert.equal(normalizePhone("7011234567"), "77011234567");
   assert.equal(normalizePhone("мұғалім"), null);
-  assert.equal(normalizePhone(""), null);
 });
 
-test("class table copied from Excel: missing mother or father, quoted cell, siblings, header", () => {
-  const table = [
-    "Аты жөні\tАнасы\tАнасының номері\tӘкесі\tӘкесінің номері",
-    "Серіков Ален\tСерікова Айжан Боранқызы\t87010000001\t\t",
-    '"Ахметов Тимур \n"\tАхметова Сара Нұрқызы\t87010000002\tАхметов Ерлан Болатұлы\t87010000003',
-    "Омаров Сұлтан\tОмарова Дина Маратовна\t\tОмаров Бауыржан Ерікұлы\t87010000004",
-    "Нұрланұлы Әли\tЖақсыбаева Гүл Сериковна\t87010000005\tНұрлан Асқар\tмұғалім",
-    "Қайрат Алдияр\tҚайратова Зере\t87010000006\tҚайратов Нұр\t87010000007",
-    "Қайрат Данияр\tҚайратова Зере\t87010000006\tҚайратов Нұр\t87010000007",
-    "\t\t\t\t",
-  ].join("\n");
-  const { ok, bad, skipped } = parseList(table);
-  assert.equal(ok.length, 9);
-  assert.deepEqual(ok[1], { student: "Ахметов Тимур", parent: "Ахметова Сара Нұрқызы", phone: "77010000002", role: "ана" });
-  assert.deepEqual(ok.filter((p) => p.student === "Серіков Ален").map((p) => p.role), ["ана"]);
-  assert.deepEqual(ok.filter((p) => p.student === "Омаров Сұлтан").map((p) => p.role), ["әке"]);
-  assert.deepEqual(skipped.map((s) => [s.parent, s.reason]), [["Омарова Дина Маратовна", "телефон жоқ"], ["Нұрлан Асқар", "«мұғалім» телефон емес"]]);
+test("contacts keep parents without a number", () => {
+  const { contacts: cs, bad } = parseContacts(TABLE);
+  assert.equal(cs.length, 11);
+  assert.deepEqual(cs.filter((c) => !c.phone).map((c) => [c.parent, c.note ?? ""]), [["Омарова Дина Маратовна", ""], ["Нұрлан Асқар", "мұғалім"]]);
+  assert.equal(cs[1].student, "Ахметов Тимур");
   assert.deepEqual(bad, []);
-
-  const rs = recipients(ok.map((d, i) => ({ id: "r" + i, data: d })));
-  assert.equal(rs.length, 7); // 9 parent entries, but the Қайрат twins share both parents
-  const mum = rs.find((r) => r.phone === "77010000006");
-  assert.deepEqual(mum.students, ["Қайрат Алдияр", "Қайрат Данияр"]);
-  assert.equal(fill("Құрметті {ата_ана}! {оқушы} ертең сабақта.", mum), "Құрметті Зере! Алдияр мен Данияр ертең сабақта.");
+  assert.deepEqual(parseContacts("Әли Нұрланов; Нұрлан Сейітұлы; +7 701 123 45 67").contacts, [{ student: "Әли Нұрланов", parent: "Нұрлан Сейітұлы", phone: "77011234567", role: "" }]);
 });
 
-test("line format still works; rows without phones are reported", () => {
-  const { ok, bad } = parseList("Әли Нұрланов; Нұрлан Сейітұлы; +7 701 123 45 67\nДанияр — 8 705 000 11 22\nтелефонсыз жол");
-  assert.deepEqual(ok, [
-    { student: "Әли Нұрланов", parent: "Нұрлан Сейітұлы", phone: "77011234567", role: "" },
-    { student: "Данияр", parent: "", phone: "77050001122", role: "" },
-  ]);
-  assert.deepEqual(bad, [{ line: 3, text: "телефонсыз жол" }]);
+test("audiences", () => {
+  const n = (a, o) => plan(contacts(), a, o).messages.length;
+  assert.equal(n("mother_first"), 5);               // 6 students, the twins' mother gets one message
+  assert.equal(n("mother_first", { perStudent: true }), 6);
+  assert.equal(n("father"), 3);                      // Тимур, Сұлтан, twins (shared)
+  assert.equal(n("both"), 7);
+  assert.equal(n("all"), 7);
+  const { notes } = plan(contacts(), "mother_first");
+  assert.deepEqual(notes, [{ student: "Омаров Сұлтан", text: "анасының нөмірі жоқ, әкесіне жіберіледі" }]);
+  const fathers = plan(contacts(), "father").notes.map((x) => [x.student, x.text]);
+  assert.deepEqual(fathers, [["Серіков Ален", "әкесі тізімде жоқ"], ["Нұрланұлы Әли", "әкесінің нөмірі жоқ"]]);
+  const cs = contacts(); cs.find((c) => c.student === "Ахметов Тимур" && c.role === "әке").primary = true;
+  assert.equal(plan(cs, "primary").messages.find((m) => m.students[0] === "Ахметов Тимур").contact.role, "әке");
+  cs.push({ student: "Серіков Ален", parent: "Серікова Гүл", phone: "77019999999", role: "туысы", nearby: true });
+  assert.deepEqual(plan(cs, "nearby").messages.map((m) => m.phone), ["77019999999"]);
 });
 
-test("how people are addressed", () => {
-  assert.equal(callName("Серікова Айжан Боранқызы"), "Айжан Боранқызы");
-  assert.equal(callName("Омарова Дина Маратовна"), "Дина Маратовна");
-  assert.equal(callName("Нұрлан Асқар"), "Асқар");
-  assert.equal(callName("Нұрлан Сейітұлы"), "Нұрлан Сейітұлы");
-  assert.equal(callName("Қабылов қызы Гүлсім"), "Гүлсім");
-  assert.equal(callName("ахметова сара нұрқызы"), "Сара Нұрқызы");
-  assert.equal(callName(""), "");
+test("naming styles", () => {
+  assert.equal(addressName("Айтбекова Маржан Саматовна"), "Маржан Саматовна");
+  assert.equal(addressName("Айтбекова Маржан Саматовна", "title", "ана"), "Маржан апай");
+  assert.equal(addressName("Шахаров Кунанбай Атамуратович", "title"), "Кунанбай ағай");
+  assert.equal(addressName("Айтбекова Маржан Саматовна", "name"), "Маржан");
+  assert.equal(addressName("айтбекова маржан саматовна", "full"), "Айтбекова Маржан Саматовна");
+  assert.equal(addressName("Қабылов қызы Гүлсім", "title"), "Гүлсім апай");
+  assert.equal(addressName("Нұрлан Сейітұлы"), "Нұрлан Сейітұлы");
+  assert.equal(addressName("Камигат Жанарбек", "title"), "Жанарбек");          // no gender known, no title guessed
+  assert.equal(addressName("Камигат Жанарбек", "title", "әке"), "Жанарбек ағай");
   assert.equal(firstName("Нұрланұлы Әли "), "Әли");
-  assert.equal(fill("Құрметті {ата_ана}!", { parent: "", students: ["Данияр"] }), "Құрметті ата-ана!");
 });
 
-test("unknown placeholders and links", () => {
-  assert.deepEqual(unknownPlaceholders("{ата_ана} {сынып} {оқушы} {date}"), ["{сынып}", "{date}"]);
-  assert.equal(waLink("77011234567", "Сәлем & сау бол"), "https://wa.me/77011234567?text=%D0%A1%D3%99%D0%BB%D0%B5%D0%BC%20%26%20%D1%81%D0%B0%D1%83%20%D0%B1%D0%BE%D0%BB");
+test("genitive", () => {
+  const cases = { "Рамазан": "Рамазанның", "Әли": "Әлидің", "Салих": "Салихтың", "Берік": "Беріктің", "Нұрислам": "Нұрисламның",
+    "Онур": "Онурдың", "Данияр": "Даниярдың", "Ахмад": "Ахмадтың", "Асау-Барақ": "Асау-Барақтың", "Айсұлтан": "Айсұлтанның",
+    "Әсел": "Әселдің", "Алдияр мен Данияр": "Алдияр мен Даниярдың", "Сағадат": "Сағадаттың", "Ерғали": "Ерғалидың" };
+  for (const [w, g] of Object.entries(cases)) assert.equal(genitive(w), g, w);
+});
+
+test("data table: header, matching in any word order, per-student messages", () => {
+  const t = parseTable("Аты жөні\tМатематика\tҚазақ тілі\tЖалпы балл\nАлен Серіков\t18\t16\t34\nТимур\t20\t19\t39\nҚайрат Алдияр\t15\t\t15\nҚайрат Данияр\t17\t18\t35\nБөтен Адам\t1\t1\t2");
+  assert.deepEqual(t.headers, ["Аты жөні", "Математика", "Қазақ тілі", "Жалпы балл"]);
+  const students = [...new Set(contacts().map((c) => c.student))];
+  const m = matchTable(t, students);
+  assert.equal(m.col, 0);
+  assert.deepEqual(m.unmatched, ["Бөтен Адам"]);
+  assert.deepEqual(m.missing, ["Омаров Сұлтан", "Нұрланұлы Әли"]);
+  assert.deepEqual(parseTable("Ален\t18\nТимур\t20").headers, ["Баған 1", "Баған 2"]);
+
+  const template = "Құрметті {Алушы}! {Оқушы аты:ның} нәтижесі: Математика — {Математика}, Қазақ тілі — {Қазақ тілі}. Жалпы: {Жалпы балл}.";
+  const { messages } = messagesFor({ contacts: contacts(), template, table: t, audience: "mother_first", naming: "title" });
+  assert.equal(messages.length, 6); // twins split: each child has own grades
+  const ali = messages.find((x) => x.students[0] === "Серіков Ален");
+  assert.equal(ali.text, "Құрметті Айжан апай! Аленнің нәтижесі: Математика — 18, Қазақ тілі — 16. Жалпы: 34.");
+  assert.deepEqual(messages.find((x) => x.students[0] === "Қайрат Алдияр").empty, ["Қазақ тілі"]);
+  assert.equal(messages.find((x) => x.students[0] === "Омаров Сұлтан").noRow, true);
+});
+
+test("tags, old placeholders, links", () => {
+  assert.deepEqual(unknownPlaceholders("{Алушы} {ата_ана} {Математика} {date}", [...BUILTIN_TAGS, "Математика"]), ["date"]);
+  assert.equal(fill("Құрметті {ата_ана}! {оқушы}", { "Алушы": "Зере", "Оқушы аты": "Алдияр мен Данияр" }), "Құрметті Зере! Алдияр мен Данияр");
+  const { messages } = messagesFor({ contacts: contacts(), template: "Құрметті {Алушы}! {Оқушы аты}", audience: "both" });
+  assert.equal(messages.find((x) => x.phone === "77010000006").text, "Құрметті Зере Нұрқызы! Алдияр мен Данияр");
+  assert.equal(waLink("77011234567", "a b"), "https://wa.me/77011234567?text=a%20b");
 });

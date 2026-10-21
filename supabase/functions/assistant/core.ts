@@ -236,22 +236,24 @@ export function cleanHistory(messages: unknown) {
     .map((m: any) => ({ role: m.role, content: m.content.slice(0, 4000) }));
 }
 
-// Parents broadcast: turns general class information into one WhatsApp message with name placeholders.
-// Only the class information reaches the model; names and phones are filled in on the teacher's device.
-export function templateMessages(info: string, signature: string) {
+// Class broadcasts: turns general class information into one WhatsApp message with {tags}.
+// Only the information and the tag names reach the model; names, phones and grades are filled in on the teacher's device.
+export function templateMessages(info: string, signature: string, tags: string[] = []) {
+  const list = tags.map((t) => String(t).replace(/[{}:]/g, "").slice(0, 40)).filter(Boolean).slice(0, 30);
   return [
     { role: "system", content: [
       "You write WhatsApp messages from a school class teacher to the parents of the class.",
       "Write in the language of the information (Kazakh by default), polite and warm, short and clear.",
-      "Start with: Құрметті {ата_ана}! (or the same greeting in the information's language).",
-      "Mention the child as {оқушы} once where it fits naturally, for example 'Сіздің балаңыз {оқушы}…'.",
-      "Use only these two placeholders, exactly as written. Do not add any other placeholders or blanks.",
+      "Start with: Құрметті {Алушы}! ({Алушы} becomes the recipient's name).",
+      "Refer to the child as {Оқушы аты}. When the child's name needs the genitive case (-ның/-нің/-дың/-дің/-тың/-тің), write {Оқушы аты:ның} and never add a suffix yourself.",
+      list.length ? `Placeholders you may use, written exactly with curly braces: ${list.map((t) => `{${t}}`).join(", ")}. Use the data ones (grades, scores…) where the information calls for them.` : "",
+      "Use no other placeholders or blanks.",
       "Keep every fact exactly: dates, times, places, amounts, requirements. Never invent facts.",
-      "Plain text with short paragraphs; WhatsApp *bold* is allowed for the key date or deadline. No emojis spam: at most one.",
+      "Plain text with short paragraphs; WhatsApp *bold* is allowed for the key date or deadline. At most one emoji.",
       "At most 900 characters.",
       signature ? `End with this signature on its own line: ${signature}` : "End with: Сынып жетекшісі",
       "Return only the message text.",
-    ].join("\n") },
+    ].filter(Boolean).join("\n") },
     { role: "user", content: info.slice(0, 6000) },
   ];
 }

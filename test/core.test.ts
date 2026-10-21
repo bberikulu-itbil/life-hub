@@ -81,8 +81,9 @@ test("update_item keeps fields the tool schema does not know", async () => {
 test("template calls send no tools and keep the placeholders in the instructions", async () => {
   let body: any = null;
   const fake = (async (_u: string, init: any) => { body = JSON.parse(init.body); return new Response(JSON.stringify({ model: "m", choices: [{ message: { content: "ok" } }] })); }) as typeof fetch;
-  await callOpenRouter("k", ["a"], templateMessages("Ертең 18:00-де жиналыс, 204 кабинет.", "Бағдәулет"), fake, []);
+  await callOpenRouter("k", ["a"], templateMessages("Ертең 18:00-де жиналыс, 204 кабинет.", "Бағдәулет", ["Алушы", "Математика"]), fake, []);
   assert.equal(body.tools, undefined);
-  assert.match(body.messages[0].content, /\{ата_ана\}/);
+  assert.match(body.messages[0].content, /\{Алушы\}/);
+  assert.match(body.messages[0].content, /\{Математика\}/);
   assert.match(body.messages[0].content, /Бағдәулет/);
 });
