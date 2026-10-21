@@ -76,6 +76,15 @@ test("data table: header, matching in any word order, per-student messages", () 
   assert.deepEqual(m.missing, ["Омаров Сұлтан", "Нұрланұлы Әли"]);
   assert.deepEqual(parseTable("Ален\t18\nТимур\t20").headers, ["Баған 1", "Баған 2"]);
 
+  // typed without Kazakh letters, and a surname spelled differently: matched, the guess is reported
+  const t2 = parseTable("Аты\tБалл\nАлен Серіков\t1\nСултан Омаров\t2\nӘли Нұрланов\t3\nБөтен Адам\t4\nДанияр Қайратов\t5");
+  const m2 = matchTable(t2, students);
+  assert.equal(m2.byStudent.get("Омаров Сұлтан")[1], "2");
+  assert.equal(m2.byStudent.get("Нұрланұлы Әли")[1], "3");
+  assert.deepEqual(m2.guessed, [["Әли Нұрланов", "Нұрланұлы Әли"], ["Данияр Қайратов", "Қайрат Данияр"]]);
+  assert.deepEqual(m2.unmatched, ["Бөтен Адам"]);
+  assert.deepEqual(m2.missing, ["Ахметов Тимур", "Қайрат Алдияр"]);
+
   const template = "Құрметті {Алушы}! {Оқушы аты:ның} нәтижесі: Математика — {Математика}, Қазақ тілі — {Қазақ тілі}. Жалпы: {Жалпы балл}.";
   const { messages } = messagesFor({ contacts: contacts(), template, table: t, audience: "mother_first", naming: "title" });
   assert.equal(messages.length, 6); // twins split: each child has own grades

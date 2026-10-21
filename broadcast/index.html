@@ -47,6 +47,9 @@ details.card[open] > summary { margin-bottom: var(--space-3); }
 .msg-card.off { opacity: .55; }
 .msg-card header { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-3); align-items: start; font-weight: 600; }
 .msg-card header input { width: 22px; height: 22px; accent-color: var(--accent); margin: 2px 0 0; }
+.msg-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.msg-card .edited { font-size: var(--fs-xs); font-weight: 600; color: var(--accent); margin: 0; }
+.msg-card textarea { font: inherit; }
 .msg-card header small { display: block; color: var(--text-muted); font-size: var(--fs-sm); font-weight: 400; }
 .notes { margin: 0; padding-left: var(--space-5); color: var(--warning); font-size: var(--fs-sm); display: grid; gap: var(--space-1); }
 .send-row { grid-template-columns: minmax(0, 1fr) auto; cursor: default; }
@@ -364,7 +367,13 @@ function show(next) {
 for (const b of $("tabbar").children) b.onclick = () => show(b.dataset.view);
 $("to-contacts").onclick = () => { openGroup = klass; show("contacts"); };
 
-const build = (b) => messagesFor({ contacts: classContacts(b.data.class), template: b.data.template || "", table: b.data.table || null, audience: b.data.audience || "mother_first", naming: b.data.naming || "name_patronymic", ...fieldsOf(b.data.class) });
+const generate = (b) => messagesFor({ contacts: classContacts(b.data.class), template: b.data.template || "", table: b.data.table || null, audience: b.data.audience || "mother_first", naming: b.data.naming || "name_patronymic", ...fieldsOf(b.data.class) });
+// Hand edits replace the generated text; "stale" when the template or data changed after the edit.
+function build(b) {
+  const out = generate(b), edits = b.data.edits || {};
+  for (const m of out.messages) { const e = edits[m.key]; if (e) { m.stale = e.base !== m.text; m.base = m.text; m.text = e.text; m.edited = true; } }
+  return out;
+}
 const picked = (b, msgs) => msgs.filter((m) => !(b.data.excluded || {})[m.key]);
 
 function renderList() {
@@ -435,7 +444,8 @@ function renderStep1() {
     const w = [];
     if (match.col < 0) w.push("Оқушылардың аттары бар баған табылмады: бір бағанда тізімдегідей аты-жөні тұрсын.");
     if (match.unmatched.length) w.push(`Тізімде жоқ аттар: ${match.unmatched.slice(0, 8).join(", ")}${match.unmatched.length > 8 ? "…" : ""}.`);
-    if (match.col >= 0 && match.missing.length) w.push(`Кестеде жоқ оқушылар: ${match.missing.map(firstName).join(", ")}: оларға кесте деректері бар хабар бос шығады, 3-қадамда тексер.`);
+    if (match.guessed.length) w.push(`Ұқсас атпен қосылды: ${match.guessed.map(([a, b]) => `${a} → ${b}`).join(", ")}. Қате болса, кестедегі атты тізімдегідей жаз.`);
+    if (match.col >= 0 && match.missing.length) w.push(`Кестеде жоқ оқушылар: ${match.missing.join(", ")}: оларға кесте деректері бар хабар бос шығады, 3-қадамда тексер.`);
     $("table-warn").textContent = w.join(" "); $("table-warn").hidden = !w.length;
   } else { $("table-sum").textContent = ""; $("table-warn").hidden = true; }
   renderTemplateState();
@@ -447,7 +457,7 @@ function renderTemplateState() {
   if (t.length > 1500) w.push("Хабар ұзын: кейбір телефондарда WhatsApp сілтемесі толық ашылмауы мүмкін.");
   $("tpl-warn").textContent = w.join(" "); $("tpl-warn").hidden = !w.length;
   $("chars").textContent = `${t.length} таңба`;
-  const first = build(current).messages[0];
+  const first = generate(current).messages[0];
   $("preview1").textContent = first ? first.text : "Бұл сыныпта нөмірі бар байланыс жоқ.";
   $("to2").disabled = !t.trim() || unknown.length > 0;
 }
@@ -540,14 +550,50 @@ function renderStep3() {
     box.onchange = () => { current.data = { ...current.data, excluded: { ...excluded, [m.key]: !box.checked } }; saveSoon(); renderStep3(); };
     who.append(el("small", "", `${joinNames(m.students.map(firstName))} · +${m.phone}`));
     head.append(box, who);
-    card.append(head, el("pre", "preview", m.text));
+    const text = el("pre", "preview", m.text);
+    card.append(head, text);
     const w = [];
-    if (m.noRow) w.push("Кестеде бұл оқушының жолы жоқ.");
-    if (m.empty.length) w.push(`Бос мәндер: ${m.empty.join(", ")}.`);
+    if (m.stale) w.push("Үлгі не кесте өзгерді, бірақ бұл хат қолмен өңделген күйінде қалды: тексер.");
+    else {
+      if (m.noRow) w.push("Кестеде бұл оқушының жолы жоқ.");
+      if (m.empty.length) w.push(`Бос мәндер: ${m.empty.join(", ")}.`);
+    }
     if (w.length) card.append(el("p", "warn", w.join(" ")));
+    const tools = el("div", "msg-tools");
+    const edit = el("button", "btn sm ghost", "Өңдеу"); edit.type = "button";
+    edit.onclick = () => editMessage(card, text, tools, m);
+    tools.append(edit);
+    if (m.edited) {
+      const undo = el("button", "btn sm ghost", "Үлгідегідей қайтару"); undo.type = "button";
+      undo.onclick = () => setEdit(m.key, null);
+      card.append(el("p", "edited", "Қолмен өңделді"));
+      tools.append(undo);
+    }
+    card.append(tools);
     return card;
   }));
   $("approve").disabled = !on.length;
+}
+function setEdit(key, edit) {
+  const edits = { ...(current.data.edits || {}) };
+  if (edit) edits[key] = edit; else delete edits[key];
+  current.data = { ...current.data, edits };
+  saveSoon(); renderStep3();
+}
+function editMessage(card, text, tools, m) {
+  const ta = el("textarea"); ta.value = m.text; ta.rows = Math.min(16, m.text.split("\n").length + 2);
+  ta.setAttribute("aria-label", "Хат мәтіні");
+  const save = el("button", "btn sm", "Сақтау"), cancel = el("button", "btn sm ghost", "Болдырмау");
+  save.type = cancel.type = "button";
+  save.onclick = () => {
+    const t = ta.value.trim();
+    if (!t) return toast("Хат бос қалмасын. Жібергің келмесе, белгісін алып таста.", true);
+    const base = m.edited ? m.base : m.text; // the generated text
+    setEdit(m.key, t === base ? null : { text: t, base });
+  };
+  cancel.onclick = () => renderStep3();
+  text.replaceWith(ta); tools.replaceChildren(save, cancel);
+  ta.focus();
 }
 $("approve").onclick = async () => {
   const t = current.data.template.replace(/\{[^}]+\}/g, "…");

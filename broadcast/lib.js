@@ -91,19 +91,33 @@ export function parseTable(text) {
 }
 
 // Names match whatever the word order: "Арманұлы Рамазан" = "рамазан арманұлы".
-export const nameKey = (s) => clean(s).toLowerCase().replace(/ё/g, "е").split(" ").sort().join(" ");
+// Lower case, Kazakh letters folded ("Нуржан" = "Нұржан"), word order ignored.
+const FOLD = { "ә": "а", "ғ": "г", "қ": "к", "ң": "н", "ө": "о", "ұ": "у", "ү": "у", "һ": "х", "і": "и", "ё": "е" };
+export const nameKey = (s) => clean(s).toLowerCase().replace(/[әғқңөұүһіё]/g, (c) => FOLD[c]).split(" ").sort().join(" ");
+
+// Same name, other words spelled a bit differently: "Нұржан Тынышбек" ~ "Тыныштық Нұржан".
+function near(a, b) {
+  const x = nameKey(a).split(" "), y = nameKey(b).split(" ");
+  const [s, l] = x.length <= y.length ? [x, y] : [y, x];
+  const rest = s.filter((w) => !l.includes(w));
+  return rest.length < s.length && rest.every((w) => w.length >= 4 && l.some((v) => !s.includes(v) && v.slice(0, 4) === w.slice(0, 4)));
+}
 
 // Finds the column with student names and links each student to their row.
 export function matchTable(table, students) {
   const full = new Map(students.map((s) => [nameKey(s), s]));
   const firstNames = new Map();
-  for (const s of students) { const k = clean(s).toLowerCase().split(" ").at(-1); firstNames.set(k, firstNames.has(k) ? null : s); }
-  const find = (cell) => full.get(nameKey(cell)) || (cell && !cell.includes(" ") ? firstNames.get(clean(cell).toLowerCase()) : null) || null;
+  for (const s of students) { const k = nameKey(clean(s).split(" ").at(-1)); firstNames.set(k, firstNames.has(k) ? null : s); }
+  const find = (cell) => full.get(nameKey(cell)) || (cell && !clean(cell).includes(" ") ? firstNames.get(nameKey(cell)) : null) || null;
   let col = -1, best = 0;
   table.headers.forEach((_, i) => { const n = table.rows.filter((r) => find(r[i])).length; if (n > best) { best = n; col = i; } });
-  const byStudent = new Map(), unmatched = [];
-  if (col >= 0) for (const r of table.rows) { const s = find(r[col]); if (s && !byStudent.has(s)) byStudent.set(s, r); else if (!s && r[col]) unmatched.push(r[col]); }
-  return { col, byStudent, unmatched, missing: students.filter((s) => !byStudent.has(s)) };
+  const byStudent = new Map(), left = [], unmatched = [], guessed = [];
+  if (col >= 0) for (const r of table.rows) { const s = find(r[col]); if (s && !byStudent.has(s)) byStudent.set(s, r); else if (!s && r[col]) left.push(r); }
+  for (const r of left) {
+    const c = students.filter((s) => !byStudent.has(s) && near(r[col], s));
+    if (c.length === 1) { byStudent.set(c[0], r); guessed.push([r[col], c[0]]); } else unmatched.push(r[col]);
+  }
+  return { col, byStudent, unmatched, guessed, missing: students.filter((s) => !byStudent.has(s)) };
 }
 
 /* ---------- names ---------- */
