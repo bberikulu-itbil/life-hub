@@ -162,7 +162,7 @@ async function showLibrary() {
 async function continueReading(b, speed) {
   const vs = await byBook('versions', b.id);
   if (!vs.length) return showBook(b.id);
-  const v = vs.find(x => x.id === b.lastVersion) || vs.find(x => x.kind === 'original') || vs[0];
+  const v = vs.find(x => x.id === b.lastVersion) || [...vs].sort((a, c) => verOrder(a) - verOrder(c))[0];
   await openReader(b, v);
   if (speed) readerSpeed();
 }
@@ -178,9 +178,11 @@ async function quickAdd(files) {
     await addVersions(id, [f], '', 'original');
     toast('Мұқаба мен ақпарат оқылуда…');
     await enrichBook(b).catch(() => {});
-    last = id;
+    last = b;
   }
-  files.length === 1 ? showBook(last) : rerender();
+  // бір файл — бірден таза нұсқа жасалады; бірнеше файл — әр кітап бетінен жасауға болады
+  if (files.length === 1) autoConvert(last, () => showBook(last.id));
+  else { toast('Таза нұсқаны әр кітаптың бетінен жасауға болады'); rerender(); }
 }
 
 /* ---------- Кітаптар торы ---------- */

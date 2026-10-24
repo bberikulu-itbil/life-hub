@@ -1,13 +1,14 @@
 'use strict';
 /* Мәтінді дайындаудың ортақ ағыны: аудио, жылдам оқу және чат бір жерден пайдаланады. Бір рет жасалады, құрылғыда сақталады. */
 
-const KIND = { original: 'Түпнұсқа', translation: 'Аударма', other: 'Басқа' };
+const KIND = { clean: 'Таза нұсқа', original: 'Түпнұсқа', translation: 'Аударма', other: 'Басқа' };
 const isReady = v => v.prepV === 2; // 2 = тазартылған мәтін + бөлімдер + бөлшек нөмірлері
+const verOrder = v => v.kind === 'clean' ? 0 : v.kind === 'original' ? 1 : 2; // таза нұсқа бірінші
 
 // Дайын нұсқаны қайтарады. Дайын нұсқа жоқ болса, прогресс-панельді көрсетіп, өзі дайындайды
 // және аяқталғанда again() шақырады; бұл жағдайда null қайтады.
 async function withPrepared(b, versionId, again, back, what) {
-  const vs = await byBook('versions', b.id);
+  const vs = (await byBook('versions', b.id)).sort((a, c) => verOrder(a) - verOrder(c));
   const v = vs.filter(isReady).find(x => x.id === versionId) || vs.find(isReady);
   if (v) return v;
   if (!vs.length) {

@@ -37,6 +37,9 @@ async function showProfile(focus) {
 
     ${audioSettingsHTML()}
 
+    <div class="glass sec"><h3>${ic('layers', 18)} Кітапты өңдеу</h3>
+      <label class="tgl"><input type="checkbox" id="pAi" ${localStorage.kAiClean !== '0' ? 'checked' : ''}><span>Жүктелген кітапты ЖИ-мен қосымша тазарту<br><small class="muted">Жергілікті тазарту (бет нөмірлері, колонтитулдар, тараулар) әрқашан жасалады. ЖИ мәтіндегі қалған артық сөздер мен қате бөлінген сөздерді түзейді; Hub-қа кіру керек, кітапқа ~50-ге дейін сұрау жұмсалады.</small></span></label></div>
+
     <div class="glass sec" id="pDl"><h3>${ic('drive')} Жүктелгендер</h3>
       <div class="bar-p" style="height:10px;border-radius:99px"><i style="width:${est.quota ? Math.min(100, est.usage / est.quota * 100) : 0}%;border-radius:99px"></i></div>
       <small style="color:var(--mute)">${est.usage != null ? `Қолданылған: ${size(est.usage)}${est.quota ? ` / ${size(est.quota)}` : ''}. ` : ''}Кітап файлдары ${size(fileTotal)}, аудио ${size(audioTotal)}. Бәрі тек осы құрылғыда сақталады.</small>
@@ -56,6 +59,7 @@ async function showProfile(focus) {
       <small style="color:var(--mute)">Оқу уақытының статистикасы «Аналитика» бетінде, жылдам оқу баптаулары кітаптың «Жылдам оқу» бетінде.</small></div>`;
 
   $('#pSpeed').onclick = showSpeed;
+  $('#pAi').onchange = e => { localStorage.kAiClean = e.target.checked ? '1' : '0'; };
   bindAudioSettings();
   if (focus === 'audio') $('#audioSet').scrollIntoView({ block: 'start' });
   $('#thSeg').onclick = e => { const t = e.target.closest('[data-t]')?.dataset.t; if (!t) return; localStorage.kTheme = t; applyTheme(); showProfile(); };

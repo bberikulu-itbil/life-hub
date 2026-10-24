@@ -77,3 +77,52 @@ test("cleanText joins hyphenated words and drops bare page numbers", () => {
   vm.runInContext(fs.readFileSync(new URL("../kitapp/chat.js", import.meta.url), "utf8") + ";this.cleanText=cleanText", ctx);
   assert.equal(ctx.cleanText("Кіта-\nпхана — бұл\n12\nорын.  Келесі\nжол"), "Кітапхана — бұл орын. Келесі жол");
 });
+
+const KC = createRequire(import.meta.url)("../kitapp/kconvert.js");
+const it = (str, x, y, size = 10) => ({ str, transform: [size, 0, 0, size, x, y], width: str.length * size * .5, height: size });
+const LINE = "Мұғалім сыныпқа кіріп балалармен әңгімені бастады және сұрақ қойды"; // ~65 таңба, толық жол
+
+function fakeBook() {
+  const pages = [];
+  for (let p = 1; p <= 5; p++) {
+    const items = [it("Тәрбие сағатынан естеліктер", 120, 800, 9)];
+    let y = 760;
+    if (p === 1 || p === 4) { items.push(it(p === 1 ? "1-тарау" : "2-тарау", 150, y, 18)); y -= 30; }
+    const L = "абвгдежзик"[p];
+    for (let k = 0; k < 6; k++, y -= 14) items.push(it(`${LINE} ${L}${"абвгде"[k]}`, 50, y));
+    if (p === 2) { items.push(it("Бұл кіта-", 50, y)); y -= 14; items.push(it("пхана туралы әңгіме болды", 50, y), it("1", 190, y + 4, 6)); y -= 14; }
+    items.push(it("Абзац соңы.", 50, y)); y -= 14;
+    items.push(it(`Жаңа абзац басталды ${L} ${LINE}`, 62, y)); y -= 14;
+    items.push(it(String(p), 300, 40, 9));
+    pages.push(KC.linesFromItems(items));
+  }
+  return pages;
+}
+
+test("structure removes page numbers, running headers and footnote marks", () => {
+  const { chapters, removed } = KC.structure(fakeBook());
+  const text = chapters.flatMap((c) => c.paras).join("\n");
+  assert.equal(removed.pageNum, 5);
+  assert.equal(removed.header, 5);
+  assert.ok(!/Тәрбие сағатынан/.test(text));
+  assert.ok(text.includes("Бұл кітапхана туралы әңгіме болды Абзац") || text.includes("Бұл кітапхана туралы әңгіме болды"));
+  assert.ok(!/болды 1\b/.test(text));
+});
+
+test("structure splits chapters by large headings and paragraphs by indent", () => {
+  const { chapters } = KC.structure(fakeBook());
+  assert.deepEqual(chapters.map((c) => c.title), ["1-тарау", "2-тарау"]);
+  assert.ok(chapters[0].paras.some((p) => p.startsWith("Жаңа абзац басталды")));
+  assert.ok(chapters[0].paras.every((p) => !/^\d+$/.test(p)));
+});
+
+test("structure prefers the PDF outline for chapter titles", () => {
+  const { chapters } = KC.structure(fakeBook(), [{ title: "Кіріспе", page: 0 }, { title: "Негізгі бөлім", page: 3 }]);
+  assert.deepEqual(chapters.map((c) => c.title), ["Кіріспе", "Негізгі бөлім"]);
+  assert.ok(!chapters[0].paras.includes("1-тарау")); // тарау атының қайталануы алынды
+});
+
+test("chunkAt stops at a chapter boundary", () => {
+  const w = ["бір", "екі", "үш", "төрт"];
+  assert.deepEqual(KSP.chunkAt(w, 0, 4, new Map([[2, {}]])).words, ["бір", "екі"]);
+});

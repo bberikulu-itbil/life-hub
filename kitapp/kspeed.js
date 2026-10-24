@@ -12,11 +12,11 @@
     return lead + Math.min(k, core - 1);
   }
 
-  // i-ші сөзден бастап ең көбі per сөз, бірақ сөйлем соңында тоқтайды.
-  function chunkAt(words, i, per) {
+  // i-ші сөзден бастап ең көбі per сөз, бірақ сөйлем соңында және бөлім шекарасында (stops) тоқтайды.
+  function chunkAt(words, i, per, stops) {
     if (i >= words.length) return null;
     const out = []; let j = i;
-    while (j < words.length && out.length < per) { out.push(words[j++]); if (END.test(out[out.length - 1])) break; }
+    while (j < words.length && out.length < per) { out.push(words[j++]); if (END.test(out[out.length - 1]) || stops?.has(j)) break; }
     return { words: out, end: j };
   }
 

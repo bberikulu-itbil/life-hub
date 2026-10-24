@@ -310,3 +310,17 @@ dialog.bsheet{margin:auto auto 0;width:100%;max-width:640px;max-height:80vh;bord
 .lrow span small{font-size:.8rem;white-space:normal}
 #pSpeed span{white-space:normal}
 @media(max-width:430px){.r-title{visibility:hidden}.sp-bar b{font-size:.95rem}}
+.sp-t{display:flex;flex-direction:column;min-width:0;line-height:1.2}.sp-t small{color:var(--mute);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw}
+.ch-card{display:flex;flex-direction:column;align-items:center;gap:.4rem;padding:0 1.5rem;animation:kUp .3s ease-out}.ch-card small{color:var(--acc);font-size:1rem;font-weight:600;font-family:system-ui,sans-serif}.ch-card b{font-size:.6em;line-height:1.2}
+
+/* таза нұсқа */
+.tip{display:flex;align-items:center;gap:.9rem}.tip>div{flex:1;display:flex;flex-direction:column}.tip small{color:var(--mute)}.tip>.ic{color:var(--acc)}
+.steps{display:flex;flex-direction:column;gap:.55rem;margin-bottom:.4rem}
+.step{display:flex;align-items:center;gap:.6rem;color:var(--mute)}
+.step i{width:18px;height:18px;border-radius:50%;border:2px solid currentColor;flex:none}
+.step.run{color:var(--acc);font-weight:600}.step.run i{border-top-color:transparent;animation:kSpin .8s linear infinite}
+.step.ok{color:var(--ink)}.step.ok i{background:var(--acc);border-color:var(--acc)}
+.step.warn i{background:var(--star);border-color:var(--star)}.step.err{color:var(--warn)}.step.err i{background:var(--warn);border-color:var(--warn)}
+@keyframes kSpin{to{transform:rotate(360deg)}}
+.tgl{display:flex;gap:.7rem;align-items:flex-start;color:var(--ink);font-size:.95rem}.tgl input{margin-top:.2rem}
+.step{width:100%}.step span{flex:1;min-width:0}

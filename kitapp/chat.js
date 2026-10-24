@@ -75,7 +75,7 @@ async function extractParts(v, ctl) {
     for (let i = 0; i < items.length; i++) {
       if (ctl.stopped) { book.destroy(); throw STOP; }
       const c = await items[i].load(book.load.bind(book));
-      parts.push({ ref: `бөлім ${i + 1}`, text: cleanText(c?.textContent || '') });
+      parts.push({ ref: `бөлім ${i + 1}`, text: cleanText((c?.querySelector?.('body') || c)?.textContent || '') }); // <title> оқылмасын
       items[i].unload(); ctl.prog((i + 1) / items.length * .9, `Бөлім ${i + 1} / ${items.length}`);
       if (i % 4 === 0) await tick();
     }

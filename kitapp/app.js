@@ -50,7 +50,9 @@ async function showBook(id) {
   if (!b) return showLibrary();
   const [vs, notes, ks, recs, books] = await Promise.all([byBook('versions', id), byBook('notes', id), get('konspekt', id), byBook('audio', id), all('books')]);
   notes.sort((a, c) => c.created - a.created);
+  vs.sort((a, c) => verOrder(a) - verOrder(c));
   const rv = vs.filter(isReady), av = rv.find(x => recs.some(r => r.versionId === x.id)) || rv[0];
+  const clean = vs.find(x => x.kind === 'clean'), src = vs.find(x => x.type === 'pdf') || vs.find(x => x.kind === 'original') || vs[0];
   const chs = av ? await audioChapters(av) : [];
   const dur = (c, i) => recs.find(r => r.versionId === av.id && r.ci === i)?.dur || estSecs(c.text);
   const totalAudio = chs.reduce((a, c, i) => a + dur(c, i), 0);
@@ -86,6 +88,8 @@ async function showBook(id) {
     <div class="glass sec"><h3>Сипаттама</h3>${b.summary ? `<p class="clamp" id="sum">${esc(b.summary)}</p><button class="link" id="sumMore">Толығырақ</button>`
       : `<p class="muted">Сипаттама жоқ. Жоғарғы ${ic('more', 14)} мәзірінен «Өңдеу» арқылы қос.</p>`}</div>
 
+    ${!clean && src ? `<div class="glass sec tip">${ic('layers', 22)}<div><b>Таза нұсқа жасау</b><small>Тыңдау мен жылдам оқу үшін бет нөмірлерісіз, колонтитулсыз, тараулары бөлінген EPUB кітап.</small></div><button class="primary" id="convBtn">Жасау</button></div>` : ''}
+
     <div class="glass sec"><h3>Бөлімдер${chs.length ? ` · ${chs.length}` : ''}</h3>${chs.length ? `
       <div class="chlist" id="chs">${chs.map((c, i) => `<button class="lrow ${i >= 4 ? 'more' : ''}" data-i="${i}"><em class="num">${i + 1}</em><span>${esc(c.title)}</span><em>${fmtT(dur(c, i))}</em></button>`).join('')}</div>
       ${chs.length > 4 ? '<button class="link center" id="chAll">Барлығын көру</button>' : ''}`
@@ -118,6 +122,7 @@ async function showBook(id) {
   $('#chatBtn').onclick = () => showChat(id);
   $('#audioBtn').onclick = () => showAudio(id);
   $('#speedBtn').onclick = () => continueReading(b, true);
+  $('#convBtn') && ($('#convBtn').onclick = () => showConvert(b, src, () => showBook(id)));
   $('#prepBtn') && ($('#prepBtn').onclick = () => renderPrep(b, vs.find(x => x.kind === 'original') || vs[0], () => showBook(id), () => showBook(id), 'бөлімдер'));
   $('#sumMore') && ($('#sumMore').onclick = e => { $('#sum').classList.toggle('clamp'); e.target.textContent = $('#sum').classList.contains('clamp') ? 'Толығырақ' : 'Жасыру'; });
   $('#chAll') && ($('#chAll').onclick = e => { $('#chs').classList.add('open'); e.target.remove(); });
@@ -158,8 +163,9 @@ $('#addForm').onsubmit = async e => {
   const b = { id, title: typed || files[0]?.name.replace(/\.[^.]+$/, '') || 'Атаусыз кітап', titleAuto: !typed, author: d.get('author').trim(), status: 'plan', rating: 0, added: Date.now() };
   await put('books', b);
   await addVersions(id, files, d.get('vname').trim());
-  if (files.length) { toast('Мұқаба мен ақпарат оқылуда…'); await enrichBook(b).catch(() => {}); }
-  showBook(id);
+  if (!files.length) return showBook(id);
+  toast('Мұқаба мен ақпарат оқылуда…'); await enrichBook(b).catch(() => {});
+  autoConvert(b, () => showBook(id));
 };
 
 /* ---------- Оқығыш ---------- */

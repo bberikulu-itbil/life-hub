@@ -1,11 +1,19 @@
 'use strict';
 /* Kitapp: жылдам оқу. Жалпы жаттығу (Профиль: бастапқы өлшем, 6 кезең, еркін жаттығу, баптаулар) және оқығыштың ішіндегі жылдам оқу. */
 
-const SP_DEF = { baseline: 200, family: 'serif', font: 56, orp: true, punct: 1, long: true, ramp: true, countdown: true, unlocked: 1, freeMode: 'rsvp', freePer: 1, freeWpm: 260, freeMins: 3 };
+const SP_DEF = { chapPause: 2, baseline: 200, family: 'serif', font: 56, orp: true, punct: 1, long: true, ramp: true, countdown: true, unlocked: 1, freeMode: 'rsvp', freePer: 1, freeWpm: 260, freeMins: 3 };
 const FF = { serif: 'Georgia,"Times New Roman",serif', sans: 'system-ui,sans-serif', mono: 'ui-monospace,Menlo,monospace' };
 const spGet = () => ({ ...SP_DEF, ...JSON.parse(localStorage.kSpeed || '{}') });
 const spSet = o => { localStorage.kSpeed = JSON.stringify(o); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Бөлім басталатын сөз индексі -> {n, title}
+function chapterMarks(v, firstOfPi) {
+  const pis = Object.keys(firstOfPi).map(Number).sort((a, c) => a - c), m = new Map();
+  (v.chapters || []).forEach((ch, n) => { const p = pis.find(x => x >= ch.from); if (p != null && !m.has(firstOfPi[p])) m.set(firstOfPi[p], { n: n + 1, title: ch.title }); });
+  return m;
+}
+const markAt = (marks, i) => { let r = null; if (marks) for (const [k, m] of marks) if (k <= i && (!r || k > r.k)) r = { k, ...m }; return r; };
 
 async function loadWords(v) {
   const cs = (await byBook('chunks', v.bookId)).filter(c => c.versionId === v.id).sort((a, b) => a.n - b.n);
@@ -18,12 +26,13 @@ async function loadWords(v) {
 function runDrill(cfg, words, start, S, done) {
   const WIN = 70, total = cfg.mins * 60000, o = KSP.opts(S.punct, S.long);
   const ov = document.createElement('div'); ov.className = 'sp-ov';
-  ov.innerHTML = `<div class="sp-bar"><button id="spX" aria-label="Жабу">${ic('x')}</button><b>${esc(cfg.title)}</b><span id="spW" style="color:var(--mute)"></span><span style="flex:1"></span><button id="spM">−</button><button id="spP">+</button></div>
+  ov.innerHTML = `<div class="sp-bar"><button id="spX" aria-label="Жабу">${ic('x')}</button><div class="sp-t"><b>${esc(cfg.title)}</b><small id="spC"></small></div><span id="spW" style="color:var(--mute)"></span><span style="flex:1"></span><button id="spM">−</button><button id="spP">+</button></div>
     <div class="sp-main" id="spMain" style="font-family:${FF[S.family]};font-size:${S.font}px"></div><div class="sp-ctx" id="spCtx"></div>
     <div class="sp-foot"><div class="bar-p"><i id="spBar" style="width:0"></i></div><div class="row" style="justify-content:center;margin-top:.6rem"><button id="spB" aria-label="10 сөз артқа">${ic('skip-back')} 10</button><button id="spPlay" class="primary" aria-label="Ойнату">${ic('play')}</button><button id="spF" aria-label="10 сөз алға">10 ${ic('skip-forward')}</button></div></div>`;
   document.body.append(ov);
   const q = s => ov.querySelector(s), main = q('#spMain');
-  let i = start, maxI = start, adj = 0, playing = false, timer = 0, active = 0, seg = 0, gone = false, ws = -1;
+  let i = start, maxI = start, adj = 0, playing = false, timer = 0, active = 0, seg = 0, gone = false, ws = -1, shown = start;
+  const setCh = () => { const m = markAt(cfg.marks, i); q('#spC').textContent = m ? `${m.n}. ${m.title}` : ''; };
 
   const el = () => active + (playing ? Date.now() - seg : 0);
   const wpm = () => Math.max(60, (S.ramp ? KSP.rampWpm(cfg.from, cfg.to, el() / total) : cfg.from) + adj);
@@ -44,7 +53,13 @@ function runDrill(cfg, words, start, S, done) {
   const step = () => {
     if (!playing || gone) return;
     if (el() >= total) return finish();
-    const c = KSP.chunkAt(words, i, cfg.per);
+    // Жаңа бөлім басталғанда: бөлім атын көрсетіп, баптаудағы уақытқа кідіреміз
+    const m = cfg.marks?.get(i);
+    if (m && i !== shown) {
+      shown = i; setCh();
+      if (S.chapPause > 0) { main.innerHTML = `<div class="ch-card"><small>${m.n}-бөлім</small><b>${esc(m.title)}</b></div>`; timer = setTimeout(step, S.chapPause * 1000); return; }
+    }
+    const c = KSP.chunkAt(words, i, cfg.per, cfg.marks);
     if (!c) return finish();
     show(c); stat(); cfg.onStep?.();
     timer = setTimeout(() => { i = c.end; maxI = Math.max(maxI, i); step(); }, KSP.delayFor(c.words, wpm(), o));
@@ -55,7 +70,7 @@ function runDrill(cfg, words, start, S, done) {
     playing = false; clearTimeout(timer); active += Date.now() - seg; q('#spPlay').innerHTML = ic('play');
     if (cfg.mode !== 'pacer') q('#spCtx').innerHTML = words.slice(Math.max(start, i - 12), i + 24).map((w, k) => esc(w)).join(' ');
   };
-  const jump = d => { i = Math.max(start, Math.min(words.length - 1, i + d)); const c = KSP.chunkAt(words, i, cfg.per); if (c) { show(c); if (!playing) q('#spCtx').textContent = ''; } };
+  const jump = d => { i = Math.max(start, Math.min(words.length - 1, i + d)); shown = i; setCh(); const c = KSP.chunkAt(words, i, cfg.per, cfg.marks); if (c) { show(c); if (!playing) q('#spCtx').textContent = ''; } };
   const finish = () => {
     if (gone) return; pause(); gone = true; document.removeEventListener('keydown', onKey); ov.remove();
     const n = maxI - start, secs = active / 1000;
@@ -67,6 +82,7 @@ function runDrill(cfg, words, start, S, done) {
     if (e.key === 'Escape') finish();
   };
   document.addEventListener('keydown', onKey);
+  setCh();
   q('#spX').onclick = finish; q('#spPlay').onclick = () => playing ? pause() : play();
   q('#spB').onclick = () => jump(-10); q('#spF').onclick = () => jump(10);
   q('#spM').onclick = () => { adj -= 10; stat(); }; q('#spP').onclick = () => { adj += 10; stat(); };
@@ -107,7 +123,7 @@ async function readerSpeed() {
   const here = R.kind === 'pdf' ? R.page - 1 : (R.rend?.currentLocation()?.start?.index ?? 0);
   const start = firstOfPi[pis.find(p => p >= here)] ?? 0;
   const S = spGet();
-  runDrill({ title: 'Жылдам оқу', mode: S.freeMode, per: S.freePer, from: S.freeWpm, to: S.freeWpm, mins: 24 * 60, book: true, onStep: touchRead }, words, start, { ...S, ramp: false }, async res => {
+  runDrill({ title: 'Жылдам оқу', mode: S.freeMode, per: S.freePer, from: S.freeWpm, to: S.freeWpm, mins: 24 * 60, book: true, onStep: touchRead, marks: chapterMarks(v, firstOfPi) }, words, start, { ...S, ramp: false }, async res => {
     if (!res) return;
     await put('drills', { id: uid(), bookId: b.id, versionId: v.id, ts: Date.now(), stage: -2, name: `Оқығышта: ${b.title}`, mode: S.freeMode, per: S.freePer, wpm: Math.round(res.wpm), words: res.words, secs: Math.round(res.secs), comp: null });
     // Оқығышты жылдам оқу тоқтаған жерге көшіру
@@ -179,6 +195,7 @@ async function showSpeed() {
         <label>Кезеңде қарқын біртіндеп өсуі ${sel('oRamp', [[1, 'Иә'], [0, 'Жоқ']], +S.ramp)}</label>
         <label>Ұстау әрпін бөлектеу (1 сөз) ${sel('oOrp', [[1, 'Иә'], [0, 'Жоқ']], +S.orp)}</label>
         <label>Бастар алдында 3-2-1 ${sel('oCount', [[1, 'Иә'], [0, 'Жоқ']], +S.countdown)}</label>
+        <label>Бөлім аяқталғанда кідіріс ${sel('oChap', [[0, 'Жоқ'], [1, '1 сек'], [2, '2 сек'], [3, '3 сек'], [5, '5 сек'], [8, '8 сек']], S.chapPause)}</label>
         <label>Бастапқы қарқынды қолмен қою <input id="oBase" type="number" min="80" max="700" step="10" value="${S.baseline}"></label></div>
       <button class="ghost danger" id="oReset">${ic('refresh', 16)} Кезеңдерді басынан бастау</button></div>
     <div class="glass sec"><h3>Тарих</h3>${drills.length ? `<div class="bars" style="height:90px">${recent.map(d => `<div class="col" title="${new Date(d.ts).toLocaleDateString('kk')} · ${d.wpm} сөз/мин · ${compTxt(d)}"><i style="height:${d.wpm / top * 100}%;opacity:${d.comp == null || d.comp >= 3 ? 1 : .35}"></i></div>`).join('')}</div>
@@ -189,11 +206,11 @@ async function showSpeed() {
   $('#sSrc').onchange = e => { localStorage.kSpeedSrc = e.target.value; showSpeed(); };
   const startIdx = () => { const f = $('#sFrom').value; return f === 'pos' ? (v.speedPos || 0) : f === '0' ? 0 : chStart(v.chapters[+f.slice(1)]); };
   const save = () => {
-    Object.assign(S, { family: $('#oFam').value, font: +$('#oFont').value || 56, punct: +$('#oPunct').value, long: $('#oLong').value === '1', ramp: $('#oRamp').value === '1', orp: $('#oOrp').value === '1', countdown: $('#oCount').value === '1', baseline: Math.max(80, +$('#oBase').value || 200),
+    Object.assign(S, { family: $('#oFam').value, font: +$('#oFont').value || 56, punct: +$('#oPunct').value, long: $('#oLong').value === '1', ramp: $('#oRamp').value === '1', orp: $('#oOrp').value === '1', countdown: $('#oCount').value === '1', chapPause: +$('#oChap').value, baseline: Math.max(80, +$('#oBase').value || 200),
       freeMode: $('#fMode').value, freePer: +$('#fPer').value, freeWpm: Math.max(60, +$('#fWpm').value || 260), freeMins: +$('#fMins').value });
     spSet(S);
   };
-  ['oFam', 'oFont', 'oPunct', 'oLong', 'oRamp', 'oOrp', 'oCount', 'oBase', 'fMode', 'fPer', 'fWpm', 'fMins'].forEach(id => $('#' + id).onchange = () => { const b0 = S.baseline; save(); if (S.baseline !== b0) showSpeed(); });
+  ['oFam', 'oFont', 'oPunct', 'oLong', 'oRamp', 'oOrp', 'oCount', 'oChap', 'oBase', 'fMode', 'fPer', 'fWpm', 'fMins'].forEach(id => $('#' + id).onchange = () => { const b0 = S.baseline; save(); if (S.baseline !== b0) showSpeed(); });
   $('#oReset').onclick = () => { if (confirm('Ашылған кезеңдер жабылып, 1-кезеңнен басталады. Тарих сақталады.')) { S.unlocked = 1; spSet(S); showSpeed(); } };
 
   const after = cfg => async res => {
@@ -212,7 +229,8 @@ async function showSpeed() {
       spSet(s2); showSpeed();
     };
   };
-  const launch = cfg => runDrill(cfg, words, startIdx(), spGet(), after(cfg));
+  const marks = chapterMarks(v, firstOfPi);
+  const launch = cfg => runDrill({ ...cfg, marks }, words, startIdx(), spGet(), after(cfg));
   view.querySelectorAll('[data-s]').forEach(btn => btn.onclick = () => {
     save(); const n = +btn.dataset.s;
     if (n === 0) return runBaseline(words, startIdx(), r => after({ title: 'Бастапқы өлшем', baseline: true, mode: 'static', per: 0 })(r));
