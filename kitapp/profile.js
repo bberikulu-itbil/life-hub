@@ -25,19 +25,20 @@ async function showProfile(section) {
   const row = (id, icon, title, sub) => `<button class="lrow" data-p="${id}">${ic(icon, 22)}<span>${title}<br><small class="muted">${sub}</small></span>${ic('chevron-right', 18)}</button>`;
 
   view.innerHTML = `
-    <header class="hd"><h1>Профиль</h1></header>
+    <header class="hd"><h1>Профиль</h1><button class="icon-btn glass" id="pApps" aria-label="Life Hub қосымшалары">${ic('apps', 22)}</button></header>
     <div class="glass sec"><div class="row" style="flex-wrap:nowrap">
       <div class="avatar">${esc((email || 'K')[0].toUpperCase())}</div>
       <div style="min-width:0"><b>${email ? esc(email) : 'Hub-қа кірмегенсің'}</b><br>
         <small class="muted">${email ? 'Life Hub аккаунты: ЖИ чат, ЖИ тазарту және бұлттық аудио осы арқылы жұмыс істейді' : `ЖИ мүмкіндіктері үшін <a href="../">Life Hub</a>-қа кіру керек`}</small></div></div>
       <div class="stats" style="margin-top:.8rem"><div class="stat"><b>${books.length}</b><small>Кітап</small></div><div class="stat"><b>${KS.fmtDur(S.total)}</b><small>Оқу уақыты</small></div><div class="stat"><b>${dr.length}</b><small>Жылдам оқу жаттығуы</small></div></div></div>
     <div class="glass list" id="pList">
-      ${row('theme', 'sun', 'Тақырып және мақсаттар', `${theme} тақырып · күніне ${+(localStorage.kGoal || 20)} мин · жылына ${+(localStorage.kYearGoal || 12)} кітап`)}
+      ${row('theme', 'sun', 'Сыртқы түр және мақсаттар', `${theme} тақырып · ${curLogo().name.toLowerCase()} белгіше · күніне ${+(localStorage.kGoal || 20)} мин · жылына ${+(localStorage.kYearGoal || 12)} кітап`)}
       ${row('speed', 'zap', 'Жылдам оқу', `Бастапқы қарқын ${S2.baseline} сөз/мин · ${Math.min(S2.unlocked, 6)}/6 кезең ашық`)}
       ${row('audio', 'headphones', 'Аудио баптаулары', `${(localStorage.kGender || 'f') === 'm' ? 'Дәулет' : 'Айгүл'} дауысы · ${+(localStorage.kRate || 1)}× жылдамдық`)}
       ${row('convert', 'layers', 'Кітапты өңдеу', `Таза нұсқа жасау · ЖИ тазарту ${localStorage.kAiClean !== '0' ? 'қосулы' : 'өшірулі'}`)}
       ${row('downloads', 'drive', 'Жүктелгендер және интернетсіз', `${est.usage != null ? size(est.usage) + ' · ' : ''}${vs.length} файл, ${au.length} аудио · ${off ? 'интернетсіз дайын' : 'интернетсіз әлі дайын емес'}`)}
     </div>`;
+  $('#pApps').onclick = e => openApps(e.currentTarget);
   $('#pList').onclick = e => {
     const p = e.target.closest('[data-p]')?.dataset.p; if (!p) return;
     p === 'speed' ? showSpeed() : p === 'downloads' ? showDownloads() : showProfileSec(p);
@@ -48,12 +49,14 @@ async function showProfileSec(key) {
   setNav('profile'); view.dataset.page = 'profile-' + key;
   if (key === 'theme') {
     const theme = localStorage.kTheme || 'system', goal = +(localStorage.kGoal || 20);
-    view.innerHTML = `${pageHead('Тақырып және мақсаттар')}
+    view.innerHTML = `${pageHead('Сыртқы түр және мақсаттар')}
       <div class="glass sec"><h3>Тақырып</h3>
         <div class="seg" id="thSeg">${[['system', 'monitor', 'Жүйе'], ['light', 'sun', 'Жарық'], ['dark', 'moon', 'Қараңғы']].map(([k, i, t]) => `<button data-t="${k}" class="${theme === k ? 'on' : ''}">${ic(i, 16)} ${t}</button>`).join('')}</div></div>
+      ${logoPickerHTML()}
       <div class="glass sec"><h3>Мақсаттар</h3><div class="fgrid">
         <label>Күнделікті оқу мақсаты (минут) <input id="pGoal" type="number" min="1" max="600" value="${goal}"></label>
         <label>Жылдық мақсат (кітап) <input id="pYear" type="number" min="1" max="500" value="${+(localStorage.kYearGoal || 12)}"></label></div></div>`;
+    bindLogoPicker(() => showProfileSec('theme'));
     $('#thSeg').onclick = e => { const t = e.target.closest('[data-t]')?.dataset.t; if (!t) return; localStorage.kTheme = t; applyTheme(); showProfileSec('theme'); };
     $('#pGoal').onchange = e => { localStorage.kGoal = Math.max(1, +e.target.value || 20); toast('Мақсат сақталды'); };
     $('#pYear').onchange = e => { localStorage.kYearGoal = Math.max(1, +e.target.value || 12); toast('Мақсат сақталды'); };

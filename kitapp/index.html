@@ -49,9 +49,26 @@
   </form>
 </dialog>
 
+<!-- Бетбелгі -->
+<dialog id="markDlg"><form method="dialog" id="markForm"><h3>Бетбелгі</h3><small class="muted" id="mkLabel"></small>
+  <label>Атауы <input name="title" placeholder="мыс: Маңызды ой, Дәйексөз"></label>
+  <div class="mk-colors" id="mkColors"></div>
+  <label>Жазба <textarea name="note" rows="3" placeholder="Неге белгіледің?"></textarea></label>
+  <div class="row" style="justify-content:space-between"><button type="button" class="ghost danger" id="mkDel">Өшіру</button>
+    <div class="row"><button type="button" class="ghost" id="mkCancel">Бас тарту</button><button class="primary" value="ok">Сақтау</button></div></div></form></dialog>
+
 <!-- Сөре және серия -->
 <dialog id="shelfDlg"><form method="dialog" id="shelfForm"><h3>Сөре және серия</h3><div class="sd-body"></div>
   <div class="row end" style="margin-top:1rem"><button type="button" class="ghost" id="shelfCancel">Бас тарту</button><button class="primary" value="ok">Сақтау</button></div></form></dialog>
+
+<!-- Сөре/серия жасау -->
+<dialog id="colDlg" class="bsheet"><div class="fs-grip"></div>
+  <div class="col-hd"><b></b><button type="button" class="icon-btn glass" id="colX" aria-label="Жабу"><i data-ic="x" data-s="20"></i></button></div>
+  <div class="col-prev"></div>
+  <label>Атауы <input id="colName" maxlength="60"></label>
+  <label>Сипаттама <textarea id="colDesc" rows="3" placeholder="Бұл жинақ не туралы?"></textarea></label>
+  <div id="colIconsWrap"><label style="margin-bottom:.4rem">Белгіше таңда</label><div class="col-icons" id="colIcons"></div></div>
+  <button type="button" class="primary big" id="colOk" style="width:100%;margin-top:1rem"></button></dialog>
 
 <!-- Кітаптарды таңдау -->
 <dialog id="pickDlg" class="bsheet"><div class="fs-grip"></div><h3></h3><small class="muted">Басу арқылы таңда; серияда таңдау реті — кітап нөмірі.</small><div class="pk-body"></div>
@@ -95,6 +112,7 @@
     <div class="r-tools">
       <button class="ghost" id="rMinus">A−</button>
       <button class="ghost" id="rPlus">A+</button>
+      <button class="ghost" id="rMark" aria-label="Бетбелгі қою"><i data-ic="bookmark"></i></button>
       <button class="ghost" id="rSpeed" aria-label="Жылдам оқу"><i data-ic="zap"></i></button>
       <button class="ghost" id="rNotes" aria-label="Ескертпелер"><i data-ic="note"></i></button>
     </div>
@@ -102,6 +120,7 @@
   <div class="r-body">
     <div id="rStage"></div>
     <aside id="rPanel" hidden>
+      <h4>Бетбелгілер</h4><div id="rMarks"></div>
       <h4>Ескертпелер</h4>
       <textarea id="rNoteText" placeholder="Осы жерге ескертпе жаз…"></textarea>
       <button class="primary" id="rNoteSave">Ескертпені сақтау</button>
@@ -124,8 +143,10 @@
   <div class="ps-bg" id="psBg"></div>
   <div class="ps-in">
     <div class="ps-top"><button class="icon-btn glass" id="psDown" aria-label="Жабу"><i data-ic="chevron-down" data-s="24"></i></button>
-      <button class="icon-btn glass" id="psSet" aria-label="Аудио жасау"><i data-ic="music" data-s="20"></i></button></div>
+      <div class="row" style="flex-wrap:nowrap"><button class="pill glass" id="psTxt" aria-label="Мәтінмен ілесу"><i data-ic="note" data-s="16"></i> Мәтін</button><button class="icon-btn glass" id="psMark" aria-label="Бетбелгі қою"><i data-ic="bookmark" data-s="20"></i></button>
+      <button class="icon-btn glass" id="psSet" aria-label="Аудио жасау"><i data-ic="music" data-s="20"></i></button></div></div>
     <div class="ps-cover" id="psCover"></div>
+    <div class="ps-text" id="psText"></div>
     <div class="ps-meta"><b id="psTitle"></b><span id="psAuthor"></span><button class="link" id="psCh"></button><small id="psMode"></small></div>
     <input type="range" id="psSeek" min="0" max="1" value="0" step="1" aria-label="Уақыт">
     <div class="ps-times"><span id="psT0">0:00</span><span id="psT1">-0:00</span></div>
@@ -166,6 +187,8 @@
 <script src="speed.js"></script>
 <script src="edit.js"></script>
 <script src="shelves.js"></script>
+<script src="marks.js"></script>
+<script src="brand.js"></script>
 <script src="profile.js"></script>
 </body>
 </html>

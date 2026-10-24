@@ -61,6 +61,9 @@ async function showHome() {
   const cur = currentBook(books), pct = cur ? bookPct(cur, vs) : 0;
   const reading = books.filter(b => b.status === 'reading' && b.id !== cur?.id).sort((a, c) => (c.lastOpened || 0) - (a.lastOpened || 0));
   const recent = [...books].sort((a, c) => c.added - a.added).slice(0, 12);
+  const goals = [];
+  for (const b of books.filter(x => x.goal && x.status !== 'done')) goals.push({ b, plan: await goalInfo(b, bookPct(b, vs)) });
+  goals.sort((a, c) => a.b.goal.by.localeCompare(c.b.goal.by));
   const hour = now.getHours(), hello = hour < 12 ? 'Қайырлы таң' : hour < 18 ? 'Қайырлы күн' : 'Қайырлы кеш';
 
   view.innerHTML = `
@@ -71,6 +74,7 @@ async function showHome() {
           <div class="sc-row"><div><small>бүгін</small><b>${Math.round(S.today / 60)} мин</b></div><div><small>${MONTH_IN[now.getMonth()]}</small><b>${monthDays} күн</b></div><div><small>қатарынан</small><b>${S.streak} күн</b></div>${ic('chevron-right', 22)}</div>
           <div class="sc-goal"><small>${yDone}/${yGoal} кітап оқылды (${year})</small><div class="bar-p"><i style="width:${Math.min(100, yDone / yGoal * 100)}%"></i></div></div>
         </button>
+        ${goals.length ? `<div class="glass list goals" id="hGoals">${goals.map(({ b, plan }) => `<button class="lrow" data-b="${b.id}">${ic('target', 20)}<span>${esc(b.title)}<br><small class="muted">${fmtDay(b.goal.by)} дейін${plan.status !== 'late' ? ` · күніне ~${Math.ceil(plan.pctPerDay)}%` : ''}</small></span><em class="gchip ${GOAL_ST[plan.status][1]}">${GOAL_ST[plan.status][0]}</em></button>`).join('')}</div>` : ''}
         ${cur ? `<div class="glass hero" data-id="${cur.id}">
           <div class="hero-hd"><div class="hero-t"><b>${esc(cur.title)}</b><small>${esc(cur.author || '')}</small></div>
             ${navigator.share ? `<button class="icon-btn" data-a="share" aria-label="Бөлісу">${ic('share', 20)}</button>` : ''}
@@ -213,7 +217,7 @@ async function showList(kind, val, focus) {
 
   view.innerHTML = `
     <button class="back" id="lBack">${ic('back', 22)} Артқа</button>
-    <header class="hd"><div><small class="muted">${kind === 'tag' ? 'Сөре' : kind === 'series' ? 'Серия' : kind === 'author' ? 'Автор' : ''}</small><h1>${esc(title)}</h1></div><span class="hd-n">${base.length}</span>
+    <header class="hd"><div><small class="muted">${kind === 'tag' ? 'Сөре' : kind === 'series' ? 'Серия' : kind === 'author' ? 'Автор' : ''}</small><h1>${kind === 'tag' ? shelfIcon(val, 24) + ' ' : ''}${esc(title)}</h1>${group && metaGet(kind === 'tag' ? 'shelves' : 'series', val).desc ? `<p class="muted hd-d">${esc(metaGet(kind === 'tag' ? 'shelves' : 'series', val).desc)}</p>` : ''}</div><span class="hd-n">${base.length}</span>
       ${group ? `<div class="row" style="flex-wrap:nowrap"><button class="icon-btn primary" id="gPick" aria-label="Кітап қосу">${ic('plus', 22)}</button><button class="icon-btn glass" id="gMenu" aria-label="Мәзір">${ic('more', 20)}</button></div>` : ''}</header>
     <div class="bar"><label class="search glass">${ic('search', 18)}<input id="q" placeholder="Атауы, автор, жанр, сөре…" value="${esc(q0)}"></label>
       <select id="srt" class="glass" aria-label="Сұрыптау">${Object.entries(sorts).map(([k, t]) => `<option value="${k}" ${k === sort ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
@@ -235,8 +239,8 @@ async function showList(kind, val, focus) {
     $('#gPick').onclick = () => pickBooks(kind === 'tag' ? `«${val}» сөресі` : `«${val}» сериясы: кітаптарды ретімен таңда`, base.map(b => b.id), async ids => {
       kind === 'tag' ? await shelfAssign(val, ids) : await seriesAssign(val, ids); showList(kind, val);
     });
-    $('#gMenu').onclick = e => popup(e.currentTarget, [{ a: 'ren', icon: 'edit', text: 'Атауын өзгерту' }, { a: 'del', icon: 'trash', text: kind === 'tag' ? 'Сөрені өшіру' : 'Серияны өшіру', cls: 'danger' }], async a => {
-      if (a === 'ren') { const n = await renameGroup(kind, val); if (n) showList(kind, n); }
+    $('#gMenu').onclick = e => popup(e.currentTarget, [{ a: 'ren', icon: 'edit', text: 'Өңдеу' }, { a: 'del', icon: 'trash', text: kind === 'tag' ? 'Сөрені өшіру' : 'Серияны өшіру', cls: 'danger' }], async a => {
+      if (a === 'ren') openGroupDlg(kind === 'tag' ? 'shelves' : 'series', val);
       if (a === 'del' && await deleteGroup(kind, val)) showGroups(kind === 'tag' ? 'shelves' : 'series');
     });
   }
@@ -255,7 +259,7 @@ async function showGroups(kind) {
   view.innerHTML = `
     <button class="back" id="gBack">${ic('back', 22)} Артқа</button>
     <header class="hd"><h1>${T[0]}</h1>${T[2] ? `<button class="icon-btn primary" id="gNew" aria-label="${T[2]}">${ic('plus', 22)}</button>` : ''}</header>
-    ${items.length ? `<div class="glass list">${items.map(([k, n]) => `<button class="lrow" data-k="${esc(k)}">${kind === 'authors' ? ic('user', 22) : `<span class="stack">${covers(k) || ic(T[1], 22)}</span>`}<span>${esc(k)}</span><em>${n}</em>${ic('chevron-right', 18)}</button>`).join('')}</div>`
+    ${items.length ? `<div class="glass list">${items.map(([k, n]) => `<button class="lrow" data-k="${esc(k)}">${kind === 'authors' ? ic('user', 22) : kind === 'shelves' ? shelfIcon(k) : `<span class="stack">${covers(k) || ic(T[1], 22)}</span>`}<span>${esc(k)}${metaGet(kind, k).desc ? `<br><small class="muted">${esc(metaGet(kind, k).desc)}</small>` : ''}</span><em>${n}</em>${ic('chevron-right', 18)}</button>`).join('')}</div>`
       : `<div class="empty">${kind === 'shelves' ? 'Сөре әлі жоқ. «+» арқылы жасап, кітаптарды таңда: мысалы «Жазғы оқу», «Психология».' : kind === 'series' ? 'Серия әлі жоқ. «+» арқылы жасап, сериядағы кітаптарды ретімен таңда.' : 'Авторы көрсетілген кітап әлі жоқ.'}</div>`}`;
   $('#gBack').onclick = showLibrary;
   $('#gNew') && ($('#gNew').onclick = () => createGroup(kind));

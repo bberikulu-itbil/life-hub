@@ -90,7 +90,7 @@ $('#editForm').onsubmit = async e => {
 
 async function deleteBook(id, after) {
   if (!confirm('Кітап, барлық нұсқасы, конспект, ескертпелер және оқу статистикасы жойылады. Жалғастырамыз ба?')) return;
-  for (const n of ['versions', 'notes', 'sessions', 'drills']) for (const r of await byBook(n, id)) await del(n, r.id);
+  for (const n of ['versions', 'notes', 'sessions', 'drills', 'marks']) for (const r of await byBook(n, id)) await del(n, r.id);
   if (P.b?.id === id) pStop(); // мини-плеер өшкен кітапты көрсетпесін
   await dropChunks(id); await del('chats', id); await del('konspekt', id); await del('books', id);
   try { delete localStorage['kPlay:' + id]; } catch { /* сақтау өшік */ }

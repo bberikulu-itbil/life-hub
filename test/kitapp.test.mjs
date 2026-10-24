@@ -126,3 +126,17 @@ test("chunkAt stops at a chapter boundary", () => {
   const w = ["бір", "екі", "үш", "төрт"];
   assert.deepEqual(KSP.chunkAt(w, 0, 4, new Map([[2, {}]])).words, ["бір", "екі"]);
 });
+
+test("goalPlan: daily pace, status against the plan, done and late", () => {
+  const set = at(2026, 10, 1), now = at(2026, 10, 11); // 10 күн өтті, мерзім 30 қазан
+  const g = { by: "2026-10-30", set, p0: 0 };
+  const p = KS.goalPlan(g, 20, now, 300, 3600);
+  assert.equal(p.daysLeft, 20);
+  assert.equal(p.pctPerDay, 4);                 // (100-20)/20
+  assert.equal(p.pagesPerDay, 12);              // 4% × 300 бет
+  assert.equal(p.minsPerDay, 3600 / 20 * 4 / 60); // 1% = 180 сек
+  assert.equal(p.status, "behind");             // жоспар бойынша ~34% болуы керек еді
+  assert.equal(KS.goalPlan(g, 40, now).status, "ahead");
+  assert.equal(KS.goalPlan(g, 100, now).status, "done");
+  assert.equal(KS.goalPlan({ by: "2026-10-05", set, p0: 0 }, 50, now).status, "late");
+});

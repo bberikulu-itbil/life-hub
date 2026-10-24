@@ -198,9 +198,9 @@ async function showSpeed() {
         <label>Бөлім аяқталғанда кідіріс ${sel('oChap', [[0, 'Жоқ'], [1, '1 сек'], [2, '2 сек'], [3, '3 сек'], [5, '5 сек'], [8, '8 сек']], S.chapPause)}</label>
         <label>Бастапқы қарқынды қолмен қою <input id="oBase" type="number" min="80" max="700" step="10" value="${S.baseline}"></label></div>
       <button class="ghost danger" id="oReset">${ic('refresh', 16)} Кезеңдерді басынан бастау</button></div>
-    <div class="glass sec"><h3>Тарих</h3>${drills.length ? `<div class="bars" style="height:90px">${recent.map(d => `<div class="col" title="${new Date(d.ts).toLocaleDateString('kk')} · ${d.wpm} сөз/мин · ${compTxt(d)}"><i style="height:${d.wpm / top * 100}%;opacity:${d.comp == null || d.comp >= 3 ? 1 : .35}"></i></div>`).join('')}</div>
+    <div class="glass sec"><h3>Тарих</h3>${drills.length ? `<div class="bars" style="height:90px">${recent.map(d => `<div class="col" title="${new Date(d.ts).toLocaleDateString('ru')} · ${d.wpm} сөз/мин · ${compTxt(d)}"><i style="height:${d.wpm / top * 100}%;opacity:${d.comp == null || d.comp >= 3 ? 1 : .35}"></i></div>`).join('')}</div>
       <small class="muted">Соңғы 20 жаттығудың қарқыны; түсіну 3/5-тен төмен болса баған күңгірт.</small>` +
-      drills.slice(0, 10).map(d => `<div class="note"><small>${new Date(d.ts).toLocaleDateString('kk')} · ${esc(d.name)}${d.stage !== -2 ? ` · ${esc(title(d.bookId))}` : ''}</small><div>${d.wpm} сөз/мин · ${d.words} сөз · ${compTxt(d)}</div></div>`).join('') : '<div class="empty">Әлі жаттығу жоқ. Бастапқы өлшемнен баста.</div>'}</div>`;
+      drills.slice(0, 10).map(d => `<div class="note"><small>${new Date(d.ts).toLocaleDateString('ru')} · ${esc(d.name)}${d.stage !== -2 ? ` · ${esc(title(d.bookId))}` : ''}</small><div>${d.wpm} сөз/мин · ${d.words} сөз · ${compTxt(d)}</div></div>`).join('') : '<div class="empty">Әлі жаттығу жоқ. Бастапқы өлшемнен баста.</div>'}</div>`;
 
   $('#sBack').onclick = showProfile;
   $('#sSrc').onchange = e => { localStorage.kSpeedSrc = e.target.value; showSpeed(); };

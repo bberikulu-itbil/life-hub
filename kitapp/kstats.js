@@ -19,6 +19,21 @@
   // Қазіргі қарқынмен кітапты аяқтауға қанша уақыт қалды; деректер аз болса null.
   const remaining = (secs, pct) => (pct < 3 || secs < 120) ? null : secs / pct * (100 - pct);
 
-  const api = { dayKey, daysAgo, summarize, fmtDur, remaining };
+  // Кітапты мерзімге дейін аяқтау мақсаты. g = { by: 'YYYY-MM-DD', set: ts, p0: қойған кездегі % }.
+  // Күнделікті қарқын (%, бет, минут) және жоспармен салыстыру күйін қайтарады.
+  function goalPlan(g, pct, now = Date.now(), pages = 0, secsSoFar = 0) {
+    if (pct >= 100) return { status: 'done', daysLeft: 0, pctPerDay: 0 };
+    const end = new Date(g.by + 'T23:59:59').getTime(), dayMs = 864e5;
+    const daysLeft = Math.ceil((end - now) / dayMs);
+    if (daysLeft <= 0) return { status: 'late', daysLeft, pctPerDay: 100 - pct };
+    const pctPerDay = (100 - pct) / daysLeft;
+    const expected = g.p0 + (100 - g.p0) * Math.min(1, Math.max(0, (now - g.set) / Math.max(1, end - g.set)));
+    const status = pct >= expected + 2 ? 'ahead' : pct >= expected - 3 ? 'on' : 'behind';
+    return { status, daysLeft, pctPerDay, expected,
+      pagesPerDay: pages ? pctPerDay / 100 * pages : null,
+      minsPerDay: secsSoFar >= 120 && pct >= 3 ? secsSoFar / pct * pctPerDay / 60 : null };
+  }
+
+  const api = { dayKey, daysAgo, summarize, fmtDur, remaining, goalPlan };
   if (typeof module !== 'undefined') module.exports = api; else g.KS = api;
 })(globalThis);

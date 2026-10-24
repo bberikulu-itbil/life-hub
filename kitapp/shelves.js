@@ -2,8 +2,15 @@
 /* Kitapp: сөрелер (өз жинақтарың, кітаптың tags өрісі) және сериялар (бір серияның кітаптары нөмір ретімен).
    Бос сөрелер де сақталуы үшін атаулары localStorage-та тұрады. */
 
-const getShelfList = () => { try { return JSON.parse(localStorage.kShelves || '[]'); } catch { return []; } };
-const setShelfList = a => { localStorage.kShelves = JSON.stringify([...new Set(a)]); };
+// Сөре мен серия туралы қосымша ақпарат (сипаттама, белгіше) localStorage-та: [{ name, desc, icon }]
+const META_KEY = { shelves: 'kShelves', series: 'kSeriesMeta' };
+const metaList = k => { try { return JSON.parse(localStorage[META_KEY[k]] || '[]').map(x => typeof x === 'string' ? { name: x } : x); } catch { return []; } };
+const metaSave = (k, list) => { const seen = new Set(); localStorage[META_KEY[k]] = JSON.stringify(list.filter(x => x.name && !seen.has(x.name) && seen.add(x.name))); };
+const metaGet = (k, name) => metaList(k).find(x => x.name === name) || { name };
+const getShelfList = () => metaList('shelves').map(x => x.name);
+const setShelfList = names => { const m = metaList('shelves'); metaSave('shelves', names.map(n => m.find(x => x.name === n) || { name: n })); };
+const SHELF_ICONS = ['folder', 'bookmark', 'edit', 'book-open', 'mic', 'smile', 'star', 'feather', 'music', 'coffee', 'heart', 'zap', 'globe', 'target', 'flag'];
+const shelfIcon = (name, size = 22) => `<span class="sh-ic">${ic(metaGet('shelves', name).icon || 'folder', size)}</span>`;
 const byKk = (a, c) => a.localeCompare(c, 'kk');
 const shelfNames = books => [...new Set([...getShelfList(), ...books.flatMap(b => b.tags || [])])].sort(byKk);
 const seriesNames = books => [...new Set(books.map(b => (b.series || '').trim()).filter(Boolean))].sort(byKk);
@@ -78,15 +85,12 @@ async function seriesAssign(name, ids) {
     else if (b.series === name) { b.series = ''; b.seriesNo = ''; await put('books', b); }
   }
 }
-async function renameGroup(kind, old) {
-  const n = prompt(kind === 'tag' ? 'Сөренің жаңа атауы' : 'Серияның жаңа атауы', old)?.trim();
-  if (!n || n === old) return null;
+// Атауын өзгерткенде кітаптардағы сілтемелер де жаңарады
+async function renameGroup(kind, old, n) {
   for (const b of await all('books')) {
     if (kind === 'tag' && (b.tags || []).includes(old)) { b.tags = [...new Set(b.tags.map(t => t === old ? n : t))]; await put('books', b); }
     if (kind === 'series' && b.series === old) { b.series = n; await put('books', b); }
   }
-  if (kind === 'tag') setShelfList(getShelfList().map(t => t === old ? n : t));
-  return n;
 }
 async function deleteGroup(kind, name) {
   if (!confirm(kind === 'tag' ? `«${name}» сөресі өшеді. Кітаптар кітапханада қалады.` : `«${name}» сериясы өшеді. Кітаптар кітапханада қалады.`)) return false;
@@ -94,16 +98,42 @@ async function deleteGroup(kind, name) {
     if (kind === 'tag' && (b.tags || []).includes(name)) { b.tags = b.tags.filter(t => t !== name); await put('books', b); }
     if (kind === 'series' && b.series === name) { b.series = ''; b.seriesNo = ''; await put('books', b); }
   }
-  if (kind === 'tag') setShelfList(getShelfList().filter(t => t !== name));
+  const k = kind === 'tag' ? 'shelves' : 'series';
+  metaSave(k, metaList(k).filter(x => x.name !== name));
   return true;
 }
-// Жаңа сөре/серия: атауын сұрап, бірден кітаптарды таңдатады
-async function createGroup(kind) {
-  const n = prompt(kind === 'shelves' ? 'Жаңа сөренің атауы' : 'Жаңа серияның атауы (мыс: Абай жолы)')?.trim();
-  if (!n) return;
-  if (kind === 'shelves') setShelfList([...getShelfList(), n]);
-  pickBooks(kind === 'shelves' ? `«${n}» сөресіне кітап қосу` : `«${n}» сериясы: кітаптарды ретімен таңда`, [], async ids => {
-    if (kind === 'shelves') await shelfAssign(n, ids); else await seriesAssign(n, ids);
-    showList.q = ''; showList(kind === 'shelves' ? 'tag' : 'series', n);
-  });
+/* ---------- Сөре/серия жасау және өңдеу терезесі ---------- */
+// kind: 'shelves' | 'series'; old — өңделетін атау (жаңасы үшін бос)
+async function openGroupDlg(kind, old) {
+  const books = await all('books'), D = $('#colDlg'), shelf = kind === 'shelves';
+  const meta = old ? metaGet(kind, old) : { name: '', desc: '', icon: 'folder' };
+  let icon = meta.icon || 'folder';
+  const sample = (old ? (shelf ? books.filter(b => (b.tags || []).includes(old)) : seriesBooks(books, old)) : [...books].sort((a, c) => c.added - a.added)).slice(0, 3);
+  D.querySelector('.col-hd b').textContent = old ? (shelf ? 'Сөрені өңдеу' : 'Серияны өңдеу') : (shelf ? 'Сөре жасау' : 'Серия жасау');
+  D.querySelector('.col-prev').innerHTML = `<div class="fan">${sample.map(b => coverHTML(b, 'cv-sm')).join('') || ic(shelf ? 'shelves' : 'layers', 48)}</div>
+    <small class="muted">${shelf ? 'Кітаптарыңды оңай табылатын тізімдерге жина' : 'Бір серияның кітаптарын ретімен байланыстыр'}</small>`;
+  $('#colName').value = meta.name; $('#colDesc').value = meta.desc || '';
+  $('#colName').placeholder = shelf ? 'мыс: Жазғы оқу' : 'мыс: Абай жолы';
+  const drawIcons = () => $('#colIcons').innerHTML = SHELF_ICONS.map(n => `<button type="button" class="${n === icon ? 'on' : ''}" data-i="${n}" aria-label="${n}">${ic(n, 22)}</button>`).join('');
+  $('#colIconsWrap').hidden = !shelf;
+  drawIcons();
+  $('#colIcons').onclick = e => { const n = e.target.closest('[data-i]')?.dataset.i; if (n) { icon = n; drawIcons(); } };
+  const ok = $('#colOk'), check = () => { ok.disabled = !$('#colName').value.trim(); };
+  ok.textContent = old ? 'Сақтау' : shelf ? 'Сөре жасау' : 'Серия жасау';
+  $('#colName').oninput = check; check();
+  $('#colX').onclick = () => D.close();
+  ok.onclick = async () => {
+    const name = $('#colName').value.trim(), existing = shelf ? shelfNames(books) : seriesNames(books);
+    if (name !== old && existing.includes(name)) return toast('Бұл атаумен ' + (shelf ? 'сөре' : 'серия') + ' бар');
+    if (old && name !== old) await renameGroup(shelf ? 'tag' : 'series', old, name);
+    metaSave(kind, [...metaList(kind).filter(x => x.name !== old && x.name !== name), { name, desc: $('#colDesc').value.trim(), icon: shelf ? icon : undefined }]);
+    D.close();
+    if (old) return showList(shelf ? 'tag' : 'series', name);
+    pickBooks(shelf ? `«${name}» сөресіне кітап қосу` : `«${name}» сериясы: кітаптарды ретімен таңда`, [], async ids => {
+      if (shelf) await shelfAssign(name, ids); else await seriesAssign(name, ids);
+      showList.q = ''; showList(shelf ? 'tag' : 'series', name);
+    });
+  };
+  D.showModal(); setTimeout(() => $('#colName').focus(), 50);
 }
+const createGroup = kind => openGroupDlg(kind);

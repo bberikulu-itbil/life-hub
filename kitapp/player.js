@@ -15,6 +15,10 @@ const estSecs = text => text.length / CPS;
 /* ---------- Ойнату логикасы ---------- */
 async function pLoad(i, pos) {
   P.i = i; stopSpeech(); paud.pause();
+  // мәтін бөліктері екі режимге де керек: браузер дауысы осылармен оқиды, «Мәтін» көрінісі осыларды белгілейді
+  P.parts = RAG.chunkText(P.chs[i].text, 200);
+  P.cum = [0]; for (const p of P.parts) P.cum.push(P.cum[P.cum.length - 1] + p.length);
+  P.textFor = -1; P.hl = -1;
   P.rec = await get('audio', `${P.v.id}:${i}`);
   P.mode = P.rec ? 'mp3' : 'tts';
   if (P.mode === 'mp3') {
@@ -26,11 +30,35 @@ async function pLoad(i, pos) {
       if (isFinite(paud.duration) && !P.rec.dur) { P.rec.dur = paud.duration; P.durs[i] = paud.duration; put('audio', P.rec); }
     }, { once: true });
   } else {
-    P.parts = RAG.chunkText(P.chs[i].text, 200);
-    P.cum = [0]; for (const p of P.parts) P.cum.push(P.cum[P.cum.length - 1] + p.length);
     Sp.i = Math.min(pos?.part || 0, Math.max(0, P.parts.length - 1));
   }
   pMeta(); pRender();
+}
+
+// Қазір оқылып жатқан мәтін бөлігі: браузер дауысында нақты, mp3-те уақыт үлесі бойынша шамамен
+function curPart() {
+  if (P.mode === 'tts') return Math.min(Sp.i, P.parts.length - 1);
+  const [t, d] = pTimes(), ch = d ? t / d * P.cum[P.cum.length - 1] : 0;
+  return Math.max(0, P.cum.findIndex(c => c > ch) - 1);
+}
+function seekPart(k) {
+  if (P.mode === 'tts') { Sp.i = k; if (P.playing) speakFrom(k); }
+  else { const d = pTimes()[1]; if (d) paud.currentTime = P.cum[k] / P.cum[P.cum.length - 1] * d; }
+  pSave(); pRender();
+}
+function renderText() {
+  const box = $('#psText');
+  if (P.textFor !== P.i) {
+    P.textFor = P.i; P.hl = -1;
+    box.innerHTML = `<h4>${esc(P.chs[P.i].title)}</h4>` + P.parts.map((p, k) => `<span data-k="${k}">${esc(p)} </span>`).join('');
+  }
+  const k = curPart();
+  if (k !== P.hl) {
+    box.querySelector('.on')?.classList.remove('on');
+    const el = box.querySelector(`[data-k="${k}"]`);
+    if (el) { el.classList.add('on'); if (!box.matches(':hover') || P.playing) el.scrollIntoView({ block: 'center', behavior: P.hl < 0 ? 'auto' : 'smooth' }); }
+    P.hl = k;
+  }
 }
 
 function speakFrom(k) {
@@ -135,6 +163,8 @@ function pRender() {
   $('#psT0').textContent = fmtT(t); $('#psT1').textContent = '-' + fmtT(d - t);
   $('#psPlay').innerHTML = playIc; $('#psPlay').setAttribute('aria-label', P.playing ? 'Кідірту' : 'Ойнату');
   $('#psRate').textContent = P.rate + '×';
+  sheet.classList.toggle('txt', !!P.textMode);
+  if (P.textMode) renderText();
   $('#psSleep').innerHTML = `${ic('moon', 18)} ${P.sleepAt ? fmtT((P.sleepAt - Date.now()) / 1000) : P.sleepEnd ? 'Бөлім соңында' : 'Ұйқы таймері'}`;
 }
 
@@ -159,6 +189,10 @@ function sheetList(title, rows, onPick) {
 }
 
 $('#psDown').onclick = hideSheet;
+P.textMode = localStorage.kPText === '1';
+$('#psTxt').onclick = () => { P.textMode = !P.textMode; localStorage.kPText = P.textMode ? '1' : '0'; P.textFor = -1; P.hl = -1; pRender(); };
+$('#psText').onclick = e => { const s = e.target.closest('[data-k]'); if (s) seekPart(+s.dataset.k); };
+$('#psMark').onclick = () => audioMark();
 $('#psPlay').onclick = pToggle;
 $('#psRw').onclick = () => pSkip(-15);
 $('#psFf').onclick = () => pSkip(30);
@@ -204,7 +238,7 @@ const Player = {
   async open(b, ci, opts = {}) {
     const saved = JSON.parse(localStorage['kPlay:' + b.id] || 'null');
     // дайындау бетінен кейін кітап бетіне қайтып, плеерді ашамыз
-    const v = await withPrepared(b, saved?.vid, () => { showBook(b.id); Player.open(b, ci, opts); }, () => showBook(b.id), 'аудио');
+    const v = await withPrepared(b, opts.vid || saved?.vid, () => { showBook(b.id); Player.open(b, ci, opts); }, () => showBook(b.id), 'аудио');
     if (!v) return;
     const chs = await audioChapters(v);
     if (!chs.length) return toast('Аудио үшін мәтін табылмады');
@@ -212,8 +246,9 @@ const Player = {
     b.lastOpened = Date.now(); put('books', b);
     const recs = (await byBook('audio', b.id)).filter(a => a.versionId === v.id);
     Object.assign(P, { b, v, chs, durs: chs.map((c, i) => recs.find(r => r.ci === i)?.dur || estSecs(c.text)) });
-    const resume = ci == null && saved?.vid === v.id && saved.ci < chs.length;
-    await pLoad(resume ? saved.ci : (ci || 0), resume ? saved : null);
+    const at = opts.at && opts.vid === v.id && opts.at.ci < chs.length ? opts.at : null; // бетбелгіден ашу
+    const resume = !at && ci == null && saved?.vid === v.id && saved.ci < chs.length;
+    await pLoad(at ? at.ci : resume ? saved.ci : (ci || 0), at || (resume ? saved : null));
     if (opts.expand !== false) showSheet();
     pPlay();
   },

@@ -11,13 +11,13 @@ const STATUS = { plan: 'Жоспарда', reading: 'Оқып жатырмын',
 /* ---------- IndexedDB ---------- */
 let db;
 const openDB = () => new Promise((res, rej) => {
-  const r = indexedDB.open('kitapp', 5);
+  const r = indexedDB.open('kitapp', 6);
   r.onupgradeneeded = () => {
     const d = r.result;
     // Әр қойма жоқ болса ғана құрылады, сондықтан кез келген ескі нұсқадан көтерілуге болады.
     const mk = (n, key, idx) => { if (!d.objectStoreNames.contains(n)) { const o = d.createObjectStore(n, { keyPath: key }); if (idx) o.createIndex(idx, idx); } };
     mk('books', 'id'); mk('versions', 'id', 'bookId'); mk('notes', 'id', 'bookId'); mk('konspekt', 'bookId');
-    mk('chunks', 'id', 'bookId'); mk('chats', 'bookId'); mk('audio', 'id', 'bookId'); mk('sessions', 'id', 'bookId'); mk('drills', 'id', 'bookId');
+    mk('chunks', 'id', 'bookId'); mk('chats', 'bookId'); mk('audio', 'id', 'bookId'); mk('sessions', 'id', 'bookId'); mk('drills', 'id', 'bookId'); mk('marks', 'id', 'bookId');
   };
   r.onsuccess = () => { db = r.result; res(); };
   r.onerror = () => rej(r.error);
@@ -48,7 +48,8 @@ async function showBook(id) {
   setNav('lib'); view.dataset.page = 'book'; rerender = () => showBook(id);
   const b = await get('books', id);
   if (!b) return showLibrary();
-  const [vs, notes, ks, recs, books] = await Promise.all([byBook('versions', id), byBook('notes', id), get('konspekt', id), byBook('audio', id), all('books')]);
+  const [vs, notes, ks, recs, books, marks] = await Promise.all([byBook('versions', id), byBook('notes', id), get('konspekt', id), byBook('audio', id), all('books'), byBook('marks', id)]);
+  marks.sort((a, c) => (a.pct || 0) - (c.pct || 0) || a.created - c.created);
   notes.sort((a, c) => c.created - a.created);
   vs.sort((a, c) => verOrder(a) - verOrder(c));
   const rv = vs.filter(isReady), av = rv.find(x => recs.some(r => r.versionId === x.id)) || rv[0];
@@ -56,7 +57,7 @@ async function showBook(id) {
   const chs = av ? await audioChapters(av) : [];
   const dur = (c, i) => recs.find(r => r.versionId === av.id && r.ci === i)?.dur || estSecs(c.text);
   const totalAudio = chs.reduce((a, c, i) => a + dur(c, i), 0);
-  const pct = bookPct(b, vs);
+  const pct = bookPct(b, vs), plan = await goalInfo(b, pct);
   const ser = b.series ? seriesBooks(books, b.series) : [];
   const mine = new Set(authorsOf(b)), others = books.filter(x => x.id !== id && !ser.includes(x) && authorsOf(x).some(a => mine.has(a)));
   const info = INFO.map(([k, t]) => [t, k === 'lang' ? LANGS[b.lang] : b[k]]).filter(([, v]) => v).concat((b.tags || []).length ? [['Сөрелер', b.tags.map(t => '#' + t).join(' ')]] : []);
@@ -86,6 +87,10 @@ async function showBook(id) {
         <span class="stars" id="stars">${[1, 2, 3, 4, 5].map(n => `<button data-n="${n}" class="${n <= (b.rating || 0) ? 'on' : ''}" aria-label="${n} жұлдыз">${ic('star', 24, n <= (b.rating || 0))}</button>`).join('')}</span>
       </div>
     </div>
+
+    ${b.status !== 'done' || b.goal ? goalHTML(b, plan, pct) : ''}
+
+    <div class="glass sec"><h3>Бетбелгілер${marks.length ? ` · ${marks.length}` : ''}</h3>${marks.length ? `<div id="bMarks">${marks.map(markRow).join('')}</div>` : `<p class="muted">Оқығышта немесе плеерде ${ic('bookmark', 14)} батырмасымен қоясың: атауы, түсі, жазбасы бар.</p>`}</div>
 
     <div class="glass sec"><h3>Сипаттама</h3>${b.summary ? `<p class="clamp" id="sum">${esc(b.summary)}</p><button class="link" id="sumMore">Толығырақ</button>`
       : `<p class="muted">Сипаттама жоқ. Жоғарғы ${ic('more', 14)} мәзірінен «Өңдеу» арқылы қос.</p>`}</div>
@@ -121,6 +126,8 @@ async function showBook(id) {
 
   $('#back').onclick = () => (showBook.back || showLibrary)();
   $('#bMenu').onclick = e => bookMenu(id, e.currentTarget);
+  bindGoal(b, pct, () => showBook(id));
+  $('#bMarks') && bindMarks($('#bMarks'), marks, () => showBook(id));
   $('#bRead').onclick = () => continueReading(b);
   $('#bListen').onclick = () => Player.open(b);
   $('#chatBtn').onclick = () => showChat(id);
@@ -261,6 +268,7 @@ function zoom(d) {
   else { R.zoom = Math.max(.6, Math.min(3, R.zoom + d * .2)); renderPdf(R.page); }
 }
 $('#rSpeed').onclick = () => readerSpeed();
+$('#rMark').onclick = () => readerMark();
 $('#rNotes').onclick = () => { const p = $('#rPanel'); p.hidden = !p.hidden; };
 $('#rClose').onclick = async () => {
   clearTimeout(pT);
@@ -278,6 +286,9 @@ document.addEventListener('keydown', e => {
 });
 
 async function refreshNotes() {
+  const ms = (await byBook('marks', R.book.id)).filter(m => m.kind === 'read' && m.versionId === R.ver.id).sort((a, b) => (a.pct || 0) - (b.pct || 0));
+  $('#rMarks').innerHTML = ms.length ? ms.map(markRow).join('') : '<small class="muted">Әзірге жоқ</small>';
+  bindMarks($('#rMarks'), ms, refreshNotes);
   const ns = (await byBook('notes', R.book.id)).sort((a, b) => b.created - a.created);
   $('#rNoteList').innerHTML = ns.map(n => `<div class="note"><small>${esc(n.ref)}</small><div>${esc(n.text).replace(/\n/g, '<br>')}</div></div>`).join('');
 }
@@ -297,6 +308,7 @@ function applyTheme() {
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 applyTheme();
+addEventListener('DOMContentLoaded', () => applyLogo());
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 navigator.storage?.persist?.(); // iOS/Chrome-ға деректерді өздігінен өшірмеуді сұрау
 
