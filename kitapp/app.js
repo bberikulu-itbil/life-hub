@@ -38,81 +38,94 @@ const hue = s => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7);
 const cover = t => `background:linear-gradient(160deg,hsl(${hue(t)} 45% 38%),hsl(${(hue(t) + 40) % 360} 50% 28%))`;
 const typeOf = f => (f.name.toLowerCase().endsWith('.epub') || f.type === 'application/epub+zip') ? 'epub' : 'pdf';
 
-/* ---------- Кітапхана ---------- */
 const view = $('#view');
-let filter = { q: '', status: '' };
-
-async function showLibrary() {
-  setNav('lib');
-  const [books, versions] = await Promise.all([all('books'), all('versions')]);
-  books.sort((a, b) => b.added - a.added);
-  view.innerHTML = `
-    <div class="bar">
-      <input id="q" placeholder="Кітап немесе автор іздеу…" value="${esc(filter.q)}">
-      <select id="fs"><option value="">Барлығы</option>${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${filter.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-    </div>
-    <div class="grid" id="grid"></div>`;
-  const draw = () => {
-    const q = filter.q.toLowerCase();
-    const list = books.filter(b => (!filter.status || b.status === filter.status) && (`${b.title} ${b.author} ${b.genre || ''} ${(b.tags || []).join(' ')}`.toLowerCase().includes(q)));
-    $('#grid').innerHTML = list.length ? list.map(b => {
-      const vs = versions.filter(v => v.bookId === b.id);
-      const pct = Math.max(0, ...vs.map(v => v.pct || 0));
-      return `<div class="card" data-id="${b.id}"><button class="kebab card-k" data-k="${b.id}" aria-label="Мәзір">${ic('more', 20)}</button>
-        <div class="cover" style="${cover(b.title)}">${esc(b.title)}</div>
-        <div class="bar-p"><i style="width:${pct}%"></i></div>
-        <div class="meta">${esc(b.author || '—')}<br><span class="badge">${STATUS[b.status]}</span> · ${vs.length} нұсқа</div></div>`;
-    }).join('') : `<div class="empty" style="grid-column:1/-1">${books.length ? 'Ештеңе табылмады' : 'Кітапхана бос. «+ Кітап қосу» батырмасын бас.'}</div>`;
-  };
-  draw();
-  $('#q').oninput = e => { filter.q = e.target.value; draw(); };
-  $('#fs').onchange = e => { filter.status = e.target.value; draw(); };
-  $('#grid').onclick = e => { const k = e.target.closest('.kebab'); if (k) return bookMenu(k.dataset.k, k); const c = e.target.closest('.card'); if (c) showBook(c.dataset.id); };
-}
 
 /* ---------- Кітап беті ---------- */
+const INFO = [['pages', 'Бет саны'], ['year', 'Шыққан жылы'], ['isbn', 'ISBN'], ['publisher', 'Баспа'], ['lang', 'Тілі'], ['genre', 'Жанры'], ['source', 'Қайдан алынды'], ['startDate', 'Оқи бастаған күні'], ['finishDate', 'Аяқтаған күні']];
+
 async function showBook(id) {
-  setNav('lib');
+  if (['home', 'list', 'groups'].includes(view.dataset.page)) showBook.back = rerender; // «Артқа» осы бетке қайтарады
+  setNav('lib'); view.dataset.page = 'book'; rerender = () => showBook(id);
   const b = await get('books', id);
   if (!b) return showLibrary();
-  const [vs, notes, ks] = await Promise.all([byBook('versions', id), byBook('notes', id), get('konspekt', id)]);
+  const [vs, notes, ks, recs, books] = await Promise.all([byBook('versions', id), byBook('notes', id), get('konspekt', id), byBook('audio', id), all('books')]);
   notes.sort((a, c) => c.created - a.created);
+  const rv = vs.filter(isReady), av = rv.find(x => recs.some(r => r.versionId === x.id)) || rv[0];
+  const chs = av ? await audioChapters(av) : [];
+  const dur = (c, i) => recs.find(r => r.versionId === av.id && r.ci === i)?.dur || estSecs(c.text);
+  const totalAudio = chs.reduce((a, c, i) => a + dur(c, i), 0);
+  const pct = bookPct(b, vs);
+  const mine = new Set(authorsOf(b)), others = books.filter(x => x.id !== id && authorsOf(x).some(a => mine.has(a)));
+  const info = INFO.map(([k, t]) => [t, k === 'lang' ? LANGS[b.lang] : b[k]]).filter(([, v]) => v).concat((b.tags || []).length ? [['Сөрелер', b.tags.map(t => '#' + t).join(' ')]] : []);
+  const stat = (v, l) => `<div><b>${v}</b><small>${l}</small></div>`;
+  const hh = Math.floor(totalAudio / 3600), mm = Math.round(totalAudio % 3600 / 60);
+
   view.innerHTML = `
-    <button class="ghost" id="back">${ic('back')} Кітапхана</button>
-    <div class="sec">
-      <div class="row" style="align-items:flex-start;flex-wrap:nowrap"><div style="flex:1;min-width:0"><h2 style="margin:0;word-break:break-word">${esc(b.title)}</h2>
-        <div style="color:var(--mute)">${esc(b.author || 'Автор көрсетілмеген')}</div></div>
-        <button class="kebab" id="bMenu" aria-label="Мәзір">${ic('more', 22)}</button></div>
-      <div class="chips">${chips(b)}</div>
-      ${b.summary ? `<p style="margin:.6rem 0 0">${esc(b.summary)}</p>` : ''}
-      <div class="row" style="margin-top:.6rem">
-        <select id="bs" style="width:auto">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${b.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-        <span class="stars" id="stars">${[1, 2, 3, 4, 5].map(n => `<button data-n="${n}" class="${n <= (b.rating || 0) ? 'on' : ''}" aria-label="${n}">${ic('star', 22, n <= (b.rating || 0))}</button>`).join('')}</span>
+    <div class="bk-top"><button class="back" id="back">${ic('back', 22)} Артқа</button><button class="icon-btn glass" id="bMenu" aria-label="Мәзір">${ic('more', 22)}</button></div>
+    <div class="bk-hero">
+      <div class="bk-cv">${coverHTML(b, 'cv-lg')}</div>
+      <h1>${esc(b.title)}</h1>
+      <div class="bk-au">${authorsOf(b).map(a => `<button class="link" data-au="${esc(a)}">${esc(a)}</button>`).join(', ') || '<span>Автор көрсетілмеген</span>'}</div>
+      <div class="bk-stats">
+        ${b.pages ? stat(b.pages, 'бет') : ''}${b.year ? stat(b.year, 'жыл') : ''}
+        ${chs.length ? stat(hh ? `${hh} сағ ${mm} мин` : `${mm} мин`, ic('headphones', 16)) : ''}
+        ${stat(pct + '%', 'оқылды')}
+      </div>
+      <div class="bk-act"><button class="primary big" id="bRead">${ic('book-open', 20)} Оқу</button><button class="glass big" id="bListen">${ic('headphones', 20)} Тыңдау</button></div>
+      <div class="bk-more">
+        <button class="chip glass" id="speedBtn">${ic('zap', 16)} Жылдам оқу</button>
+        <button class="chip glass" id="chatBtn">${ic('chat', 16)} ЖИ-мен талқылау</button>
+        <button class="chip glass" id="audioBtn">${ic('sliders', 16)} Аудио баптау</button>
+      </div>
+      <div class="bk-st">
+        <div class="seg glass" id="bs">${Object.entries(STATUS).map(([k, v]) => `<button data-s="${k}" class="${b.status === k ? 'on' : ''}">${v}</button>`).join('')}</div>
+        <span class="stars" id="stars">${[1, 2, 3, 4, 5].map(n => `<button data-n="${n}" class="${n <= (b.rating || 0) ? 'on' : ''}" aria-label="${n} жұлдыз">${ic('star', 24, n <= (b.rating || 0))}</button>`).join('')}</span>
       </div>
     </div>
-    <div class="row"><button class="primary" id="chatBtn" style="flex:1;min-width:130px">${ic('chat', 16)} ЖИ-мен талқылау</button><button class="primary" id="audioBtn" style="flex:1;min-width:130px">${ic('headphones', 16)} Аудио</button><button class="primary" id="speedBtn" style="flex:1;min-width:130px">${ic('zap', 16)} Жылдам оқу</button></div>
-    <div class="sec"><h3>Нұсқалар</h3><div id="vers">${vs.length ? vs.map(v => `
+
+    <div class="glass sec"><h3>Сипаттама</h3>${b.summary ? `<p class="clamp" id="sum">${esc(b.summary)}</p><button class="link" id="sumMore">Толығырақ</button>`
+      : `<p class="muted">Сипаттама жоқ. Жоғарғы ${ic('more', 14)} мәзірінен «Өңдеу» арқылы қос.</p>`}</div>
+
+    <div class="glass sec"><h3>Бөлімдер${chs.length ? ` · ${chs.length}` : ''}</h3>${chs.length ? `
+      <div class="chlist" id="chs">${chs.map((c, i) => `<button class="lrow ${i >= 4 ? 'more' : ''}" data-i="${i}"><em class="num">${i + 1}</em><span>${esc(c.title)}</span><em>${fmtT(dur(c, i))}</em></button>`).join('')}</div>
+      ${chs.length > 4 ? '<button class="link center" id="chAll">Барлығын көру</button>' : ''}`
+      : vs.length ? `<p class="muted">Бөлімдерді көру және тыңдау үшін кітап мәтінін бір рет дайындау керек.</p><button id="prepBtn">${ic('layers', 16)} Мәтінді дайындау</button>`
+      : '<p class="muted">Кітапқа әлі файл қосылмаған.</p>'}</div>
+
+    ${others.length ? `<div class="sec bare"><h3>Автордың басқа кітаптары</h3><div class="hscroll">${others.map(x => `<button class="mini-card" data-b="${x.id}">${coverHTML(x)}<span>${esc(x.title)}</span></button>`).join('')}</div></div>` : ''}
+
+    ${info.length ? `<div class="glass sec"><h3>Ақпарат</h3><dl class="info">${info.map(([t, v]) => `<div><dt>${t}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl></div>` : ''}
+
+    <div class="glass sec"><h3>Нұсқалар</h3><div id="vers">${vs.length ? vs.map(v => `
       <div class="ver" data-id="${v.id}">
-        <div><b>${esc(v.name)}</b> <span class="badge">${v.type.toUpperCase()}</span>${v.kind ? ` <span class="badge">${KIND[v.kind]}</span>` : ''}<br><small style="color:var(--mute)">${mb(v.blob.size)} · ${v.pct || 0}% оқылды${isReady(v) ? ' · мәтін дайын' : ''}</small></div>
-        <div class="row"><button class="primary" data-a="open">${ic('book-open', 16)} Оқу</button><button class="kebab" data-a="vmenu" aria-label="Нұсқа мәзірі">${ic('more', 20)}</button></div>
-      </div>`).join('') : `<div class="empty">Нұсқа жоқ. Файл қосу үшін жоғарғы ${ic('more', 16)} мәзірінен «Нұсқа қосу» таңда.</div>`}</div>
+        <div><b>${esc(v.name)}</b> <span class="badge">${v.type.toUpperCase()}</span>${v.kind ? ` <span class="badge">${KIND[v.kind]}</span>` : ''}<br><small class="muted">${mb(v.blob.size)} · ${v.pct || 0}% оқылды${isReady(v) ? ' · мәтін дайын' : ''}</small></div>
+        <div class="row"><button class="primary" data-a="open">${ic('book-open', 16)} Оқу</button><button class="icon-btn" data-a="vmenu" aria-label="Нұсқа мәзірі">${ic('more', 20)}</button></div>
+      </div>`).join('') : `<div class="empty">Нұсқа жоқ. Жоғарғы ${ic('more', 16)} мәзірінен «Нұсқа қосу» таңда.</div>`}</div>
     </div>
-    <div class="sec"><h3>Конспект</h3>
-      <textarea id="ks" rows="10" placeholder="Кітап бойынша өз конспектің…">${esc(ks?.text || '')}</textarea>
-      <div class="row end" style="margin-top:.5rem"><span id="ksSt" style="color:var(--mute);font-size:.85rem"></span><button id="ksExp">.md жүктеу</button></div>
+
+    <div class="glass sec"><h3>Конспект</h3>
+      <textarea id="ks" rows="8" placeholder="Кітап бойынша өз конспектің…">${esc(ks?.text || '')}</textarea>
+      <div class="row end" style="margin-top:.5rem"><span id="ksSt" class="muted" style="font-size:.85rem"></span><button id="ksExp">${ic('download', 16)} .md жүктеу</button></div>
     </div>
-    <div class="sec"><h3>Ескертпелер</h3>${notes.length ? notes.map(n => `
-      <div class="note" data-id="${n.id}"><small>${esc(n.ref)} · ${esc(n.vname || '')}</small><div>${esc(n.text).replace(/\n/g, '<br>')}</div><button class="ghost danger" data-a="dn">жою</button></div>`).join('') : '<div class="empty">Оқығанда оқығыштағы «Ескертпелер» батырмасы арқылы қосасың</div>'}</div>
+    <div class="glass sec"><h3>Ескертпелер</h3>${notes.length ? notes.map(n => `
+      <div class="note" data-id="${n.id}"><small>${esc(n.ref)} · ${esc(n.vname || '')}</small><div>${esc(n.text).replace(/\n/g, '<br>')}</div><button class="ghost danger" data-a="dn">${ic('trash', 14)} жою</button></div>`).join('') : '<div class="empty">Оқығанда оқығыштағы «Ескертпелер» батырмасы арқылы қосасың</div>'}</div>
 `;
 
-  $('#back').onclick = showLibrary;
+  $('#back').onclick = () => (showBook.back || showLibrary)();
+  $('#bMenu').onclick = e => bookMenu(id, e.currentTarget);
+  $('#bRead').onclick = () => continueReading(b);
+  $('#bListen').onclick = () => Player.open(b);
   $('#chatBtn').onclick = () => showChat(id);
   $('#audioBtn').onclick = () => showAudio(id);
   $('#speedBtn').onclick = () => showSpeed(id);
-  const save = async p => { Object.assign(b, p); await put('books', b); };
-  $('#bMenu').onclick = e => bookMenu(id, e.currentTarget);
-  $('#bs').onchange = async e => { applyStatus(b, e.target.value); await put('books', b); showBook(id); };
-  $('#stars').onclick = async e => { const n = +e.target.dataset.n; if (!n) return; await save({ rating: n === b.rating ? 0 : n }); showBook(id); };
+  $('#prepBtn') && ($('#prepBtn').onclick = () => renderPrep(b, vs.find(x => x.kind === 'original') || vs[0], () => showBook(id), () => showBook(id), 'бөлімдер'));
+  $('#sumMore') && ($('#sumMore').onclick = e => { $('#sum').classList.toggle('clamp'); e.target.textContent = $('#sum').classList.contains('clamp') ? 'Толығырақ' : 'Жасыру'; });
+  $('#chAll') && ($('#chAll').onclick = e => { $('#chs').classList.add('open'); e.target.remove(); });
+  $('#chs') && ($('#chs').onclick = e => { const r = e.target.closest('[data-i]'); if (r) Player.open(b, +r.dataset.i); });
+  view.querySelectorAll('[data-au]').forEach(x => x.onclick = () => { showList.q = ''; showList('author', x.dataset.au); });
+  view.querySelectorAll('[data-b]').forEach(x => x.onclick = () => showBook(x.dataset.b));
+  $('#bs').onclick = async e => { const s = e.target.closest('[data-s]')?.dataset.s; if (!s || s === b.status) return; applyStatus(b, s); await put('books', b); showBook(id); };
+  $('#stars').onclick = async e => { const n = +e.target.closest('[data-n]')?.dataset.n; if (!n) return; b.rating = n === b.rating ? 0 : n; await put('books', b); showBook(id); };
   $('#vers').onclick = e => {
     const btn = e.target.closest('[data-a]'), row = e.target.closest('.ver'); if (!btn || !row) return;
     const v = vs.find(x => x.id === row.dataset.id);
@@ -126,10 +139,10 @@ async function showBook(id) {
   };
   $('#ksExp').onclick = () => {
     const body = `# ${b.title}\n${b.author ? `_${b.author}_\n` : ''}\n${$('#ks').value}\n\n## Ескертпелер\n${notes.map(n => `- (${n.ref}) ${n.text.replace(/\n/g, ' ')}`).join('\n')}\n`;
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([body], { type: 'text/markdown' }));
-    a.download = `${b.title}.md`; a.click(); URL.revokeObjectURL(a.href);
+    saveBlob(new Blob([body], { type: 'text/markdown' }), `${b.title}.md`);
   };
   view.querySelectorAll('[data-a=dn]').forEach(btn => btn.onclick = async () => { await del('notes', btn.closest('.note').dataset.id); showBook(id); });
+  scrollTo(0, 0);
 }
 
 /* ---------- Кітап қосу ---------- */
@@ -141,12 +154,13 @@ $('#addForm').querySelector('[name=file]').onchange = e => {
   if (f && !t.value) t.value = f.name.replace(/\.[^.]+$/, '');
 };
 $('#addForm').onsubmit = async e => {
-  const d = new FormData(e.target), id = uid();
-  await put('books', { id, title: d.get('title').trim(), author: d.get('author').trim(), status: 'plan', rating: 0, added: Date.now() });
-  await addVersions(id, [...e.target.file.files], d.get('vname').trim());
+  const d = new FormData(e.target), id = uid(), files = [...e.target.file.files], typed = d.get('title').trim();
+  const b = { id, title: typed || files[0]?.name.replace(/\.[^.]+$/, '') || 'Атаусыз кітап', titleAuto: !typed, author: d.get('author').trim(), status: 'plan', rating: 0, added: Date.now() };
+  await put('books', b);
+  await addVersions(id, files, d.get('vname').trim());
+  if (files.length) { toast('Мұқаба мен ақпарат оқылуда…'); await enrichBook(b).catch(() => {}); }
   showBook(id);
 };
-$('#home').onclick = showLibrary;
 
 /* ---------- Оқығыш ---------- */
 const R = { book: null, ver: null, kind: null, pdf: null, rend: null, page: 1, total: 1, font: 100, zoom: 1 };
@@ -156,7 +170,8 @@ async function openReader(b, v) {
   Object.assign(R, { book: b, ver: v, kind: v.type, font: +(localStorage.kFont || 100) });
   $('#rTitle').textContent = `${b.title} · ${v.name}`;
   stage.innerHTML = ''; rEl.hidden = false; $('#rPanel').hidden = true;
-  if (b.status === 'plan') { applyStatus(b, 'reading'); put('books', b); }
+  if (b.status === 'plan') applyStatus(b, 'reading');
+  b.lastOpened = Date.now(); b.lastVersion = v.id; put('books', b);
   startTrack(b, v);
   const buf = await v.blob.arrayBuffer();
   try {
@@ -207,8 +222,8 @@ async function openEpub(buf) {
 function applyEpubTheme() {
   if (!R.rend) return;
   const dark = document.documentElement.dataset.theme === 'dark';
-  R.rend.themes.override('color', dark ? '#e8ece9' : '#1d2421');
-  R.rend.themes.override('background', dark ? '#121614' : '#f6f4ef');
+  R.rend.themes.override('color', dark ? '#e9edf5' : '#1b2130');
+  R.rend.themes.override('background', dark ? '#161b26' : '#fbfbfd');
 }
 
 let pT;
@@ -241,7 +256,7 @@ $('#rClose').onclick = async () => {
   await endTrack();
   if (R.rend) { R.rend.destroy(); R.rend = null; }
   if (R.pdf) { R.pdf.destroy(); R.pdf = null; }
-  rEl.hidden = true; stage.innerHTML = ''; showBook(R.book.id);
+  rEl.hidden = true; stage.innerHTML = ''; rerender();
 };
 document.addEventListener('keydown', e => {
   if (rEl.hidden || /TEXTAREA|INPUT/.test(e.target.tagName)) return;
@@ -263,7 +278,9 @@ $('#rNoteSave').onclick = async () => {
 /* ---------- Тақырып (жүйе / жарық / қараңғы), PWA ---------- */
 function applyTheme() {
   const t = localStorage.kTheme || 'system';
-  document.documentElement.dataset.theme = t === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
+  const d = t === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
+  document.documentElement.dataset.theme = d;
+  document.querySelector('meta[name=theme-color]').content = d === 'dark' ? '#1a2030' : '#eef1f7';
   applyEpubTheme();
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
@@ -272,11 +289,15 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 navigator.storage?.persist?.(); // iOS/Chrome-ға деректерді өздігінен өшірмеуді сұрау
 
 /* ---------- Мәзір (телефонда төменде, компьютерде сол жақта) ---------- */
-const setNav = v => document.querySelectorAll('#nav [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+function setNav(v) {
+  document.querySelectorAll('#nav [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  view.dataset.page = ''; closeMenu();
+  setTimeout(updateMini); // бет өз атын (view.dataset.page) қойғаннан кейін
+}
 $('#nav').onclick = e => {
   const v = e.target.closest('[data-v]')?.dataset.v; if (!v) return;
-  $('#aud')?.pause(); if (typeof stopSpeech === 'function') stopSpeech(); // көрініс ауысқанда аудио қалып қоймасын
   ({ lib: showLibrary, stats: showStats, chat: () => showChat(null), profile: showProfile })[v]();
+  scrollTo(0, 0);
 };
 
 addEventListener('DOMContentLoaded', () => openDB().then(showLibrary));

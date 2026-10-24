@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kitapp</title>
-<meta name="theme-color" content="#1f6f5c">
+<meta name="theme-color" content="#eef1f7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="top"><button class="brand" id="home"><i data-ic="book" data-s="20"></i> Kitapp</button></header>
-
 <nav id="nav" aria-label="Негізгі мәзір">
   <button class="nav-brand" data-v="lib"><i data-ic="book" data-s="22"></i><span>Kitapp</span></button>
   <button data-v="lib"><i data-ic="book" data-s="22"></i><span>Кітапхана</span></button>
@@ -27,9 +27,9 @@
 <dialog id="addDlg">
   <form method="dialog" id="addForm">
     <h3>Жаңа кітап</h3>
-    <label>Атауы <input name="title" required></label>
-    <label>Авторы <input name="author"></label>
     <label>Файл (PDF немесе EPUB) <input name="file" type="file" accept=".pdf,.epub,application/pdf,application/epub+zip" multiple></label>
+    <label>Атауы <input name="title" placeholder="Бос қалдырсаң, файлдан алынады"></label>
+    <label>Авторы <input name="author" placeholder="Бос қалдырсаң, файлдан алынады"></label>
     <label>Нұсқа аты <input name="vname" placeholder="мыс: Қазақша, Түпнұсқа, Қысқартылған"></label>
     <div class="row end">
       <button type="button" class="ghost" id="addCancel">Бас тарту</button>
@@ -53,6 +53,8 @@
 <dialog id="editDlg">
   <form method="dialog" id="editForm">
     <h3>Кітапты өңдеу</h3>
+    <div class="e-cv"><div id="eCv"></div><div><label>Мұқаба суреті <input name="coverFile" type="file" accept="image/*"></label>
+      <button type="button" id="eCvReset"><i data-ic="refresh" data-s="16"></i> Файлдан қайта алу</button></div></div>
     <div class="fgrid">
       <label class="wide">Атауы <input name="title" required></label>
       <label>Авторы <input name="author"></label>
@@ -61,6 +63,7 @@
       <label>Тілі <select name="lang"><option value="">—</option><option value="kk">Қазақша</option><option value="ru">Орысша</option><option value="en">Ағылшынша</option><option value="tr">Түрікше</option><option value="other">Басқа</option></select></label>
       <label>Бет саны <input name="pages" type="number" min="1"></label>
       <label>ISBN <input name="isbn"></label>
+      <label>Баспа <input name="publisher"></label>
       <label>Қайдан алынды <select name="source"><option value="">—</option><option>Электронды</option><option>Қағаз (өзімдікі)</option><option>Кітапхана</option><option>Сыйлыққа</option><option>Басқа</option></select></label>
       <label>Күйі <select name="status"><option value="plan">Жоспарда</option><option value="reading">Оқып жатырмын</option><option value="done">Оқыдым</option></select></label>
       <label>Оқи бастаған күні <input name="startDate" type="date"></label>
@@ -102,6 +105,30 @@
   </div>
 </section>
 
+<!-- Аудиоплеер (толық экран) -->
+<section id="psheet" class="psheet" hidden aria-label="Аудиоплеер">
+  <div class="ps-bg" id="psBg"></div>
+  <div class="ps-in">
+    <div class="ps-top"><button class="icon-btn glass" id="psDown" aria-label="Жабу"><i data-ic="chevron-down" data-s="24"></i></button>
+      <button class="icon-btn glass" id="psSet" aria-label="Аудио баптау"><i data-ic="sliders" data-s="20"></i></button></div>
+    <div class="ps-cover" id="psCover"></div>
+    <div class="ps-meta"><b id="psTitle"></b><span id="psAuthor"></span><button class="link" id="psCh"></button><small id="psMode"></small></div>
+    <input type="range" id="psSeek" min="0" max="1" value="0" step="1" aria-label="Уақыт">
+    <div class="ps-times"><span id="psT0">0:00</span><span id="psT1">-0:00</span></div>
+    <div class="ps-ctl">
+      <button class="icon-btn" id="psPrev" aria-label="Алдыңғы бөлім"><i data-ic="skip-back" data-s="28"></i></button>
+      <button class="icon-btn skip" id="psRw" aria-label="15 секунд артқа"><i data-ic="rotate-ccw" data-s="34"></i><b>15</b></button>
+      <button class="play-btn" id="psPlay" aria-label="Ойнату"></button>
+      <button class="icon-btn skip" id="psFf" aria-label="30 секунд алға"><i data-ic="rotate-cw" data-s="34"></i><b>30</b></button>
+      <button class="icon-btn" id="psNext" aria-label="Келесі бөлім"><i data-ic="skip-forward" data-s="28"></i></button>
+    </div>
+    <div class="ps-bot"><button class="ghost" id="psRate">1×</button><button class="ghost" id="psChs"><i data-ic="list" data-s="18"></i> Бөлімдер</button><button class="ghost" id="psSleep"></button></div>
+  </div>
+  <div class="ps-list glass" id="psList" hidden></div>
+</section>
+
+<div id="mini" class="mini glass" hidden></div>
+<audio id="pAudio" preload="metadata" playsinline></audio>
 <div id="toast" hidden></div>
 
 <script src="icons.js"></script>
@@ -113,9 +140,12 @@
 <script src="kstats.js"></script>
 <script src="kspeed.js"></script>
 <script src="app.js"></script>
+<script src="covers.js"></script>
+<script src="home.js"></script>
 <script src="chat.js"></script>
 <script src="prep.js"></script>
 <script src="audio.js"></script>
+<script src="player.js"></script>
 <script src="stats.js"></script>
 <script src="speed.js"></script>
 <script src="edit.js"></script>

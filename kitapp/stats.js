@@ -11,13 +11,13 @@ function flushTrack() {
   return put('sessions', T.s);
 }
 function startTrack(b, v) {
-  endTrack();
+  clearInterval(T.tick); flushTrack();
   const now = Date.now();
   T.s = { id: uid(), bookId: b.id, versionId: v.id, start: now, day: KS.dayKey(now), secs: 0, fromPct: v.pct || 0, toPct: v.pct || 0 };
   T.last = now;
   // Экран көрініп тұрғанда және соңғы 2 минутта әрекет болғанда ғана секунд санаймыз.
   T.tick = setInterval(() => {
-    if (document.visibilityState !== 'visible' || Date.now() - T.last > 120000) return;
+    if (!T.s || document.visibilityState !== 'visible' || Date.now() - T.last > 120000) return;
     if (++T.s.secs % 30 === 0) flushTrack();
   }, 1000);
 }
@@ -56,8 +56,8 @@ async function showStats() {
   const stat = (v, l) => `<div class="stat"><b>${v}</b><small>${l}</small></div>`;
 
   view.innerHTML = `
-    <h2 style="margin:.2rem 0 1rem">${ic('chart', 22)} Оқу аналитикасы</h2>
-    <div class="sec">
+    <header class="hd"><h1>Аналитика</h1></header>
+    <div class="glass sec">
       <div class="row" style="justify-content:space-between"><b>Бүгінгі мақсат</b>
         <label style="margin:0">мин/күн <input id="goal" type="number" min="1" max="600" value="${goal}" style="width:5rem;display:inline-block"></label></div>
       <div class="bar-p" style="height:10px;border-radius:99px;margin:.5rem 0"><i style="width:${todayPct}%;border-radius:99px"></i></div>
@@ -68,13 +68,13 @@ async function showStats() {
       ${stat(S.streak + ' күн', `${ic('flame', 14)} Қатарынан`)}${stat(KS.fmtDur(S.total), 'Барлығы')}${stat(KS.fmtDur(S.avg30), 'Орташа/күн (30)')}
       ${stat(KS.fmtDur(S.best), 'Ең жақсы күн')}${stat(cnt('done'), `Оқылған кітап (${year}: ${doneYear})`)}${stat(cnt('reading'), 'Оқып жатырмын')}
     </div>
-    <div class="sec"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Күн сайынғы оқу</h3>
+    <div class="glass sec"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Күн сайынғы оқу</h3>
       <select id="range" style="width:auto">${[7, 14, 30, 90].map(r => `<option value="${r}" ${r === range ? 'selected' : ''}>${r} күн</option>`).join('')}</select></div>
       <div class="bars">${days.map(x => `<div class="col" title="${x.k}: ${KS.fmtDur(x.secs)}"><i style="height:${x.secs / max * 100}%"></i></div>`).join('')}<div class="goal" style="bottom:${goal * 60 / max * 100}%"></div></div>
       <div class="lbls">${days.map((x, i) => `<div>${label(x, i)}</div>`).join('')}</div>
       ${S.total ? '' : '<div class="empty">Деректер әлі жоқ. Кітапты оқи бастасаң, уақыт өзі есептеледі.</div>'}
     </div>
-    <div class="sec"><h3>Кітаптар бойынша</h3>${per.length ? per.map(x => `
+    <div class="glass sec"><h3>Кітаптар бойынша</h3>${per.length ? per.map(x => `
       <div class="ver" data-id="${x.b.id}" style="cursor:pointer"><div><b>${esc(x.b.title)}</b> <span class="badge">${STATUS[x.b.status]}</span><br>
         <small style="color:var(--mute)">${KS.fmtDur(x.secs)} · ${x.n} сессия · ${x.pct}% оқылды${x.eta ? ` · аяқтауға ~${KS.fmtDur(x.eta)}` : ''}</small></div>
         <div style="width:90px"><div class="bar-p"><i style="width:${x.pct}%"></i></div></div></div>`).join('') : '<div class="empty">Әлі оқылған кітап жоқ</div>'}</div>`;

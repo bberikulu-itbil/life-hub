@@ -110,27 +110,27 @@ async function showSpeed(bookId, versionId) {
   const sel = (id, opts, cur) => `<select id="${id}">${opts.map(([k, t]) => `<option value="${k}" ${String(k) === String(cur) ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
 
   view.innerHTML = `
-    <button class="ghost" id="sBack">${ic('back')} Кітапқа</button>
-    <div class="sec"><h3>${ic('zap')} Жылдам оқу: ${esc(b.title)}</h3>
+    <button class="back" id="sBack">${ic('back')} Кітапқа</button>
+    <div class="glass sec"><h3>${ic('zap')} Жылдам оқу: ${esc(b.title)}</h3>
       ${vs.length > 1 ? `<label>Нұсқа <select id="sVer">${vs.map(x => `<option value="${x.id}" ${x.id === v.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>` : ''}
       <label>Қайдан бастау
         <select id="sFrom"><option value="pos">Тоқтаған жерден (${posPct}%)</option><option value="0">Басынан</option>${(v.chapters || []).map((c, i) => `<option value="c${i}">${i + 1}. ${esc(c.title)}</option>`).join('')}</select></label>
       <div class="stats"><div class="stat"><b>${S.baseline}</b><small>Бастапқы қарқын (сөз/мин)</small></div><div class="stat"><b>${best || '—'}</b><small>Ең жақсы (түсінумен)</small></div><div class="stat"><b>${drills.length}</b><small>Жаттығу саны</small></div>
         <div class="stat"><b>${words.length.toLocaleString('kk')}</b><small>Кітаптағы сөз</small></div><div class="stat"><b>${KS.fmtDur(words.length / S.baseline * 60)}</b><small>Бастапқы қарқынмен аяқтау</small></div>${best ? `<div class="stat"><b>${KS.fmtDur(words.length / best * 60)}</b><small>Ең жақсы қарқынмен</small></div>` : ''}</div>
     </div>
-    <div class="sec"><h3>Кезеңдер</h3>
+    <div class="glass sec"><h3>Кезеңдер</h3>
       <div class="ver"><div><b>0. Бастапқы өлшем</b><br><small style="color:var(--mute)">Жай оқып, өз қарқыныңды өлшейміз. Кезеңдер осыған қарай есептеледі</small></div><button data-s="0">Өлшеу</button></div>
       ${stages.map(s => `<div class="ver"><div><b>${s.id}. ${s.title}</b> ${s.id < S.unlocked ? `<span class="badge">${ic('check', 13)}</span>` : ''}<br><small style="color:var(--mute)">${s.desc} · ${s.from}–${s.to} сөз/мин · ${s.mins} мин</small></div>
         <button class="${s.id <= S.unlocked ? 'primary' : ''}" data-s="${s.id}" ${s.id > S.unlocked ? 'disabled' : ''}>${s.id > S.unlocked ? ic('lock', 16) : 'Бастау'}</button></div>`).join('')}
       <small style="color:var(--mute)">Келесі кезең ашылуы үшін: кезеңді аяқтап, түсінуді кемінде 3/5 деп бағала.</small>
     </div>
-    <div class="sec"><h3>Еркін жаттығу</h3><div class="fgrid">
+    <div class="glass sec"><h3>Еркін жаттығу</h3><div class="fgrid">
       <label>Режим ${sel('fMode', [['rsvp', 'Сөз-сөзден (RSVP)'], ['pacer', 'Нұсқаушы (мәтін көрінеді)']], S.freeMode)}</label>
       <label>Бір мезгілде сөз ${sel('fPer', [1, 2, 3, 4].map(n => [n, n]), S.freePer)}</label>
       <label>Қарқын (сөз/мин) <input id="fWpm" type="number" min="80" max="1200" step="10" value="${S.freeWpm}"></label>
       <label>Ұзақтығы (мин) ${sel('fMins', [1, 2, 3, 5, 10].map(n => [n, n]), S.freeMins)}</label></div>
       <button class="primary" id="fGo">Бастау</button></div>
-    <details class="sec"><summary><b>Баптаулар</b></summary>
+    <details class="glass sec"><summary><b>Баптаулар</b></summary>
       <div class="fgrid" style="margin-top:.6rem">
         <label>Қаріп ${sel('oFam', [['serif', 'Serif'], ['sans', 'Sans'], ['mono', 'Mono']], S.family)}</label>
         <label>Қаріп өлшемі (px) <input id="oFont" type="number" min="24" max="120" step="4" value="${S.font}"></label>
@@ -140,7 +140,7 @@ async function showSpeed(bookId, versionId) {
         <label>Ұстау әрпін бөлектеу (1 сөз) ${sel('oOrp', [[1, 'Иә'], [0, 'Жоқ']], +S.orp)}</label>
         <label>Бастар алдында 3-2-1 ${sel('oCount', [[1, 'Иә'], [0, 'Жоқ']], +S.countdown)}</label>
         <label>Бастапқы қарқынды қолмен қою <input id="oBase" type="number" min="80" max="700" step="10" value="${S.baseline}"></label></div></details>
-    <div class="sec"><h3>Тарих</h3>${drills.length ? `<div class="bars" style="height:90px">${drills.slice(0, 20).reverse().map(d => `<div class="col" title="${new Date(d.ts).toLocaleDateString('kk')} · ${d.wpm} сөз/мин · түсіну ${d.comp}/5"><i style="height:${d.wpm / Math.max(...drills.slice(0, 20).map(x => x.wpm)) * 100}%;opacity:${d.comp >= 3 ? 1 : .35}"></i></div>`).join('')}</div>
+    <div class="glass sec"><h3>Тарих</h3>${drills.length ? `<div class="bars" style="height:90px">${drills.slice(0, 20).reverse().map(d => `<div class="col" title="${new Date(d.ts).toLocaleDateString('kk')} · ${d.wpm} сөз/мин · түсіну ${d.comp}/5"><i style="height:${d.wpm / Math.max(...drills.slice(0, 20).map(x => x.wpm)) * 100}%;opacity:${d.comp >= 3 ? 1 : .35}"></i></div>`).join('')}</div>
       <small style="color:var(--mute)">Соңғы 20 жаттығудың қарқыны; түсіну 3/5-тен төмен болса баған күңгірт.</small>` +
       drills.slice(0, 8).map(d => `<div class="note"><small>${new Date(d.ts).toLocaleDateString('kk')} · ${esc(d.name)}</small><div>${d.wpm} сөз/мин · ${d.words} сөз · түсіну ${d.comp}/5</div></div>`).join('') : '<div class="empty">Әлі жаттығу жоқ. Бастапқы өлшемнен баста.</div>'}</div>`;
 
@@ -155,7 +155,7 @@ async function showSpeed(bookId, versionId) {
 
   const after = cfg => async res => {
     if (!res) return showSpeed(bookId, v.id);
-    view.innerHTML = `<div class="sec"><h3>${esc(cfg.title)}: нәтиже</h3>
+    view.innerHTML = `<div class="glass sec"><h3>${esc(cfg.title)}: нәтиже</h3>
       <div class="stats"><div class="stat"><b>${Math.round(res.wpm)}</b><small>сөз/мин</small></div><div class="stat"><b>${res.words}</b><small>сөз</small></div><div class="stat"><b>${KS.fmtDur(res.secs)}</b><small>уақыт</small></div></div>
       <p>Оқығаныңның қаншасын түсіндің?</p><div class="seg" id="comp">${[1, 2, 3, 4, 5].map(n => `<button data-n="${n}">${n}</button>`).join('')}</div>
       <small style="color:var(--mute)">1 = ештеңе түсінбедім, 5 = бәрін түсіндім. Адал баға қарқынды дұрыс өсіруге көмектеседі.</small></div>`;

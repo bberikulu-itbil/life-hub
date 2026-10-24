@@ -11,7 +11,7 @@ async function withPrepared(b, versionId, again, back, what) {
   const v = vs.filter(isReady).find(x => x.id === versionId) || vs.find(isReady);
   if (v) return v;
   if (!vs.length) {
-    view.innerHTML = `<button class="ghost" id="pBack">${ic('back')} Кітапқа</button><div class="sec"><h3>${esc(b.title)}</h3><p>Алдымен кітапқа файл қос: кітап бетінің жоғарғы оң жағындағы мәзірден «Нұсқа қосу».</p></div>`;
+    view.innerHTML = `<button class="back" id="pBack">${ic('back')} Кітапқа</button><div class="glass sec"><h3>${esc(b.title)}</h3><p>Алдымен кітапқа файл қос: кітап бетінің жоғарғы оң жағындағы мәзірден «Нұсқа қосу».</p></div>`;
     $('#pBack').onclick = back; return null;
   }
   renderPrep(b, vs.find(x => x.id === versionId) || vs.find(x => x.kind === 'original') || vs[0], again, back, what);
@@ -21,8 +21,8 @@ async function withPrepared(b, versionId, again, back, what) {
 function renderPrep(b, v, again, back, what) {
   const ctl = { stopped: false, prog(f, label) { if (!$('#pf')) return; $('#pf').style.width = Math.round(f * 100) + '%'; $('#pl').textContent = `${label} · ${Math.round(f * 100)}%`; } };
   const stop = () => { ctl.stopped = true; back(); };
-  view.innerHTML = `<button class="ghost" id="pBack">${ic('back')} Кітапқа</button>
-    <div class="sec"><h3>${ic('layers')} Мәтінді дайындау</h3>
+  view.innerHTML = `<button class="back" id="pBack">${ic('back')} Кітапқа</button>
+    <div class="glass sec"><h3>${ic('layers')} Мәтінді дайындау</h3>
       <p>«${esc(b.title)}», ${esc(v.name)}: мәтін оқылып, тазартылып, ${esc(what)} үшін бөлімдерге бөлінеді. Бұл бір рет жасалады, нәтиже құрылғыда сақталады.</p>
       <div class="prog"><i id="pf"></i></div><small id="pl" style="color:var(--mute)">Басталуда…</small>
       <div class="row end" style="margin-top:.6rem"><button id="pStop">${ic('x', 16)} Тоқтату</button></div></div>`;
@@ -30,7 +30,7 @@ function renderPrep(b, v, again, back, what) {
   indexVersion(b, v, ctl).then(() => { if (!ctl.stopped) again(); }).catch(err => {
     if (err === STOP || ctl.stopped) return;
     console.error(err);
-    view.innerHTML = `<button class="ghost" id="pBack">${ic('back')} Кітапқа</button><div class="sec"><h3>${ic('alert')} Дайындау сәтсіз</h3><p>${esc(err.message)}</p>
+    view.innerHTML = `<button class="back" id="pBack">${ic('back')} Кітапқа</button><div class="glass sec"><h3>${ic('alert')} Дайындау сәтсіз</h3><p>${esc(err.message)}</p>
       <div class="row"><button class="primary" id="pRetry">${ic('refresh', 16)} Қайталау</button></div></div>`;
     $('#pBack').onclick = back; $('#pRetry').onclick = () => renderPrep(b, v, again, back, what);
   });

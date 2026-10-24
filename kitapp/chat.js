@@ -120,8 +120,8 @@ async function showChat(bookId) {
   const { data: { session } } = await sb.auth.getSession();
 
   view.innerHTML = `
-    <button class="ghost" id="cBack">${ic('back')} ${b ? 'Кітапқа' : 'Кітапхана'}</button>
-    <div class="sec"><h3>${ic('chat')} ${b ? esc(b.title) : 'Бүкіл кітапхана бойынша чат'}</h3>
+    <button class="back" id="cBack">${ic('back')} ${b ? 'Кітапқа' : 'Кітапхана'}</button>
+    <div class="glass sec"><h3>${ic('chat')} ${b ? esc(b.title) : 'Бүкіл кітапхана бойынша чат'}</h3>
       <small style="color:var(--mute)">Чат кітап мәтінінен сұраққа керек үзінділерді тауып, ЖИ-ға жібереді. Мәтіннің қалған бөлігі құрылғыдан шықпайды.</small>
       <div id="idx" style="margin-top:.6rem"></div>
       ${session ? '' : '<p style="color:var(--warn)">ЖИ жұмыс істеуі үшін алдымен <a href="../">Life Hub</a>-қа кіру керек.</p>'}

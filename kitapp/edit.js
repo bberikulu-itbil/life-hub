@@ -2,7 +2,7 @@
 /* Kitapp: кітапты және оның нұсқаларын өңдеу, ⋮ мәзірлері, нұсқа қосу. */
 
 const LANGS = { kk: 'Қазақша', ru: 'Орысша', en: 'Ағылшынша', tr: 'Түрікше', other: 'Басқа' };
-const FIELDS = ['title', 'author', 'genre', 'year', 'lang', 'pages', 'isbn', 'tags', 'source', 'status', 'startDate', 'finishDate', 'summary'];
+const FIELDS = ['title', 'author', 'genre', 'year', 'lang', 'pages', 'isbn', 'publisher', 'tags', 'source', 'status', 'startDate', 'finishDate', 'summary'];
 const mb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(n / 1024)) + ' КБ';
 
 // Күйді өзгерткенде бос қалған күндерді өзі толтырады.
@@ -13,13 +13,7 @@ function applyStatus(b, st) {
   if (st === 'done') { b.startDate = b.startDate || t; b.finishDate = b.finishDate || t; }
 }
 
-function chips(b) {
-  const c = [b.genre, b.year, LANGS[b.lang], b.pages && `${b.pages} бет`, b.isbn && `ISBN ${b.isbn}`, b.source, ...(b.tags || []).map(t => '#' + t),
-    b.startDate && `Басталды: ${b.startDate}`, b.finishDate && `Аяқталды: ${b.finishDate}`].filter(Boolean);
-  return c.map(x => `<span class="badge">${esc(x)}</span>`).join(' ');
-}
-
-const refresh = id => $('#grid') ? showLibrary() : showBook(id);
+const refresh = () => rerender();
 
 /* ---------- Нұсқалар ---------- */
 async function addVersions(bookId, files, vname, kind) {
@@ -45,7 +39,7 @@ $('#verCancel').onclick = () => $('#verDlg').close();
 $('#verForm').onsubmit = async e => {
   const f = e.target, id = f.dataset.id, d = new FormData(f);
   await addVersions(id, [...f.elements.file.files], d.get('vname').trim(), d.get('kind'));
-  f._after ? f._after() : refresh(id);
+  f._after ? f._after() : refresh();
 };
 
 /* ---------- Кітапты өңдеу ---------- */
@@ -67,20 +61,29 @@ async function openEdit(id) {
   for (const k of FIELDS) f.elements[k].value = k === 'tags' ? (b.tags || []).join(', ') : (b[k] ?? '');
   f.dataset.id = id;
   await drawEditFiles(id);
+  $('#eCv').innerHTML = coverHTML(b, 'cv-sm');
   $('#editDlg').showModal();
 }
 $('#editCancel').onclick = () => $('#editDlg').close();
+$('#eCvReset').onclick = async () => {
+  const b = await get('books', $('#editForm').dataset.id);
+  b.cover = null; b.coverTried = false; await enrichBook(b);
+  $('#eCv').innerHTML = coverHTML(b, 'cv-sm'); toast(b.cover ? 'Мұқаба файлдан алынды' : 'Файлда мұқаба табылмады');
+};
 $('#eAddFile').onclick = () => openVerDialog($('#editForm').dataset.id, () => drawEditFiles($('#editForm').dataset.id));
 $('#editForm').onsubmit = async e => {
   const f = e.target, id = f.dataset.id, b = await get('books', id), d = Object.fromEntries(new FormData(f));
   const old = b.status;
   Object.assign(b, {
     title: d.title.trim() || b.title, author: d.author.trim(), genre: d.genre.trim(), year: d.year ? +d.year : '', lang: d.lang,
-    pages: d.pages ? +d.pages : '', isbn: d.isbn.trim(), source: d.source, startDate: d.startDate, finishDate: d.finishDate, summary: d.summary.trim(),
+    pages: d.pages ? +d.pages : '', isbn: d.isbn.trim(), publisher: d.publisher.trim(), source: d.source, startDate: d.startDate, finishDate: d.finishDate, summary: d.summary.trim(),
     tags: d.tags.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean),
   });
   if (d.status !== old) applyStatus(b, d.status);
-  await put('books', b); toast('Сақталды'); refresh(id);
+  if (d.title.trim()) b.titleAuto = false;
+  const img = f.elements.coverFile.files[0];
+  if (img) { try { b.cover = await shrink(img); b.coverAt = Date.now(); } catch { toast('Суретті оқу мүмкін болмады'); } }
+  await put('books', b); toast('Сақталды'); refresh();
 };
 
 async function deleteBook(id) {
@@ -113,16 +116,17 @@ async function bookMenu(id, anchor) {
     { a: 'edit', icon: 'edit', text: 'Өңдеу' },
     { a: 'addver', icon: 'file-plus', text: 'Нұсқа қосу' },
     b.status !== 'done' ? { a: 'done', icon: 'check', text: 'Оқыдым деп белгілеу' } : { a: 'reading', icon: 'book-open', text: 'Қайта оқып жатырмын' },
-    { a: 'chat', icon: 'chat', text: 'ЖИ-мен талқылау' }, { a: 'audio', icon: 'headphones', text: 'Аудио' }, { a: 'speed', icon: 'zap', text: 'Жылдам оқу' },
+    { a: 'listen', icon: 'headphones', text: 'Тыңдау' }, { a: 'speed', icon: 'zap', text: 'Жылдам оқу' }, { a: 'chat', icon: 'chat', text: 'ЖИ-мен талқылау' }, { a: 'audio', icon: 'sliders', text: 'Аудио баптау (mp3)' },
     { a: 'del', icon: 'trash', text: 'Жою', cls: 'danger' },
   ], async a => {
     if (a === 'edit') openEdit(id);
     if (a === 'addver') openVerDialog(id);
     if (a === 'chat') showChat(id);
     if (a === 'audio') showAudio(id);
+    if (a === 'listen') Player.open(b);
     if (a === 'speed') showSpeed(id);
     if (a === 'del') deleteBook(id);
-    if (a === 'done' || a === 'reading') { applyStatus(b, a); await put('books', b); refresh(id); }
+    if (a === 'done' || a === 'reading') { applyStatus(b, a); await put('books', b); refresh(); }
   });
 }
 
