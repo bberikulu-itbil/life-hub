@@ -48,3 +48,9 @@ dialog::backdrop{background:#0008}
 #toast{position:fixed;left:50%;bottom:1.5rem;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:.6rem 1rem;border-radius:99px;z-index:50}
 #toast[hidden]{display:none}
 @media(max-width:640px){#rPanel{position:absolute;right:0;top:0;bottom:0;z-index:2}}
+.chat{display:flex;flex-direction:column;gap:.6rem;margin:1rem 0}
+.msg{max-width:88%;padding:.6rem .85rem;border-radius:14px;border:1px solid var(--line);background:var(--card)}
+.msg.u{align-self:flex-end;background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.msg button{margin-top:.4rem;font-size:.8rem;padding:.2rem .6rem}
+.composer{position:sticky;bottom:0;background:var(--bg);padding:.6rem 0 calc(.6rem + env(safe-area-inset-bottom))}
+.composer textarea{margin-bottom:.4rem}

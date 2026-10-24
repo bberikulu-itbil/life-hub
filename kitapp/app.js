@@ -11,13 +11,17 @@ const STATUS = { plan: 'Жоспарда', reading: 'Оқып жатырмын',
 /* ---------- IndexedDB ---------- */
 let db;
 const openDB = () => new Promise((res, rej) => {
-  const r = indexedDB.open('kitapp', 1);
+  const r = indexedDB.open('kitapp', 2);
   r.onupgradeneeded = () => {
     const d = r.result;
+    if (!d.objectStoreNames.contains('books')) {
     d.createObjectStore('books', { keyPath: 'id' });
     d.createObjectStore('versions', { keyPath: 'id' }).createIndex('bookId', 'bookId');
     d.createObjectStore('notes', { keyPath: 'id' }).createIndex('bookId', 'bookId');
     d.createObjectStore('konspekt', { keyPath: 'bookId' });
+    }
+    d.createObjectStore('chunks', { keyPath: 'id' }).createIndex('bookId', 'bookId');
+    d.createObjectStore('chats', { keyPath: 'bookId' });
   };
   r.onsuccess = () => { db = r.result; res(); };
   r.onerror = () => rej(r.error);
@@ -49,6 +53,7 @@ async function showLibrary() {
     <div class="bar">
       <input id="q" placeholder="Кітап немесе автор іздеу…" value="${esc(filter.q)}">
       <select id="fs"><option value="">Барлығы</option>${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${filter.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      <button id="chatAll" title="Бүкіл кітапхана бойынша чат">💬</button>
     </div>
     <div class="grid" id="grid"></div>`;
   const draw = () => {
@@ -66,6 +71,7 @@ async function showLibrary() {
   draw();
   $('#q').oninput = e => { filter.q = e.target.value; draw(); };
   $('#fs').onchange = e => { filter.status = e.target.value; draw(); };
+  $('#chatAll').onclick = () => showChat(null);
   $('#grid').onclick = e => { const c = e.target.closest('.card'); if (c) showBook(c.dataset.id); };
 }
 
@@ -86,6 +92,7 @@ async function showBook(id) {
         <button class="danger" id="delBook" style="margin-left:auto">Кітапты жою</button>
       </div>
     </div>
+    <button class="primary" id="chatBtn" style="width:100%">💬 Кітапты ЖИ-мен талқылау</button>
     <div class="sec"><h3>Нұсқалар</h3><div id="vers">${vs.length ? vs.map(v => `
       <div class="ver" data-id="${v.id}">
         <div><b>${esc(v.name)}</b> <span class="badge">${v.type.toUpperCase()}</span><br><small style="color:var(--mute)">${(v.blob.size / 1048576).toFixed(1)} МБ · ${v.pct || 0}% оқылды</small></div>
@@ -100,9 +107,10 @@ async function showBook(id) {
     </div>
     <div class="sec"><h3>Ескертпелер</h3>${notes.length ? notes.map(n => `
       <div class="note" data-id="${n.id}"><small>${esc(n.ref)} · ${esc(n.vname || '')}</small><div>${esc(n.text).replace(/\n/g, '<br>')}</div><button class="ghost danger" data-a="dn">жою</button></div>`).join('') : '<div class="empty">Оқығанда 📝 арқылы қосасың</div>'}</div>
-    <div class="sec"><h3>Жақында</h3><div class="tabs-soon"><span>🎧 Аудио</span><span>⚡ Жылдам оқу</span><span>💬 ЖИ чат</span></div></div>`;
+    <div class="sec"><h3>Жақында</h3><div class="tabs-soon"><span>🎧 Аудио</span><span>⚡ Жылдам оқу</span></div></div>`;
 
   $('#back').onclick = showLibrary;
+  $('#chatBtn').onclick = () => showChat(id);
   const save = async p => { Object.assign(b, p); await put('books', b); };
   $('#bt').onchange = e => save({ title: e.target.value.trim() || b.title });
   $('#ba').onchange = e => save({ author: e.target.value.trim() });
@@ -112,6 +120,7 @@ async function showBook(id) {
     if (!confirm('Кітап, барлық нұсқасы, конспект және ескертпелер жойылады. Жалғастырамыз ба?')) return;
     for (const v of vs) await del('versions', v.id);
     for (const n of notes) await del('notes', n.id);
+    await dropChunks(id); await del('chats', id);
     await del('konspekt', id); await del('books', id); showLibrary();
   };
   $('#addVer').onclick = () => $('#verFile').click();
@@ -121,7 +130,7 @@ async function showBook(id) {
     const v = vs.find(x => x.id === row.dataset.id);
     if (a === 'open') openReader(b, v);
     if (a === 'ren') { const n = prompt('Нұсқа аты', v.name); if (n) { v.name = n.trim(); await put('versions', v); showBook(id); } }
-    if (a === 'del' && confirm('Бұл нұсқаны жоямыз ба?')) { await del('versions', v.id); showBook(id); }
+    if (a === 'del' && confirm('Бұл нұсқаны жоямыз ба?')) { await dropChunks(id, v.id); await del('versions', v.id); showBook(id); }
   };
   let t;
   $('#ks').oninput = e => {
