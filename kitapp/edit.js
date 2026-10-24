@@ -2,7 +2,7 @@
 /* Kitapp: кітапты және оның нұсқаларын өңдеу, ⋮ мәзірлері, нұсқа қосу. */
 
 const LANGS = { kk: 'Қазақша', ru: 'Орысша', en: 'Ағылшынша', tr: 'Түрікше', other: 'Басқа' };
-const FIELDS = ['title', 'author', 'genre', 'year', 'lang', 'pages', 'isbn', 'publisher', 'tags', 'source', 'status', 'startDate', 'finishDate', 'summary'];
+const FIELDS = ['title', 'author', 'genre', 'year', 'lang', 'pages', 'isbn', 'publisher', 'series', 'seriesNo', 'tags', 'source', 'status', 'startDate', 'finishDate', 'summary'];
 const mb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(n / 1024)) + ' КБ';
 
 // Күйді өзгерткенде бос қалған күндерді өзі толтырады.
@@ -26,6 +26,7 @@ async function addVersions(bookId, files, vname, kind) {
 }
 
 async function deleteVersion(v) {
+  if (P.v?.id === v.id) pStop(); // ойнап тұрған нұсқа өшсе, плеер де жабылады
   await dropChunks(v.bookId, v.id); await del('versions', v.id);
 }
 
@@ -76,9 +77,10 @@ $('#editForm').onsubmit = async e => {
   const old = b.status;
   Object.assign(b, {
     title: d.title.trim() || b.title, author: d.author.trim(), genre: d.genre.trim(), year: d.year ? +d.year : '', lang: d.lang,
-    pages: d.pages ? +d.pages : '', isbn: d.isbn.trim(), publisher: d.publisher.trim(), source: d.source, startDate: d.startDate, finishDate: d.finishDate, summary: d.summary.trim(),
+    pages: d.pages ? +d.pages : '', isbn: d.isbn.trim(), publisher: d.publisher.trim(), series: d.series.trim(), seriesNo: d.series.trim() && d.seriesNo !== '' ? +d.seriesNo : '', source: d.source, startDate: d.startDate, finishDate: d.finishDate, summary: d.summary.trim(),
     tags: d.tags.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean),
   });
+  setShelfList([...getShelfList(), ...b.tags]);
   if (d.status !== old) applyStatus(b, d.status);
   if (d.title.trim()) b.titleAuto = false;
   const img = f.elements.coverFile.files[0];
@@ -86,11 +88,14 @@ $('#editForm').onsubmit = async e => {
   await put('books', b); toast('Сақталды'); refresh();
 };
 
-async function deleteBook(id) {
+async function deleteBook(id, after) {
   if (!confirm('Кітап, барлық нұсқасы, конспект, ескертпелер және оқу статистикасы жойылады. Жалғастырамыз ба?')) return;
   for (const n of ['versions', 'notes', 'sessions', 'drills']) for (const r of await byBook(n, id)) await del(n, r.id);
+  if (P.b?.id === id) pStop(); // мини-плеер өшкен кітапты көрсетпесін
   await dropChunks(id); await del('chats', id); await del('konspekt', id); await del('books', id);
-  showLibrary();
+  try { delete localStorage['kPlay:' + id]; } catch { /* сақтау өшік */ }
+  toast('Кітап өшірілді');
+  (after || showLibrary)();
 }
 
 /* ---------- ⋮ мәзірлері ---------- */
@@ -115,12 +120,14 @@ async function bookMenu(id, anchor) {
   popup(anchor, [
     { a: 'edit', icon: 'edit', text: 'Өңдеу' },
     { a: 'addver', icon: 'file-plus', text: 'Нұсқа қосу' },
+    { a: 'shelf', icon: 'shelves', text: 'Сөре және серия' },
     b.status !== 'done' ? { a: 'done', icon: 'check', text: 'Оқыдым деп белгілеу' } : { a: 'reading', icon: 'book-open', text: 'Қайта оқып жатырмын' },
     { a: 'listen', icon: 'headphones', text: 'Тыңдау' }, { a: 'speed', icon: 'zap', text: 'Жылдам оқу' }, { a: 'chat', icon: 'chat', text: 'ЖИ-мен талқылау' }, { a: 'audio', icon: 'music', text: 'Аудио жасау (mp3)' },
     { a: 'del', icon: 'trash', text: 'Жою', cls: 'danger' },
   ], async a => {
     if (a === 'edit') openEdit(id);
     if (a === 'addver') openVerDialog(id);
+    if (a === 'shelf') openShelfDlg(id);
     if (a === 'chat') showChat(id);
     if (a === 'audio') showAudio(id);
     if (a === 'listen') Player.open(b);

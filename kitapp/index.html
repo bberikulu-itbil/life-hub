@@ -49,6 +49,14 @@
   </form>
 </dialog>
 
+<!-- Сөре және серия -->
+<dialog id="shelfDlg"><form method="dialog" id="shelfForm"><h3>Сөре және серия</h3><div class="sd-body"></div>
+  <div class="row end" style="margin-top:1rem"><button type="button" class="ghost" id="shelfCancel">Бас тарту</button><button class="primary" value="ok">Сақтау</button></div></form></dialog>
+
+<!-- Кітаптарды таңдау -->
+<dialog id="pickDlg" class="bsheet"><div class="fs-grip"></div><h3></h3><small class="muted">Басу арқылы таңда; серияда таңдау реті — кітап нөмірі.</small><div class="pk-body"></div>
+  <div class="row end" style="margin-top:.8rem"><button type="button" class="ghost" id="pickCancel">Бас тарту</button><button type="button" class="primary" id="pickOk">Сақтау</button></div></dialog>
+
 <!-- Кітапты өңдеу -->
 <dialog id="editDlg">
   <form method="dialog" id="editForm">
@@ -68,7 +76,9 @@
       <label>Күйі <select name="status"><option value="plan">Жоспарда</option><option value="reading">Оқып жатырмын</option><option value="done">Оқыдым</option></select></label>
       <label>Оқи бастаған күні <input name="startDate" type="date"></label>
       <label>Аяқтаған күні <input name="finishDate" type="date"></label>
-      <label class="wide">Тегтер (үтірмен) <input name="tags" placeholder="психология, өзін дамыту"></label>
+      <label>Серия <input name="series" placeholder="мыс: Абай жолы"></label>
+      <label>Сериядағы нөмірі <input name="seriesNo" type="number" min="0" step="1"></label>
+      <label class="wide">Сөрелер (үтірмен) <input name="tags" placeholder="психология, жазғы оқу"></label>
       <label class="wide">Не үшін оқимын? Мақсат, қысқаша сипаттама <textarea name="summary" rows="3"></textarea></label>
       <div class="wide"><div class="row" style="justify-content:space-between"><b>Файлдар (нұсқалар)</b><button type="button" id="eAddFile"><i data-ic="file-plus" data-s="16"></i> Файл қосу</button></div><div id="eFiles"></div></div>
     </div>
@@ -155,6 +165,7 @@
 <script src="stats.js"></script>
 <script src="speed.js"></script>
 <script src="edit.js"></script>
+<script src="shelves.js"></script>
 <script src="profile.js"></script>
 </body>
 </html>

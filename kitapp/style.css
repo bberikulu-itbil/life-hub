@@ -324,3 +324,17 @@ dialog.bsheet{margin:auto auto 0;width:100%;max-width:640px;max-height:80vh;bord
 @keyframes kSpin{to{transform:rotate(360deg)}}
 .tgl{display:flex;gap:.7rem;align-items:flex-start;color:var(--ink);font-size:.95rem}.tgl input{margin-top:.2rem}
 .step{width:100%}.step span{flex:1;min-width:0}
+
+/* сөрелер, сериялар */
+.stack{display:flex;flex:none!important;min-width:0}.stack .cv-xs{width:30px}.stack .cv-xs+.cv-xs{margin-left:-14px}
+.bc-l{display:block;font-style:normal;font-size:.75rem;font-weight:700;color:var(--acc);margin-top:.45rem}
+.bcard .bc-l+b{margin-top:.1rem}
+.mini-card.cur .cv{outline:3px solid var(--acc);outline-offset:2px}
+.pk-body{display:flex;flex-direction:column;overflow:auto;max-height:55vh;margin-top:.6rem}
+.pk-row{display:flex;align-items:center;gap:.8rem;border:0;background:none;border-radius:12px;padding:.5rem;text-align:left;justify-content:flex-start}
+.pk-row span{flex:1;min-width:0;display:flex;flex-direction:column}.pk-row b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-row em{width:28px;height:28px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:700;font-size:.85rem;flex:none}
+.pk-row.on{background:color-mix(in srgb,var(--acc) 10%,transparent)}.pk-row.on em{background:var(--acc);border-color:var(--acc);color:#fff}
+.fwrap .fchip{cursor:pointer}
+.dl-hd{display:flex;gap:.8rem;align-items:center;margin-bottom:.3rem}.dl-hd>div{display:flex;flex-direction:column;min-width:0}
+.dl .ver{padding:.55rem 0}

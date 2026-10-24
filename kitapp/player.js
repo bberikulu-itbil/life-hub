@@ -203,7 +203,8 @@ const Player = {
   // ci берілсе — сол бөлімнің басынан, әйтпесе тоқтаған жерден.
   async open(b, ci, opts = {}) {
     const saved = JSON.parse(localStorage['kPlay:' + b.id] || 'null');
-    const v = await withPrepared(b, saved?.vid, () => Player.open(b, ci, opts), () => showBook(b.id), 'аудио');
+    // дайындау бетінен кейін кітап бетіне қайтып, плеерді ашамыз
+    const v = await withPrepared(b, saved?.vid, () => { showBook(b.id); Player.open(b, ci, opts); }, () => showBook(b.id), 'аудио');
     if (!v) return;
     const chs = await audioChapters(v);
     if (!chs.length) return toast('Аудио үшін мәтін табылмады');

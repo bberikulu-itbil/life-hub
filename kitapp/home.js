@@ -29,7 +29,7 @@ const COLLECTIONS = [
 // Жинақтар тізімі: keys — қай жолдар көрінеді (басты бетте қысқа, кітапханада толық).
 function collectionsHTML(d, keys) {
   const row = (k, icon, text, n) => `<button class="lrow" data-c="${k}">${ic(icon, 22)}<span>${text}</span><em>${n}</em>${ic('chevron-right', 18)}</button>`;
-  const extra = { shelves: ['shelves', 'Менің сөрелерім', new Set(d.books.flatMap(b => b.tags || [])).size], authors: ['users', 'Авторлар', new Set(d.books.flatMap(authorsOf)).size] };
+  const extra = { shelves: ['shelves', 'Менің сөрелерім', shelfNames(d.books).length], series: ['layers', 'Сериялар', seriesNames(d.books).length], authors: ['users', 'Авторлар', new Set(d.books.flatMap(authorsOf)).size] };
   return `<div class="glass list" data-col>${keys.map(k => {
     const c = COLLECTIONS.find(x => x[0] === k);
     return c ? row(k, c[1], c[2], d.books.filter(b => c[3](b, d)).length) : row(k, ...extra[k]);
@@ -38,7 +38,7 @@ function collectionsHTML(d, keys) {
 function bindCollections() {
   view.querySelectorAll('.list[data-col]').forEach(l => l.onclick = e => {
     const c = e.target.closest('[data-c]')?.dataset.c; if (!c) return;
-    c === 'shelves' || c === 'authors' ? showGroups(c) : showList(c);
+    ['shelves', 'series', 'authors'].includes(c) ? showGroups(c) : showList(c);
   });
 }
 
@@ -111,8 +111,9 @@ function libFilters(d) {
   const base = [['all', 'Барлығы', () => true], ['books', 'Кітаптар', b => has.has(b.id)], ['audio', 'Аудиокітаптар', b => d.withAudio.has(b.id)]];
   const status = COLLECTIONS.filter(c => ['reading', 'done', 'plan'].includes(c[0])).map(([k, , t, f]) => [k, t, b => f(b, d)]);
   const genres = [...new Set(d.books.map(b => (b.genre || '').trim()).filter(Boolean))].sort((a, c) => a.localeCompare(c, 'kk')).map(g => ['g:' + g, g, b => (b.genre || '').trim() === g]);
-  const tags = [...new Set(d.books.flatMap(b => b.tags || []))].sort((a, c) => a.localeCompare(c, 'kk')).map(t => ['t:' + t, '#' + t, b => (b.tags || []).includes(t)]);
-  return { groups: [['Түрі', base], ['Күйі', status], ['Жанры', genres], ['Сөрелер', tags]], all: [...base, ...status, ...genres, ...tags] };
+  const tags = shelfNames(d.books).map(t => ['t:' + t, t, b => (b.tags || []).includes(t)]);
+  const series = seriesNames(d.books).map(t => ['s:' + t, t, b => b.series === t]);
+  return { groups: [['Түрі', base], ['Күйі', status], ['Жанры', genres], ['Сөрелер', tags], ['Сериялар', series]], all: [...base, ...status, ...genres, ...tags, ...series] };
 }
 
 async function showLibrary() {
@@ -128,7 +129,7 @@ async function showLibrary() {
     <div class="chips-row"><button class="fchip sq" id="lAll" aria-label="Барлық сүзгілер">${ic('grid', 18)}</button><div id="lChips" class="chips-scroll"></div></div>
     <div class="grid" id="grid"></div>
     <div class="home-grid" style="margin-top:1.4rem">
-      <div class="sec bare"><h3>Жинақтар</h3>${collectionsHTML(d, ['all', 'reading', 'done', 'plan', 'audio', 'shelves', 'authors'])}</div>
+      <div class="sec bare"><h3>Жинақтар</h3>${collectionsHTML(d, ['all', 'reading', 'done', 'plan', 'audio', 'shelves', 'series', 'authors'])}</div>
       <div>${uploadBox()}</div>
     </div>`;
 
@@ -188,58 +189,75 @@ async function quickAdd(files) {
 /* ---------- Кітаптар торы ---------- */
 const SORTS = { recent: 'Соңғы ашылған', added: 'Қосылған күні', title: 'Атауы', progress: 'Прогресс' };
 
-function bookCard(b, d) {
+function bookCard(b, d, label) {
   const pct = bookPct(b, d.vs);
   const badge = d.withAudio.has(b.id) ? `<span class="cv-badge">${ic('headphones', 16)}</span>` : '';
   return `<div class="bcard" data-id="${b.id}">
     <div class="bcard-cv">${coverHTML(b, '', badge)}<button class="icon-btn kebab card-k" data-k="${b.id}" aria-label="Мәзір">${ic('more', 18)}</button></div>
     ${pct ? `<div class="bar-p thin"><i style="width:${pct}%"></i></div>` : ''}
-    <b>${esc(b.title)}</b><small>${esc(b.author || '')}</small></div>`;
+    ${label ? `<em class="bc-l">${esc(label)}</em>` : ''}<b>${esc(b.title)}</b><small>${esc(b.author || '')}</small></div>`;
 }
 
 async function showList(kind, val, focus) {
   setNav('lib'); rerender = () => showList(kind, val); view.dataset.page = 'list';
   const d = await libData();
-  const col = COLLECTIONS.find(c => c[0] === kind);
+  const col = COLLECTIONS.find(c => c[0] === kind), group = kind === 'tag' || kind === 'series';
   const base = kind === 'tag' ? d.books.filter(b => (b.tags || []).includes(val))
+    : kind === 'series' ? seriesBooks(d.books, val)
     : kind === 'author' ? d.books.filter(b => authorsOf(b).includes(val))
     : d.books.filter(b => col ? col[3](b, d) : true);
-  const title = kind === 'tag' ? '#' + val : kind === 'author' ? val : col?.[2] || 'Барлығы';
-  const sort = localStorage.kSort || 'recent';
+  const title = kind === 'tag' ? val : kind === 'series' ? val : kind === 'author' ? val : col?.[2] || 'Барлығы';
+  const sorts = kind === 'series' ? { series: 'Серия реті', ...SORTS } : SORTS;
+  const sort = kind === 'series' ? 'series' : (localStorage.kSort || 'recent');
   const q0 = showList.q || '';
 
   view.innerHTML = `
     <button class="back" id="lBack">${ic('back', 22)} Артқа</button>
-    <header class="hd"><h1>${esc(title)}</h1><span class="hd-n">${base.length}</span></header>
-    <div class="bar"><label class="search glass">${ic('search', 18)}<input id="q" placeholder="Атауы, автор, жанр, тег…" value="${esc(q0)}"></label>
-      <select id="srt" class="glass" aria-label="Сұрыптау">${Object.entries(SORTS).map(([k, t]) => `<option value="${k}" ${k === sort ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+    <header class="hd"><div><small class="muted">${kind === 'tag' ? 'Сөре' : kind === 'series' ? 'Серия' : kind === 'author' ? 'Автор' : ''}</small><h1>${esc(title)}</h1></div><span class="hd-n">${base.length}</span>
+      ${group ? `<div class="row" style="flex-wrap:nowrap"><button class="icon-btn primary" id="gPick" aria-label="Кітап қосу">${ic('plus', 22)}</button><button class="icon-btn glass" id="gMenu" aria-label="Мәзір">${ic('more', 20)}</button></div>` : ''}</header>
+    <div class="bar"><label class="search glass">${ic('search', 18)}<input id="q" placeholder="Атауы, автор, жанр, сөре…" value="${esc(q0)}"></label>
+      <select id="srt" class="glass" aria-label="Сұрыптау">${Object.entries(sorts).map(([k, t]) => `<option value="${k}" ${k === sort ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
     <div class="grid" id="grid"></div>`;
   const draw = () => {
     const q = $('#q').value.toLowerCase(), s = $('#srt').value;
-    const list = base.filter(b => `${b.title} ${b.author} ${b.genre || ''} ${b.publisher || ''} ${(b.tags || []).join(' ')}`.toLowerCase().includes(q));
-    const by = { recent: (a, c) => (c.lastOpened || c.added) - (a.lastOpened || a.added), added: (a, c) => c.added - a.added, title: (a, c) => a.title.localeCompare(c.title, 'kk'), progress: (a, c) => bookPct(c, d.vs) - bookPct(a, d.vs) }[s];
-    list.sort(by);
-    $('#grid').innerHTML = list.length ? list.map(b => bookCard(b, d)).join('') : `<div class="empty" style="grid-column:1/-1">${base.length ? 'Ештеңе табылмады' : 'Бұл жерде әзірге кітап жоқ'}</div>`;
+    const list = base.filter(b => `${b.title} ${b.author} ${b.genre || ''} ${b.publisher || ''} ${b.series || ''} ${(b.tags || []).join(' ')}`.toLowerCase().includes(q));
+    const by = { series: null, recent: (a, c) => (c.lastOpened || c.added) - (a.lastOpened || a.added), added: (a, c) => c.added - a.added, title: (a, c) => a.title.localeCompare(c.title, 'kk'), progress: (a, c) => bookPct(c, d.vs) - bookPct(a, d.vs) }[s];
+    if (by) list.sort(by);
+    $('#grid').innerHTML = list.length ? list.map(b => bookCard(b, d, kind === 'series' ? seriesLabel(b) : '')).join('')
+      : `<div class="empty" style="grid-column:1/-1">${base.length ? 'Ештеңе табылмады' : group ? 'Әзірге кітап жоқ: «+» арқылы қос' : 'Бұл жерде әзірге кітап жоқ'}</div>`;
   };
   draw();
-  $('#lBack').onclick = () => (kind === 'tag' || kind === 'author') ? showGroups(kind === 'tag' ? 'shelves' : 'authors') : showLibrary();
+  $('#lBack').onclick = () => ({ tag: () => showGroups('shelves'), series: () => showGroups('series'), author: () => showGroups('authors') }[kind] || showLibrary)();
   $('#q').oninput = e => { showList.q = e.target.value; draw(); };
-  $('#srt').onchange = e => { localStorage.kSort = e.target.value; draw(); };
+  $('#srt').onchange = e => { if (kind !== 'series') localStorage.kSort = e.target.value; draw(); };
   $('#grid').onclick = e => { const k = e.target.closest('.card-k'); if (k) return bookMenu(k.dataset.k, k); const c = e.target.closest('.bcard'); if (c) showBook(c.dataset.id); };
+  if (group) {
+    $('#gPick').onclick = () => pickBooks(kind === 'tag' ? `«${val}» сөресі` : `«${val}» сериясы: кітаптарды ретімен таңда`, base.map(b => b.id), async ids => {
+      kind === 'tag' ? await shelfAssign(val, ids) : await seriesAssign(val, ids); showList(kind, val);
+    });
+    $('#gMenu').onclick = e => popup(e.currentTarget, [{ a: 'ren', icon: 'edit', text: 'Атауын өзгерту' }, { a: 'del', icon: 'trash', text: kind === 'tag' ? 'Сөрені өшіру' : 'Серияны өшіру', cls: 'danger' }], async a => {
+      if (a === 'ren') { const n = await renameGroup(kind, val); if (n) showList(kind, n); }
+      if (a === 'del' && await deleteGroup(kind, val)) showGroups(kind === 'tag' ? 'shelves' : 'series');
+    });
+  }
   if (focus) $('#q').focus();
 }
 
-// Сөрелер (тегтер) немесе авторлар тізімі.
+// Сөрелер, сериялар немесе авторлар тізімі.
 async function showGroups(kind) {
   setNav('lib'); rerender = () => showGroups(kind); view.dataset.page = 'groups';
   const books = await all('books'), map = new Map();
-  for (const b of books) for (const k of kind === 'shelves' ? (b.tags || []) : authorsOf(b)) map.set(k, (map.get(k) || 0) + 1);
-  const items = [...map].sort((a, c) => c[1] - a[1] || a[0].localeCompare(c[0], 'kk'));
+  if (kind === 'shelves') shelfNames(books).forEach(n => map.set(n, 0));
+  for (const b of books) for (const k of kind === 'shelves' ? (b.tags || []) : kind === 'series' ? (b.series ? [b.series] : []) : authorsOf(b)) map.set(k, (map.get(k) || 0) + 1);
+  const items = [...map].sort((a, c) => kind === 'shelves' || kind === 'series' ? a[0].localeCompare(c[0], 'kk') : c[1] - a[1] || a[0].localeCompare(c[0], 'kk'));
+  const T = { shelves: ['Менің сөрелерім', 'shelves', 'Жаңа сөре'], series: ['Сериялар', 'layers', 'Жаңа серия'], authors: ['Авторлар', 'user'] }[kind];
+  const covers = k => (kind === 'series' ? seriesBooks(books, k) : books.filter(b => (b.tags || []).includes(k))).slice(0, 3).map(b => coverHTML(b, 'cv-xs')).join('');
   view.innerHTML = `
     <button class="back" id="gBack">${ic('back', 22)} Артқа</button>
-    <header class="hd"><h1>${kind === 'shelves' ? 'Менің сөрелерім' : 'Авторлар'}</h1></header>
-    ${items.length ? `<div class="glass list">${items.map(([k, n]) => `<button class="lrow" data-k="${esc(k)}">${ic(kind === 'shelves' ? 'tag' : 'user', 22)}<span>${esc(k)}</span><em>${n}</em>${ic('chevron-right', 18)}</button>`).join('')}</div>`
-      : `<div class="empty">${kind === 'shelves' ? 'Сөре жасау үшін кітаптың ⋮ мәзірінен «Өңдеу» ашып, «Тегтер» өрісіне сөре атын жаз (мысалы: психология, жазғы оқу).' : 'Авторы көрсетілген кітап әлі жоқ.'}</div>`}`;
+    <header class="hd"><h1>${T[0]}</h1>${T[2] ? `<button class="icon-btn primary" id="gNew" aria-label="${T[2]}">${ic('plus', 22)}</button>` : ''}</header>
+    ${items.length ? `<div class="glass list">${items.map(([k, n]) => `<button class="lrow" data-k="${esc(k)}">${kind === 'authors' ? ic('user', 22) : `<span class="stack">${covers(k) || ic(T[1], 22)}</span>`}<span>${esc(k)}</span><em>${n}</em>${ic('chevron-right', 18)}</button>`).join('')}</div>`
+      : `<div class="empty">${kind === 'shelves' ? 'Сөре әлі жоқ. «+» арқылы жасап, кітаптарды таңда: мысалы «Жазғы оқу», «Психология».' : kind === 'series' ? 'Серия әлі жоқ. «+» арқылы жасап, сериядағы кітаптарды ретімен таңда.' : 'Авторы көрсетілген кітап әлі жоқ.'}</div>`}`;
   $('#gBack').onclick = showLibrary;
-  view.querySelector('.list')?.addEventListener('click', e => { const k = e.target.closest('[data-k]')?.dataset.k; if (k) { showList.q = ''; showList(kind === 'shelves' ? 'tag' : 'author', k); } });
+  $('#gNew') && ($('#gNew').onclick = () => createGroup(kind));
+  view.querySelector('.list')?.addEventListener('click', e => { const k = e.target.closest('[data-k]')?.dataset.k; if (k) { showList.q = ''; showList(kind === 'shelves' ? 'tag' : kind === 'series' ? 'series' : 'author', k); } });
 }

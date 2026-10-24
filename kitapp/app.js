@@ -57,7 +57,8 @@ async function showBook(id) {
   const dur = (c, i) => recs.find(r => r.versionId === av.id && r.ci === i)?.dur || estSecs(c.text);
   const totalAudio = chs.reduce((a, c, i) => a + dur(c, i), 0);
   const pct = bookPct(b, vs);
-  const mine = new Set(authorsOf(b)), others = books.filter(x => x.id !== id && authorsOf(x).some(a => mine.has(a)));
+  const ser = b.series ? seriesBooks(books, b.series) : [];
+  const mine = new Set(authorsOf(b)), others = books.filter(x => x.id !== id && !ser.includes(x) && authorsOf(x).some(a => mine.has(a)));
   const info = INFO.map(([k, t]) => [t, k === 'lang' ? LANGS[b.lang] : b[k]]).filter(([, v]) => v).concat((b.tags || []).length ? [['Сөрелер', b.tags.map(t => '#' + t).join(' ')]] : []);
   const stat = (v, l) => `<div><b>${v}</b><small>${l}</small></div>`;
   const hh = Math.floor(totalAudio / 3600), mm = Math.round(totalAudio % 3600 / 60);
@@ -67,6 +68,7 @@ async function showBook(id) {
     <div class="bk-hero">
       <div class="bk-cv">${coverHTML(b, 'cv-lg')}</div>
       <h1>${esc(b.title)}</h1>
+      ${b.series ? `<button class="link" id="bSer">${ic('layers', 14)} ${esc(b.series)}${b.seriesNo !== '' && b.seriesNo != null ? ` · ${b.seriesNo}-кітап` : ''}</button>` : ''}
       <div class="bk-au">${authorsOf(b).map(a => `<button class="link" data-au="${esc(a)}">${esc(a)}</button>`).join(', ') || '<span>Автор көрсетілмеген</span>'}</div>
       <div class="bk-stats">
         ${b.pages ? stat(b.pages, 'бет') : ''}${b.year ? stat(b.year, 'жыл') : ''}
@@ -95,6 +97,8 @@ async function showBook(id) {
       ${chs.length > 4 ? '<button class="link center" id="chAll">Барлығын көру</button>' : ''}`
       : vs.length ? `<p class="muted">Бөлімдерді көру және тыңдау үшін кітап мәтінін бір рет дайындау керек.</p><button id="prepBtn">${ic('layers', 16)} Мәтінді дайындау</button>`
       : '<p class="muted">Кітапқа әлі файл қосылмаған.</p>'}</div>
+
+    ${ser.length > 1 ? `<div class="sec bare"><h3>«${esc(b.series)}» сериясы · ${ser.length}</h3><div class="hscroll">${ser.map(x => `<button class="mini-card ${x.id === id ? 'cur' : ''}" data-b="${x.id}">${coverHTML(x)}<em class="bc-l">${esc(seriesLabel(x))}</em><span>${esc(x.title)}</span></button>`).join('')}</div></div>` : ''}
 
     ${others.length ? `<div class="sec bare"><h3>Автордың басқа кітаптары</h3><div class="hscroll">${others.map(x => `<button class="mini-card" data-b="${x.id}">${coverHTML(x)}<span>${esc(x.title)}</span></button>`).join('')}</div></div>` : ''}
 
@@ -128,7 +132,8 @@ async function showBook(id) {
   $('#chAll') && ($('#chAll').onclick = e => { $('#chs').classList.add('open'); e.target.remove(); });
   $('#chs') && ($('#chs').onclick = e => { const r = e.target.closest('[data-i]'); if (r) Player.open(b, +r.dataset.i); });
   view.querySelectorAll('[data-au]').forEach(x => x.onclick = () => { showList.q = ''; showList('author', x.dataset.au); });
-  view.querySelectorAll('[data-b]').forEach(x => x.onclick = () => showBook(x.dataset.b));
+  view.querySelectorAll('[data-b]').forEach(x => x.onclick = () => x.dataset.b !== id && showBook(x.dataset.b));
+  $('#bSer') && ($('#bSer').onclick = () => { showList.q = ''; showList('series', b.series); });
   $('#bs').onclick = async e => { const s = e.target.closest('[data-s]')?.dataset.s; if (!s || s === b.status) return; applyStatus(b, s); await put('books', b); showBook(id); };
   $('#stars').onclick = async e => { const n = +e.target.closest('[data-n]')?.dataset.n; if (!n) return; b.rating = n === b.rating ? 0 : n; await put('books', b); showBook(id); };
   $('#vers').onclick = e => {
