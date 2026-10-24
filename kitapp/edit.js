@@ -1,8 +1,9 @@
 'use strict';
-/* Kitapp 4-кезең: кітапты өңдеу (⋮ мәзірі арқылы), қосымша деректер өрістері. */
+/* Kitapp: кітапты және оның нұсқаларын өңдеу, ⋮ мәзірлері, нұсқа қосу. */
 
 const LANGS = { kk: 'Қазақша', ru: 'Орысша', en: 'Ағылшынша', tr: 'Түрікше', other: 'Басқа' };
 const FIELDS = ['title', 'author', 'genre', 'year', 'lang', 'pages', 'isbn', 'tags', 'source', 'status', 'startDate', 'finishDate', 'summary'];
+const mb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(n / 1024)) + ' КБ';
 
 // Күйді өзгерткенде бос қалған күндерді өзі толтырады.
 function applyStatus(b, st) {
@@ -20,14 +21,56 @@ function chips(b) {
 
 const refresh = id => $('#grid') ? showLibrary() : showBook(id);
 
+/* ---------- Нұсқалар ---------- */
+async function addVersions(bookId, files, vname, kind) {
+  const hasOriginal = (await byBook('versions', bookId)).some(v => v.kind === 'original');
+  for (const f of files) {
+    const type = typeOf(f);
+    await put('versions', { id: uid(), bookId, name: vname || f.name.replace(/\.[^.]+$/, '') || type.toUpperCase(), type, kind: kind || (hasOriginal ? 'other' : 'original'), blob: f, pos: null, pct: 0, added: Date.now() });
+  }
+  if (files.length) toast('Нұсқа қосылды');
+}
+
+async function deleteVersion(v) {
+  await dropChunks(v.bookId, v.id); await del('versions', v.id);
+}
+
+// Нұсқа қосу терезесі: «Түпнұсқа», «Аударма» немесе «Басқа» деп белгілеуге болады.
+async function openVerDialog(bookId, after) {
+  const f = $('#verForm'); f.reset(); f.dataset.id = bookId; f._after = after;
+  f.elements.kind.value = (await byBook('versions', bookId)).some(v => v.kind === 'original') ? 'translation' : 'original';
+  $('#verDlg').showModal();
+}
+$('#verCancel').onclick = () => $('#verDlg').close();
+$('#verForm').onsubmit = async e => {
+  const f = e.target, id = f.dataset.id, d = new FormData(f);
+  await addVersions(id, [...f.elements.file.files], d.get('vname').trim(), d.get('kind'));
+  f._after ? f._after() : refresh(id);
+};
+
+/* ---------- Кітапты өңдеу ---------- */
+async function drawEditFiles(id) {
+  const vs = (await byBook('versions', id)).sort((a, c) => a.added - c.added);
+  $('#eFiles').innerHTML = vs.length ? vs.map(v => `<div class="ver" data-id="${v.id}"><div><b>${esc(v.name)}</b> <span class="badge">${v.type.toUpperCase()}</span><br><small style="color:var(--mute)">${mb(v.blob.size)}</small></div>
+    <div class="row"><select data-k style="width:auto">${Object.entries(KIND).map(([k, t]) => `<option value="${k}" ${(v.kind || 'other') === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
+    <button type="button" class="danger" data-d aria-label="Өшіру">${ic('trash', 16)}</button></div></div>`).join('') : '<div class="empty">Файл жоқ</div>';
+  $('#eFiles').onchange = async e => { if (e.target.dataset.k == null) return; const v = vs.find(x => x.id === e.target.closest('.ver').dataset.id); v.kind = e.target.value; await put('versions', v); };
+  $('#eFiles').onclick = async e => {
+    const btn = e.target.closest('[data-d]'); if (!btn) return;
+    const v = vs.find(x => x.id === btn.closest('.ver').dataset.id);
+    if (confirm(`«${v.name}» файлы мен оның дайын мәтіні, аудиосы өшеді. Жалғастырамыз ба?`)) { await deleteVersion(v); drawEditFiles(id); }
+  };
+}
 async function openEdit(id) {
   const b = await get('books', id), f = $('#editForm');
   f.reset();
   for (const k of FIELDS) f.elements[k].value = k === 'tags' ? (b.tags || []).join(', ') : (b[k] ?? '');
   f.dataset.id = id;
+  await drawEditFiles(id);
   $('#editDlg').showModal();
 }
 $('#editCancel').onclick = () => $('#editDlg').close();
+$('#eAddFile').onclick = () => openVerDialog($('#editForm').dataset.id, () => drawEditFiles($('#editForm').dataset.id));
 $('#editForm').onsubmit = async e => {
   const f = e.target, id = f.dataset.id, b = await get('books', id), d = Object.fromEntries(new FormData(f));
   const old = b.status;
@@ -47,31 +90,59 @@ async function deleteBook(id) {
   showLibrary();
 }
 
-/* ---------- ⋮ мәзірі ---------- */
+/* ---------- ⋮ мәзірлері ---------- */
 function closeMenu() { document.querySelector('.menu')?.remove(); }
 document.addEventListener('pointerdown', e => { if (!e.target.closest('.menu, .kebab')) closeMenu(); });
 document.addEventListener('keydown', e => e.key === 'Escape' && closeMenu());
 
-async function bookMenu(id, anchor) {
+// items: [{a, icon, text, cls}] немесе {sep: 'Тақырып'}
+function popup(anchor, items, onPick) {
   closeMenu();
-  const b = await get('books', id);
   const m = document.createElement('div'); m.className = 'menu';
-  m.innerHTML = `<button data-a="edit">✏️ Өңдеу</button>
-    ${b.status !== 'done' ? '<button data-a="done">✅ Оқыдым деп белгілеу</button>' : '<button data-a="reading">📖 Қайта оқып жатырмын</button>'}
-    <button data-a="chat">💬 ЖИ-мен талқылау</button><button data-a="audio">🎧 Аудио</button><button data-a="speed">⚡ Жылдам оқу</button>
-    <button data-a="del" class="danger">🗑 Жою</button>`;
+  m.innerHTML = items.map(i => i.sep ? `<div class="msep">${esc(i.sep)}</div>` : `<button data-a="${i.a}" class="${i.cls || ''}">${ic(i.icon, 17)} <span>${esc(i.text)}</span></button>`).join('');
   document.body.append(m);
   const r = anchor.getBoundingClientRect();
   m.style.top = Math.max(8, Math.min(r.bottom + 4, innerHeight - m.offsetHeight - 8)) + 'px';
   m.style.left = Math.max(8, Math.min(r.right - m.offsetWidth, innerWidth - m.offsetWidth - 8)) + 'px';
-  m.onclick = async e => {
-    const a = e.target.dataset.a; if (!a) return;
-    closeMenu();
+  m.onclick = e => { const a = e.target.closest('[data-a]')?.dataset.a; if (a) { closeMenu(); onPick(a); } };
+}
+
+async function bookMenu(id, anchor) {
+  const b = await get('books', id);
+  popup(anchor, [
+    { a: 'edit', icon: 'edit', text: 'Өңдеу' },
+    { a: 'addver', icon: 'file-plus', text: 'Нұсқа қосу' },
+    b.status !== 'done' ? { a: 'done', icon: 'check', text: 'Оқыдым деп белгілеу' } : { a: 'reading', icon: 'book-open', text: 'Қайта оқып жатырмын' },
+    { a: 'chat', icon: 'chat', text: 'ЖИ-мен талқылау' }, { a: 'audio', icon: 'headphones', text: 'Аудио' }, { a: 'speed', icon: 'zap', text: 'Жылдам оқу' },
+    { a: 'del', icon: 'trash', text: 'Жою', cls: 'danger' },
+  ], async a => {
     if (a === 'edit') openEdit(id);
+    if (a === 'addver') openVerDialog(id);
     if (a === 'chat') showChat(id);
     if (a === 'audio') showAudio(id);
     if (a === 'speed') showSpeed(id);
     if (a === 'del') deleteBook(id);
     if (a === 'done' || a === 'reading') { applyStatus(b, a); await put('books', b); refresh(id); }
-  };
+  });
+}
+
+// Нұсқаның ⋮ мәзірі: оқу, мәтінді дайындау, атауы, түрі (түпнұсқа/аударма), жүктеп алу, жою.
+async function versionMenu(v, anchor) {
+  const b = await get('books', v.bookId), k = v.kind || 'other';
+  popup(anchor, [
+    { a: 'open', icon: 'book-open', text: 'Оқу' },
+    { a: 'prep', icon: 'layers', text: isReady(v) ? 'Мәтінді қайта дайындау' : 'Мәтінді дайындау' },
+    { a: 'ren', icon: 'edit', text: 'Атауын өзгерту' },
+    { sep: 'Түрі' },
+    ...Object.entries(KIND).map(([key, t]) => ({ a: 'k:' + key, icon: k === key ? 'check' : 'tag', text: t })),
+    { a: 'dl', icon: 'download', text: 'Файлды жүктеп алу' },
+    { a: 'del', icon: 'trash', text: 'Жою', cls: 'danger' },
+  ], async a => {
+    if (a === 'open') openReader(b, v);
+    if (a === 'prep') renderPrep(b, v, () => showBook(b.id), () => showBook(b.id), 'мәтін');
+    if (a === 'ren') { const n = prompt('Нұсқа аты', v.name); if (n) { v.name = n.trim(); await put('versions', v); showBook(b.id); } }
+    if (a.startsWith('k:')) { v.kind = a.slice(2); await put('versions', v); showBook(b.id); }
+    if (a === 'dl') saveBlob(v.blob, `${v.name}.${v.type}`);
+    if (a === 'del' && confirm('Бұл нұсқа, оның дайын мәтіні және аудиосы өшеді. Жалғастырамыз ба?')) { await deleteVersion(v); showBook(b.id); }
+  });
 }

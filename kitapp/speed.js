@@ -1,5 +1,5 @@
 'use strict';
-/* Kitapp 5-кезең: жылдам оқу. Бастапқы өлшем → 6 кезең → еркін жаттығу. Мәтін 2-кезеңде дайындалған бөлшектерден алынады. */
+/* Kitapp 5-кезең: жылдам оқу. Бастапқы өлшем, 6 кезең, еркін жаттығу. Мәтін 2-кезеңде дайындалған бөлшектерден алынады. */
 
 const SP_DEF = { baseline: 200, family: 'serif', font: 56, orp: true, punct: 1, long: true, ramp: true, countdown: true, unlocked: 1, freeMode: 'rsvp', freePer: 1, freeWpm: 260, freeMins: 3 };
 const FF = { serif: 'Georgia,"Times New Roman",serif', sans: 'system-ui,sans-serif', mono: 'ui-monospace,Menlo,monospace' };
@@ -18,9 +18,9 @@ async function loadWords(v) {
 function runDrill(cfg, words, start, S, done) {
   const WIN = 70, total = cfg.mins * 60000, o = KSP.opts(S.punct, S.long);
   const ov = document.createElement('div'); ov.className = 'sp-ov';
-  ov.innerHTML = `<div class="sp-bar"><button id="spX">✕</button><b>${esc(cfg.title)}</b><span id="spW" style="color:var(--mute)"></span><span style="flex:1"></span><button id="spM">−</button><button id="spP">+</button></div>
+  ov.innerHTML = `<div class="sp-bar"><button id="spX" aria-label="Жабу">${ic('x')}</button><b>${esc(cfg.title)}</b><span id="spW" style="color:var(--mute)"></span><span style="flex:1"></span><button id="spM">−</button><button id="spP">+</button></div>
     <div class="sp-main" id="spMain" style="font-family:${FF[S.family]};font-size:${S.font}px"></div><div class="sp-ctx" id="spCtx"></div>
-    <div class="sp-foot"><div class="bar-p"><i id="spBar" style="width:0"></i></div><div class="row" style="justify-content:center;margin-top:.6rem"><button id="spB">⏪ 10</button><button id="spPlay" class="primary">▶</button><button id="spF">10 ⏩</button></div></div>`;
+    <div class="sp-foot"><div class="bar-p"><i id="spBar" style="width:0"></i></div><div class="row" style="justify-content:center;margin-top:.6rem"><button id="spB" aria-label="10 сөз артқа">${ic('skip-back')} 10</button><button id="spPlay" class="primary" aria-label="Ойнату">${ic('play')}</button><button id="spF" aria-label="10 сөз алға">10 ${ic('skip-forward')}</button></div></div>`;
   document.body.append(ov);
   const q = s => ov.querySelector(s), main = q('#spMain');
   let i = start, maxI = start, adj = 0, playing = false, timer = 0, active = 0, seg = 0, gone = false, ws = -1;
@@ -48,10 +48,10 @@ function runDrill(cfg, words, start, S, done) {
     show(c); stat();
     timer = setTimeout(() => { i = c.end; maxI = Math.max(maxI, i); step(); }, KSP.delayFor(c.words, wpm(), o));
   };
-  const play = () => { playing = true; seg = Date.now(); q('#spPlay').textContent = '⏸'; q('#spCtx').textContent = ''; step(); };
+  const play = () => { playing = true; seg = Date.now(); q('#spPlay').innerHTML = ic('pause'); q('#spCtx').textContent = ''; step(); };
   const pause = () => {
     if (!playing) return;
-    playing = false; clearTimeout(timer); active += Date.now() - seg; q('#spPlay').textContent = '▶';
+    playing = false; clearTimeout(timer); active += Date.now() - seg; q('#spPlay').innerHTML = ic('play');
     if (cfg.mode !== 'pacer') q('#spCtx').innerHTML = words.slice(Math.max(start, i - 12), i + 24).map((w, k) => esc(w)).join(' ');
   };
   const jump = d => { i = Math.max(start, Math.min(words.length - 1, i + d)); const c = KSP.chunkAt(words, i, cfg.per); if (c) { show(c); if (!playing) q('#spCtx').textContent = ''; } };
@@ -80,7 +80,7 @@ function runDrill(cfg, words, start, S, done) {
 function runBaseline(words, start, done) {
   const seg = words.slice(start, start + 200);
   const ov = document.createElement('div'); ov.className = 'sp-ov';
-  ov.innerHTML = `<div class="sp-bar"><button id="bX">✕</button><b>Бастапқы өлшем</b></div>
+  ov.innerHTML = `<div class="sp-bar"><button id="bX" aria-label="Жабу">${ic('x')}</button><b>Бастапқы өлшем</b></div>
     <div class="sp-main" style="padding:1rem;overflow:auto"><div id="bBody" class="pacer" style="font-size:1.15rem">Әдеттегідей, түсініп оқы. «Бастау» бас, оқып бітіргенде «Бітірдім» бас.</div></div>
     <div class="sp-foot"><div class="row" style="justify-content:center"><button class="primary" id="bGo">Бастау</button></div></div>`;
   document.body.append(ov);
@@ -97,14 +97,9 @@ function runBaseline(words, start, done) {
 async function showSpeed(bookId, versionId) {
   setNav('lib');
   const b = await get('books', bookId);
-  const vs = (await byBook('versions', bookId)).filter(v => v.indexed);
-  const v = vs.find(x => x.id === versionId) || vs[0];
-  if (!v) {
-    view.innerHTML = `<button class="ghost" id="sBack">← Кітапқа</button><div class="sec"><h3>⚡ ${esc(b.title)}</h3>
-      <p>Жылдам оқу кітаптың мәтінін қолданады. Алдымен чат бетінде нұсқаның мәтінін дайында.</p><button class="primary" id="sGo">💬 Мәтінді дайындауға өту</button></div>`;
-    $('#sBack').onclick = () => showBook(bookId); $('#sGo').onclick = () => showChat(bookId);
-    return;
-  }
+  const v = await withPrepared(b, versionId, () => showSpeed(bookId, versionId), () => showBook(bookId), 'жылдам оқу');
+  if (!v) return;
+  const vs = (await byBook('versions', bookId)).filter(isReady);
   const { words, firstOfPi } = await loadWords(v);
   const drills = (await byBook('drills', bookId)).sort((a, c) => c.ts - a.ts);
   const S = spGet(), stages = KSP.stagesFor(S.baseline);
@@ -115,17 +110,18 @@ async function showSpeed(bookId, versionId) {
   const sel = (id, opts, cur) => `<select id="${id}">${opts.map(([k, t]) => `<option value="${k}" ${String(k) === String(cur) ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
 
   view.innerHTML = `
-    <button class="ghost" id="sBack">← Кітапқа</button>
-    <div class="sec"><h3>⚡ Жылдам оқу: ${esc(b.title)}</h3>
+    <button class="ghost" id="sBack">${ic('back')} Кітапқа</button>
+    <div class="sec"><h3>${ic('zap')} Жылдам оқу: ${esc(b.title)}</h3>
       ${vs.length > 1 ? `<label>Нұсқа <select id="sVer">${vs.map(x => `<option value="${x.id}" ${x.id === v.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>` : ''}
       <label>Қайдан бастау
         <select id="sFrom"><option value="pos">Тоқтаған жерден (${posPct}%)</option><option value="0">Басынан</option>${(v.chapters || []).map((c, i) => `<option value="c${i}">${i + 1}. ${esc(c.title)}</option>`).join('')}</select></label>
-      <div class="stats"><div class="stat"><b>${S.baseline}</b><small>Бастапқы қарқын (сөз/мин)</small></div><div class="stat"><b>${best || '—'}</b><small>Ең жақсы (түсінумен)</small></div><div class="stat"><b>${drills.length}</b><small>Жаттығу саны</small></div></div>
+      <div class="stats"><div class="stat"><b>${S.baseline}</b><small>Бастапқы қарқын (сөз/мин)</small></div><div class="stat"><b>${best || '—'}</b><small>Ең жақсы (түсінумен)</small></div><div class="stat"><b>${drills.length}</b><small>Жаттығу саны</small></div>
+        <div class="stat"><b>${words.length.toLocaleString('kk')}</b><small>Кітаптағы сөз</small></div><div class="stat"><b>${KS.fmtDur(words.length / S.baseline * 60)}</b><small>Бастапқы қарқынмен аяқтау</small></div>${best ? `<div class="stat"><b>${KS.fmtDur(words.length / best * 60)}</b><small>Ең жақсы қарқынмен</small></div>` : ''}</div>
     </div>
     <div class="sec"><h3>Кезеңдер</h3>
       <div class="ver"><div><b>0. Бастапқы өлшем</b><br><small style="color:var(--mute)">Жай оқып, өз қарқыныңды өлшейміз. Кезеңдер осыған қарай есептеледі</small></div><button data-s="0">Өлшеу</button></div>
-      ${stages.map(s => `<div class="ver"><div><b>${s.id}. ${s.title}</b> ${s.id < S.unlocked ? '<span class="badge">✓</span>' : ''}<br><small style="color:var(--mute)">${s.desc} · ${s.from}→${s.to} сөз/мин · ${s.mins} мин</small></div>
-        <button class="${s.id <= S.unlocked ? 'primary' : ''}" data-s="${s.id}" ${s.id > S.unlocked ? 'disabled' : ''}>${s.id > S.unlocked ? '🔒' : 'Бастау'}</button></div>`).join('')}
+      ${stages.map(s => `<div class="ver"><div><b>${s.id}. ${s.title}</b> ${s.id < S.unlocked ? `<span class="badge">${ic('check', 13)}</span>` : ''}<br><small style="color:var(--mute)">${s.desc} · ${s.from}–${s.to} сөз/мин · ${s.mins} мин</small></div>
+        <button class="${s.id <= S.unlocked ? 'primary' : ''}" data-s="${s.id}" ${s.id > S.unlocked ? 'disabled' : ''}>${s.id > S.unlocked ? ic('lock', 16) : 'Бастау'}</button></div>`).join('')}
       <small style="color:var(--mute)">Келесі кезең ашылуы үшін: кезеңді аяқтап, түсінуді кемінде 3/5 деп бағала.</small>
     </div>
     <div class="sec"><h3>Еркін жаттығу</h3><div class="fgrid">

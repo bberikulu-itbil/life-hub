@@ -68,3 +68,12 @@ test("stagesFor grows with the baseline and every stage is faster than the last 
   assert.ok(KSP.stagesFor(300)[3].from > s[3].from);
   assert.equal(KSP.rampWpm(200, 300, 2), 300);
 });
+
+import vm from "node:vm";
+import fs from "node:fs";
+
+test("cleanText joins hyphenated words and drops bare page numbers", () => {
+  const ctx = vm.createContext({ supabase: { createClient: () => ({}) }, esc: (s) => s, localStorage: {} });
+  vm.runInContext(fs.readFileSync(new URL("../kitapp/chat.js", import.meta.url), "utf8") + ";this.cleanText=cleanText", ctx);
+  assert.equal(ctx.cleanText("Кіта-\nпхана — бұл\n12\nорын.  Келесі\nжол"), "Кітапхана — бұл орын. Келесі жол");
+});

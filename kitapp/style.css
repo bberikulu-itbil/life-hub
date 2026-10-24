@@ -117,3 +117,14 @@ body{padding-bottom:calc(var(--navh) + env(safe-area-inset-bottom))}
 .chunk{padding:0 1rem}
 .pacer{max-width:720px;padding:1rem;line-height:1.9;text-align:left;cursor:default}
 .pacer .hl{background:color-mix(in srgb,var(--acc) 40%,transparent);border-radius:4px}
+
+/* иконкалар, прогресс, профиль */
+.ic{flex:none;vertical-align:-3px}
+button{display:inline-flex;align-items:center;justify-content:center;gap:.4rem}
+button i{display:inline-flex;font-style:normal}
+.menu button{justify-content:flex-start}.menu .msep{padding:.4rem .8rem .1rem;font-size:.75rem;color:var(--mute);text-transform:uppercase}
+.prog{height:10px;background:var(--line);border-radius:99px;overflow:hidden;margin:.6rem 0 .3rem}.prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+.avatar{flex:none;width:3rem;height:3rem;border-radius:50%;background:var(--acc);color:var(--acc-ink);display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:700}
+.msg.err{border-color:var(--warn);color:var(--warn)}
+h4{margin:1.1rem 0 .3rem}
+@media(min-width:800px){#nav [data-v=profile]{margin-top:auto}}

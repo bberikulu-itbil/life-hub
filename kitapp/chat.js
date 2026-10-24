@@ -9,9 +9,10 @@ const ALL = '__all__';
 const fmt = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
 const done = tx => new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
 
-async function dropChunks(bookId, versionId) {
+// keepAudio=true: мәтінді қайта дайындағанда жасалған аудио файлдар сақталады.
+async function dropChunks(bookId, versionId, keepAudio = false) {
   const pick = async n => (await byBook(n, bookId)).filter(c => !versionId || c.versionId === versionId);
-  const [cs, au] = await Promise.all([pick('chunks'), pick('audio')]);
+  const [cs, au] = await Promise.all([pick('chunks'), keepAudio ? [] : pick('audio')]);
   const tx = db.transaction(['chunks', 'audio'], 'readwrite');
   cs.forEach(c => tx.objectStore('chunks').delete(c.id));
   au.forEach(a => tx.objectStore('audio').delete(a.id));
@@ -47,14 +48,24 @@ function epubChapters(book, parts) {
   return out;
 }
 
-async function extractParts(v, onProg) {
+const STOP = new Error('Тоқтатылды');
+const tick = () => new Promise(r => setTimeout(r));
+
+// PDF/EPUB-тен шыққан мәтінді тазалау: сөз тасымалы, бет нөмірлері, артық бос орын.
+const cleanText = t => t.replace(/\u00ad/g, '').replace(/^\s*\d{1,4}\s*$/gm, '')
+  .replace(/(\p{L})-[ \t]*\n[ \t]*(\p{Ll})/gu, '$1$2').replace(/\s*\n\s*/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
+
+// ctl = { prog(0..1, жазу), stopped }: прогресс көрсету және тоқтату үшін.
+async function extractParts(v, ctl) {
   const buf = await v.blob.arrayBuffer(), parts = []; let chapters;
   if (v.type === 'pdf') {
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
     for (let p = 1; p <= pdf.numPages; p++) {
+      if (ctl.stopped) { pdf.destroy(); throw STOP; }
       const tc = await (await pdf.getPage(p)).getTextContent();
-      parts.push({ ref: `бет ${p}`, text: tc.items.map(i => i.str).join(' ') });
-      if (p % 10 === 0) onProg(`${p}/${pdf.numPages}`);
+      parts.push({ ref: `бет ${p}`, text: cleanText(tc.items.map(i => i.str + (i.hasEOL ? '\n' : ' ')).join('')) });
+      ctl.prog(p / pdf.numPages * .9, `Бет ${p} / ${pdf.numPages}`);
+      if (p % 8 === 0) await tick();
     }
     chapters = await pdfChapters(pdf, parts.length);
     pdf.destroy();
@@ -62,9 +73,11 @@ async function extractParts(v, onProg) {
     const book = ePub(buf); await book.ready;
     const items = book.spine.spineItems;
     for (let i = 0; i < items.length; i++) {
+      if (ctl.stopped) { book.destroy(); throw STOP; }
       const c = await items[i].load(book.load.bind(book));
-      parts.push({ ref: `бөлім ${i + 1}`, text: c?.textContent || '' });
-      items[i].unload(); onProg(`${i + 1}/${items.length}`);
+      parts.push({ ref: `бөлім ${i + 1}`, text: cleanText(c?.textContent || '') });
+      items[i].unload(); ctl.prog((i + 1) / items.length * .9, `Бөлім ${i + 1} / ${items.length}`);
+      if (i % 4 === 0) await tick();
     }
     chapters = epubChapters(book, parts);
     book.destroy();
@@ -72,16 +85,20 @@ async function extractParts(v, onProg) {
   return { parts, chapters };
 }
 
-async function indexVersion(b, v, onProg) {
-  const { parts, chapters } = await extractParts(v, onProg);
-  if (parts.reduce((a, p) => a + p.text.length, 0) < 200) throw new Error('Мәтін табылмады (скан PDF болуы мүмкін, оған OCR керек)');
-  let n = 0;
-  const chunks = parts.flatMap((p, pi) => RAG.chunkText(p.text).map(text => ({ id: uid(), bookId: b.id, versionId: v.id, title: b.title, ref: p.ref, pi, text, tf: RAG.tfOf(text), n: n++ })));
-  await dropChunks(b.id, v.id);
+async function indexVersion(b, v, ctl = { prog() {}, stopped: false }) {
+  const { parts, chapters } = await extractParts(v, ctl);
+  if (parts.reduce((a, p) => a + p.text.length, 0) < 200) throw new Error('Мәтін табылмады. Бұл скан PDF болуы мүмкін: оған OCR (суреттен мәтін оқу) керек, ол әзірге жоқ.');
+  ctl.prog(.92, 'Бөлшектеу…'); await tick();
+  let n = 0, words = 0;
+  const chunks = parts.flatMap((p, pi) => RAG.chunkText(p.text).map(text => { words += KSP.tokenize(text).length; return { id: uid(), bookId: b.id, versionId: v.id, title: b.title, ref: p.ref, pi, text, tf: RAG.tfOf(text), n: n++ }; }));
+  // Бөлім саны өзгермесе, бұрын жасалған аудио файлдар сақталады.
+  await dropChunks(b.id, v.id, v.chapters?.length === chapters.length);
+  ctl.prog(.96, 'Сақтау…');
   const tx = db.transaction('chunks', 'readwrite');
   chunks.forEach(c => tx.objectStore('chunks').put(c));
   await done(tx);
-  v.indexed = chunks.length; v.chapters = chapters; await put('versions', v);
+  Object.assign(v, { indexed: chunks.length, chapters, words, prepV: 2 }); await put('versions', v);
+  ctl.prog(1, 'Дайын');
 }
 
 async function loadChunks(bookId) {
@@ -103,8 +120,8 @@ async function showChat(bookId) {
   const { data: { session } } = await sb.auth.getSession();
 
   view.innerHTML = `
-    <button class="ghost" id="cBack">← ${b ? 'Кітапқа' : 'Кітапхана'}</button>
-    <div class="sec"><h3>💬 ${b ? esc(b.title) : 'Бүкіл кітапхана бойынша чат'}</h3>
+    <button class="ghost" id="cBack">${ic('back')} ${b ? 'Кітапқа' : 'Кітапхана'}</button>
+    <div class="sec"><h3>${ic('chat')} ${b ? esc(b.title) : 'Бүкіл кітапхана бойынша чат'}</h3>
       <small style="color:var(--mute)">Чат кітап мәтінінен сұраққа керек үзінділерді тауып, ЖИ-ға жібереді. Мәтіннің қалған бөлігі құрылғыдан шықпайды.</small>
       <div id="idx" style="margin-top:.6rem"></div>
       ${session ? '' : '<p style="color:var(--warn)">ЖИ жұмыс істеуі үшін алдымен <a href="../">Life Hub</a>-қа кіру керек.</p>'}
@@ -117,10 +134,10 @@ async function showChat(bookId) {
 
   const drawIdx = async () => {
     if (b) {
-      $('#idx').innerHTML = vs.length ? vs.map(v => `<div class="ver" data-id="${v.id}"><div><b>${esc(v.name)}</b> <span class="badge">${v.type.toUpperCase()}</span> <small style="color:var(--mute)">${v.indexed ? `✓ ${v.indexed} үзінді` : 'мәтін дайындалмаған'}</small></div><button data-a="idx">${v.indexed ? 'Қайта дайындау' : 'Мәтінді дайындау'}</button></div>`).join('') : '<div class="empty">Алдымен кітапқа нұсқа қос</div>';
+      $('#idx').innerHTML = vs.length ? vs.map(v => `<div class="ver" data-id="${v.id}"><div><b>${esc(v.name)}</b> <span class="badge">${v.type.toUpperCase()}</span> <small style="color:var(--mute)">${isReady(v) ? `${ic('check', 14)} ${v.indexed} үзінді` : 'мәтін дайындалмаған'}</small></div><button data-a="idx">${isReady(v) ? 'Қайта дайындау' : 'Мәтінді дайындау'}</button></div>`).join('') : '<div class="empty">Алдымен кітапқа нұсқа қос</div>';
     } else {
       const bs = new Set((await all('chunks')).map(c => c.bookId));
-      $('#idx').innerHTML = `<small>Мәтіні дайын кітаптар: <b>${bs.size}</b>. Қалғанын кітап бетіндегі «💬» арқылы дайында.</small>`;
+      $('#idx').innerHTML = `<small>Мәтіні дайын кітаптар: <b>${bs.size}</b>. Қалғанын кітап бетінен ашып дайында.</small>`;
     }
   };
   await drawIdx();
@@ -128,13 +145,13 @@ async function showChat(bookId) {
     if (e.target.dataset.a !== 'idx') return;
     const btn = e.target, v = vs.find(x => x.id === btn.closest('.ver').dataset.id);
     btn.disabled = true;
-    try { await indexVersion(b, v, p => btn.textContent = `Оқуда… ${p}`); toast('Мәтін дайын'); }
+    try { await indexVersion(b, v, { stopped: false, prog: (f, l) => btn.textContent = `${Math.round(f * 100)}%` }); toast('Мәтін дайын'); }
     catch (err) { console.error(err); toast(err.message); }
     drawIdx();
   };
 
   const draw = () => {
-    $('#msgs').innerHTML = chat.messages.length ? chat.messages.map((m, i) => `<div class="msg ${m.role === 'user' ? 'u' : 'a'}">${fmt(m.content)}${m.role === 'assistant' && b ? `<div><button class="ghost" data-k="${i}">→ Конспектке</button></div>` : ''}</div>`).join('') : '<div class="empty">Мысалы: «Негізгі идеясы қандай?», «3-тараудың қысқаша мазмұнын айт»</div>';
+    $('#msgs').innerHTML = chat.messages.length ? chat.messages.map((m, i) => `<div class="msg ${m.role === 'user' ? 'u' : 'a'}${m.err ? ' err' : ''}">${m.err ? ic('alert', 16) + ' ' : ''}${fmt(m.content)}${m.role === 'assistant' && b ? `<div><button class="ghost" data-k="${i}">${ic('plus', 14)} Конспектке қосу</button></div>` : ''}</div>`).join('') : '<div class="empty">Мысалы: «Негізгі идеясы қандай?», «3-тараудың қысқаша мазмұнын айт»</div>';
     window.scrollTo(0, document.body.scrollHeight);
   };
   draw();
@@ -163,13 +180,13 @@ async function showChat(bookId) {
         title: b?.title || '', author: b?.author || '', konspekt: ks?.text || '',
         excerpts: picks.map(c => ({ ref: c.ref, text: c.text, title: c.title })),
         notes: notes.map(n => `${n.ref}: ${n.text}`),
-        messages: chat.messages.filter(m => !m.content.startsWith('⚠️')).map(({ role, content }) => ({ role, content })),
+        messages: chat.messages.filter(m => !m.err).map(({ role, content }) => ({ role, content })),
         models: JSON.parse(localStorage.getItem('hub.models') || '[]'),
       } });
       if (error) throw new Error(await errText(error));
       chat.messages.push({ role: 'assistant', content: data.text, model: data.model });
     } catch (err) {
-      chat.messages.push({ role: 'assistant', content: '⚠️ ' + err.message });
+      chat.messages.push({ role: 'assistant', content: err.message, err: true });
     }
     await put('chats', chat); busy = false; $('#cSend').disabled = false; draw();
   };

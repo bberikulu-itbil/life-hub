@@ -10,15 +10,15 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="top"><button class="brand" id="home">📚 Kitapp</button></header>
+<header class="top"><button class="brand" id="home"><i data-ic="book" data-s="20"></i> Kitapp</button></header>
 
 <nav id="nav" aria-label="Негізгі мәзір">
-  <button class="nav-brand" data-v="lib">📚 <span>Kitapp</span></button>
-  <button data-v="lib">📚<span>Кітапхана</span></button>
-  <button data-v="stats">📊<span>Аналитика</span></button>
-  <button id="addBtn" class="fab">＋<span>Кітап қосу</span></button>
-  <button data-v="chat">💬<span>Чат</span></button>
-  <button id="themeBtn" class="nav-theme">🌓<span>Тақырып</span></button>
+  <button class="nav-brand" data-v="lib"><i data-ic="book" data-s="22"></i><span>Kitapp</span></button>
+  <button data-v="lib"><i data-ic="book" data-s="22"></i><span>Кітапхана</span></button>
+  <button data-v="stats"><i data-ic="chart" data-s="22"></i><span>Аналитика</span></button>
+  <button id="addBtn" class="fab" aria-label="Кітап қосу"><i data-ic="plus" data-s="26"></i><span>Кітап қосу</span></button>
+  <button data-v="chat"><i data-ic="chat" data-s="22"></i><span>Чат</span></button>
+  <button data-v="profile"><i data-ic="user" data-s="22"></i><span>Профиль</span></button>
 </nav>
 
 <main id="view"></main>
@@ -35,6 +35,17 @@
       <button type="button" class="ghost" id="addCancel">Бас тарту</button>
       <button class="primary" value="ok">Сақтау</button>
     </div>
+  </form>
+</dialog>
+
+<!-- Нұсқа қосу -->
+<dialog id="verDlg">
+  <form method="dialog" id="verForm">
+    <h3>Нұсқа қосу</h3>
+    <label>Түрі <select name="kind"><option value="original">Түпнұсқа</option><option value="translation">Аударма</option><option value="other">Басқа</option></select></label>
+    <label>Атауы (міндетті емес) <input name="vname" placeholder="мыс: Қазақша аударма, 2-басылым"></label>
+    <label>Файл (PDF немесе EPUB) <input name="file" type="file" accept=".pdf,.epub,application/pdf,application/epub+zip" multiple required></label>
+    <div class="row end"><button type="button" class="ghost" id="verCancel">Бас тарту</button><button class="primary" value="ok">Қосу</button></div>
   </form>
 </dialog>
 
@@ -56,6 +67,7 @@
       <label>Аяқтаған күні <input name="finishDate" type="date"></label>
       <label class="wide">Тегтер (үтірмен) <input name="tags" placeholder="психология, өзін дамыту"></label>
       <label class="wide">Не үшін оқимын? Мақсат, қысқаша сипаттама <textarea name="summary" rows="3"></textarea></label>
+      <div class="wide"><div class="row" style="justify-content:space-between"><b>Файлдар (нұсқалар)</b><button type="button" id="eAddFile"><i data-ic="file-plus" data-s="16"></i> Файл қосу</button></div><div id="eFiles"></div></div>
     </div>
     <datalist id="genres"><option>Роман</option><option>Ғылыми</option><option>Өмірбаян</option><option>Өзін дамыту</option><option>Тарих</option><option>Информатика</option><option>Поэзия</option></datalist>
     <div class="row end"><button type="button" class="ghost" id="editCancel">Бас тарту</button><button class="primary" value="ok">Сақтау</button></div>
@@ -65,12 +77,12 @@
 <!-- Оқығыш -->
 <section id="reader" hidden>
   <div class="r-bar">
-    <button class="ghost" id="rClose">← Артқа</button>
+    <button class="ghost" id="rClose"><i data-ic="back"></i> Артқа</button>
     <div class="r-title" id="rTitle"></div>
     <div class="r-tools">
       <button class="ghost" id="rMinus">A−</button>
       <button class="ghost" id="rPlus">A+</button>
-      <button class="ghost" id="rNotes">📝</button>
+      <button class="ghost" id="rNotes" aria-label="Ескертпелер"><i data-ic="note"></i></button>
     </div>
   </div>
   <div class="r-body">
@@ -83,15 +95,16 @@
     </aside>
   </div>
   <div class="r-foot">
-    <button class="ghost" id="rPrev">‹</button>
+    <button class="ghost" id="rPrev" aria-label="Алдыңғы"><i data-ic="chevron-left" data-s="22"></i></button>
     <div class="r-pos"><span id="rPosText"></span>
       <input type="range" id="rSlider" min="0" max="100" value="0"></div>
-    <button class="ghost" id="rNext">›</button>
+    <button class="ghost" id="rNext" aria-label="Келесі"><i data-ic="chevron-right" data-s="22"></i></button>
   </div>
 </section>
 
 <div id="toast" hidden></div>
 
+<script src="icons.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
@@ -101,9 +114,11 @@
 <script src="kspeed.js"></script>
 <script src="app.js"></script>
 <script src="chat.js"></script>
+<script src="prep.js"></script>
 <script src="audio.js"></script>
 <script src="stats.js"></script>
 <script src="speed.js"></script>
 <script src="edit.js"></script>
+<script src="profile.js"></script>
 </body>
 </html>

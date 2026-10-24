@@ -58,7 +58,7 @@ async function showLibrary() {
     $('#grid').innerHTML = list.length ? list.map(b => {
       const vs = versions.filter(v => v.bookId === b.id);
       const pct = Math.max(0, ...vs.map(v => v.pct || 0));
-      return `<div class="card" data-id="${b.id}"><button class="kebab card-k" data-k="${b.id}" aria-label="Мәзір">⋮</button>
+      return `<div class="card" data-id="${b.id}"><button class="kebab card-k" data-k="${b.id}" aria-label="Мәзір">${ic('more', 20)}</button>
         <div class="cover" style="${cover(b.title)}">${esc(b.title)}</div>
         <div class="bar-p"><i style="width:${pct}%"></i></div>
         <div class="meta">${esc(b.author || '—')}<br><span class="badge">${STATUS[b.status]}</span> · ${vs.length} нұсқа</div></div>`;
@@ -78,33 +78,31 @@ async function showBook(id) {
   const [vs, notes, ks] = await Promise.all([byBook('versions', id), byBook('notes', id), get('konspekt', id)]);
   notes.sort((a, c) => c.created - a.created);
   view.innerHTML = `
-    <button class="ghost" id="back">← Кітапхана</button>
+    <button class="ghost" id="back">${ic('back')} Кітапхана</button>
     <div class="sec">
       <div class="row" style="align-items:flex-start;flex-wrap:nowrap"><div style="flex:1;min-width:0"><h2 style="margin:0;word-break:break-word">${esc(b.title)}</h2>
         <div style="color:var(--mute)">${esc(b.author || 'Автор көрсетілмеген')}</div></div>
-        <button class="kebab" id="bMenu" aria-label="Мәзір">⋮</button></div>
+        <button class="kebab" id="bMenu" aria-label="Мәзір">${ic('more', 22)}</button></div>
       <div class="chips">${chips(b)}</div>
       ${b.summary ? `<p style="margin:.6rem 0 0">${esc(b.summary)}</p>` : ''}
       <div class="row" style="margin-top:.6rem">
         <select id="bs" style="width:auto">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${b.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-        <span class="stars" id="stars">${[1, 2, 3, 4, 5].map(n => `<button data-n="${n}" class="${n <= (b.rating || 0) ? 'on' : ''}">★</button>`).join('')}</span>
+        <span class="stars" id="stars">${[1, 2, 3, 4, 5].map(n => `<button data-n="${n}" class="${n <= (b.rating || 0) ? 'on' : ''}" aria-label="${n}">${ic('star', 22, n <= (b.rating || 0))}</button>`).join('')}</span>
       </div>
     </div>
-    <div class="row"><button class="primary" id="chatBtn" style="flex:1;min-width:130px">💬 ЖИ-мен талқылау</button><button class="primary" id="audioBtn" style="flex:1;min-width:130px">🎧 Аудио</button><button class="primary" id="speedBtn" style="flex:1;min-width:130px">⚡ Жылдам оқу</button></div>
+    <div class="row"><button class="primary" id="chatBtn" style="flex:1;min-width:130px">${ic('chat', 16)} ЖИ-мен талқылау</button><button class="primary" id="audioBtn" style="flex:1;min-width:130px">${ic('headphones', 16)} Аудио</button><button class="primary" id="speedBtn" style="flex:1;min-width:130px">${ic('zap', 16)} Жылдам оқу</button></div>
     <div class="sec"><h3>Нұсқалар</h3><div id="vers">${vs.length ? vs.map(v => `
       <div class="ver" data-id="${v.id}">
-        <div><b>${esc(v.name)}</b> <span class="badge">${v.type.toUpperCase()}</span><br><small style="color:var(--mute)">${(v.blob.size / 1048576).toFixed(1)} МБ · ${v.pct || 0}% оқылды</small></div>
-        <div class="row"><button class="primary" data-a="open">Оқу</button><button data-a="ren">Атауы</button><button class="danger" data-a="del">✕</button></div>
-      </div>`).join('') : '<div class="empty">Нұсқа жоқ</div>'}</div>
-      <button id="addVer" style="margin-top:.6rem">+ Нұсқа қосу</button>
-      <input type="file" id="verFile" accept=".pdf,.epub" multiple hidden>
+        <div><b>${esc(v.name)}</b> <span class="badge">${v.type.toUpperCase()}</span>${v.kind ? ` <span class="badge">${KIND[v.kind]}</span>` : ''}<br><small style="color:var(--mute)">${mb(v.blob.size)} · ${v.pct || 0}% оқылды${isReady(v) ? ' · мәтін дайын' : ''}</small></div>
+        <div class="row"><button class="primary" data-a="open">${ic('book-open', 16)} Оқу</button><button class="kebab" data-a="vmenu" aria-label="Нұсқа мәзірі">${ic('more', 20)}</button></div>
+      </div>`).join('') : `<div class="empty">Нұсқа жоқ. Файл қосу үшін жоғарғы ${ic('more', 16)} мәзірінен «Нұсқа қосу» таңда.</div>`}</div>
     </div>
     <div class="sec"><h3>Конспект</h3>
       <textarea id="ks" rows="10" placeholder="Кітап бойынша өз конспектің…">${esc(ks?.text || '')}</textarea>
       <div class="row end" style="margin-top:.5rem"><span id="ksSt" style="color:var(--mute);font-size:.85rem"></span><button id="ksExp">.md жүктеу</button></div>
     </div>
     <div class="sec"><h3>Ескертпелер</h3>${notes.length ? notes.map(n => `
-      <div class="note" data-id="${n.id}"><small>${esc(n.ref)} · ${esc(n.vname || '')}</small><div>${esc(n.text).replace(/\n/g, '<br>')}</div><button class="ghost danger" data-a="dn">жою</button></div>`).join('') : '<div class="empty">Оқығанда 📝 арқылы қосасың</div>'}</div>
+      <div class="note" data-id="${n.id}"><small>${esc(n.ref)} · ${esc(n.vname || '')}</small><div>${esc(n.text).replace(/\n/g, '<br>')}</div><button class="ghost danger" data-a="dn">жою</button></div>`).join('') : '<div class="empty">Оқығанда оқығыштағы «Ескертпелер» батырмасы арқылы қосасың</div>'}</div>
 `;
 
   $('#back').onclick = showLibrary;
@@ -115,14 +113,11 @@ async function showBook(id) {
   $('#bMenu').onclick = e => bookMenu(id, e.currentTarget);
   $('#bs').onchange = async e => { applyStatus(b, e.target.value); await put('books', b); showBook(id); };
   $('#stars').onclick = async e => { const n = +e.target.dataset.n; if (!n) return; await save({ rating: n === b.rating ? 0 : n }); showBook(id); };
-  $('#addVer').onclick = () => $('#verFile').click();
-  $('#verFile').onchange = async e => { await addVersions(id, [...e.target.files]); showBook(id); };
-  $('#vers').onclick = async e => {
-    const a = e.target.dataset.a, row = e.target.closest('.ver'); if (!a || !row) return;
+  $('#vers').onclick = e => {
+    const btn = e.target.closest('[data-a]'), row = e.target.closest('.ver'); if (!btn || !row) return;
     const v = vs.find(x => x.id === row.dataset.id);
-    if (a === 'open') openReader(b, v);
-    if (a === 'ren') { const n = prompt('Нұсқа аты', v.name); if (n) { v.name = n.trim(); await put('versions', v); showBook(id); } }
-    if (a === 'del' && confirm('Бұл нұсқаны жоямыз ба?')) { await dropChunks(id, v.id); await del('versions', v.id); showBook(id); }
+    if (btn.dataset.a === 'open') openReader(b, v);
+    if (btn.dataset.a === 'vmenu') versionMenu(v, btn);
   };
   let t;
   $('#ks').oninput = e => {
@@ -135,14 +130,6 @@ async function showBook(id) {
     a.download = `${b.title}.md`; a.click(); URL.revokeObjectURL(a.href);
   };
   view.querySelectorAll('[data-a=dn]').forEach(btn => btn.onclick = async () => { await del('notes', btn.closest('.note').dataset.id); showBook(id); });
-}
-
-async function addVersions(bookId, files, vname) {
-  for (const f of files) {
-    const type = typeOf(f);
-    await put('versions', { id: uid(), bookId, name: vname || f.name.replace(/\.[^.]+$/, '') || type.toUpperCase(), type, blob: f, pos: null, pct: 0, added: Date.now() });
-  }
-  if (files.length) toast('Нұсқа қосылды');
 }
 
 /* ---------- Кітап қосу ---------- */
@@ -273,13 +260,14 @@ $('#rNoteSave').onclick = async () => {
   $('#rNoteText').value = ''; refreshNotes(); toast('Ескертпе сақталды');
 };
 
-/* ---------- Тақырып, PWA ---------- */
-const theme = localStorage.kTheme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-document.documentElement.dataset.theme = theme;
-$('#themeBtn').onclick = () => {
-  const n = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-  document.documentElement.dataset.theme = n; localStorage.kTheme = n; applyEpubTheme();
-};
+/* ---------- Тақырып (жүйе / жарық / қараңғы), PWA ---------- */
+function applyTheme() {
+  const t = localStorage.kTheme || 'system';
+  document.documentElement.dataset.theme = t === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
+  applyEpubTheme();
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+applyTheme();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 navigator.storage?.persist?.(); // iOS/Chrome-ға деректерді өздігінен өшірмеуді сұрау
 
@@ -288,7 +276,7 @@ const setNav = v => document.querySelectorAll('#nav [data-v]').forEach(b => b.cl
 $('#nav').onclick = e => {
   const v = e.target.closest('[data-v]')?.dataset.v; if (!v) return;
   $('#aud')?.pause(); if (typeof stopSpeech === 'function') stopSpeech(); // көрініс ауысқанда аудио қалып қоймасын
-  ({ lib: showLibrary, stats: showStats, chat: () => showChat(null) })[v]();
+  ({ lib: showLibrary, stats: showStats, chat: () => showChat(null), profile: showProfile })[v]();
 };
 
 addEventListener('DOMContentLoaded', () => openDB().then(showLibrary));

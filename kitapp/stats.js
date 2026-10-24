@@ -56,16 +56,16 @@ async function showStats() {
   const stat = (v, l) => `<div class="stat"><b>${v}</b><small>${l}</small></div>`;
 
   view.innerHTML = `
-    <h2 style="margin:.2rem 0 1rem">📊 Оқу аналитикасы</h2>
+    <h2 style="margin:.2rem 0 1rem">${ic('chart', 22)} Оқу аналитикасы</h2>
     <div class="sec">
       <div class="row" style="justify-content:space-between"><b>Бүгінгі мақсат</b>
         <label style="margin:0">мин/күн <input id="goal" type="number" min="1" max="600" value="${goal}" style="width:5rem;display:inline-block"></label></div>
       <div class="bar-p" style="height:10px;border-radius:99px;margin:.5rem 0"><i style="width:${todayPct}%;border-radius:99px"></i></div>
-      <small style="color:var(--mute)">${KS.fmtDur(S.today)} / ${goal} мин · ${todayPct >= 100 ? 'мақсат орындалды 🎉' : `${todayPct}%`}</small>
+      <small style="color:var(--mute)">${KS.fmtDur(S.today)} / ${goal} мин · ${todayPct >= 100 ? `мақсат орындалды ${ic('check-circle', 15)}` : `${todayPct}%`}</small>
     </div>
     <div class="stats">
       ${stat(KS.fmtDur(S.today), 'Бүгін')}${stat(KS.fmtDur(S.week), '7 күнде')}${stat(KS.fmtDur(S.month), '30 күнде')}
-      ${stat(S.streak + ' күн', '🔥 Қатарынан')}${stat(KS.fmtDur(S.total), 'Барлығы')}${stat(KS.fmtDur(S.avg30), 'Орташа/күн (30)')}
+      ${stat(S.streak + ' күн', `${ic('flame', 14)} Қатарынан`)}${stat(KS.fmtDur(S.total), 'Барлығы')}${stat(KS.fmtDur(S.avg30), 'Орташа/күн (30)')}
       ${stat(KS.fmtDur(S.best), 'Ең жақсы күн')}${stat(cnt('done'), `Оқылған кітап (${year}: ${doneYear})`)}${stat(cnt('reading'), 'Оқып жатырмын')}
     </div>
     <div class="sec"><div class="row" style="justify-content:space-between"><h3 style="margin:0">Күн сайынғы оқу</h3>
