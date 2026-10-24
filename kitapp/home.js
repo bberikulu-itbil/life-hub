@@ -26,6 +26,22 @@ const COLLECTIONS = [
   ['audio', 'headphones', 'Аудиосы барлар', (b, d) => d.withAudio.has(b.id)],
 ];
 
+// Жинақтар тізімі: keys — қай жолдар көрінеді (басты бетте қысқа, кітапханада толық).
+function collectionsHTML(d, keys) {
+  const row = (k, icon, text, n) => `<button class="lrow" data-c="${k}">${ic(icon, 22)}<span>${text}</span><em>${n}</em>${ic('chevron-right', 18)}</button>`;
+  const extra = { shelves: ['shelves', 'Менің сөрелерім', new Set(d.books.flatMap(b => b.tags || [])).size], authors: ['users', 'Авторлар', new Set(d.books.flatMap(authorsOf)).size] };
+  return `<div class="glass list" data-col>${keys.map(k => {
+    const c = COLLECTIONS.find(x => x[0] === k);
+    return c ? row(k, c[1], c[2], d.books.filter(b => c[3](b, d)).length) : row(k, ...extra[k]);
+  }).join('')}</div>`;
+}
+function bindCollections() {
+  view.querySelectorAll('.list[data-col]').forEach(l => l.onclick = e => {
+    const c = e.target.closest('[data-c]')?.dataset.c; if (!c) return;
+    c === 'shelves' || c === 'authors' ? showGroups(c) : showList(c);
+  });
+}
+
 const shelf = (title, list) => list.length ? `<div class="sec bare"><h3>${title}</h3><div class="hscroll">${list.map(x => `<button class="mini-card" data-b="${x.id}">${coverHTML(x)}<span>${esc(x.title)}</span></button>`).join('')}</div></div>` : '';
 const uploadBox = () => `<button class="upload" id="hUp">${ic('cloud-up', 34)}<b>Кітапты PDF немесе EPUB форматында жүктеу</b><small>Мұқаба, автор, сипаттама файлдан өзі алынады</small></button>
   <input type="file" id="hFile" accept=".pdf,.epub,application/pdf,application/epub+zip" multiple hidden>`;
@@ -69,8 +85,10 @@ async function showHome() {
         ${shelf('Жақында қосылғандар', recent)}
         ${uploadBox()}
       </div>
-    </div>`;
+    </div>
+    <div class="sec bare"><h3>Жинақтар</h3>${collectionsHTML(d, ['all', 'reading', 'done', 'plan', 'shelves'])}</div>`;
 
+  bindCollections();
   $('#hSearch').onclick = () => { showList.q = ''; showList('all', null, true); };
   $('#hStats').onclick = showStats;
   view.querySelectorAll('[data-b]').forEach(x => x.onclick = () => showBook(x.dataset.b));
@@ -90,8 +108,6 @@ async function showHome() {
 async function showLibrary() {
   setNav('lib'); rerender = () => showLibrary(); view.dataset.page = 'library';
   const d = await libData(), { books } = d;
-  const tags = new Set(books.flatMap(b => b.tags || [])), authors = new Set(books.flatMap(authorsOf));
-  const row = (k, icon, text, n) => `<button class="lrow" data-c="${k}">${ic(icon, 22)}<span>${text}</span><em>${n}</em>${ic('chevron-right', 18)}</button>`;
   const recent = [...books].sort((a, c) => (c.lastOpened || c.added) - (a.lastOpened || a.added));
 
   view.innerHTML = `
@@ -100,11 +116,7 @@ async function showLibrary() {
       <button class="icon-btn primary" id="lAdd" aria-label="Кітап қосу">${ic('plus', 22)}</button></div></header>
     <div class="home-grid">
       <div class="home-side">
-        <div class="glass list">
-          ${COLLECTIONS.map(([k, i, t, f]) => row(k, i, t, books.filter(b => f(b, d)).length)).join('')}
-          ${row('shelves', 'shelves', 'Менің сөрелерім', tags.size)}
-          ${row('authors', 'users', 'Авторлар', authors.size)}
-        </div>
+        ${collectionsHTML(d, ['all', 'reading', 'done', 'plan', 'audio', 'shelves', 'authors'])}
         ${uploadBox()}
       </div>
       <div class="home-main">
@@ -114,10 +126,7 @@ async function showLibrary() {
 
   $('#lSearch').onclick = () => { showList.q = ''; showList('all', null, true); };
   $('#lAdd').onclick = openAdd;
-  view.querySelector('.list').onclick = e => {
-    const c = e.target.closest('[data-c]')?.dataset.c; if (!c) return;
-    c === 'shelves' || c === 'authors' ? showGroups(c) : showList(c);
-  };
+  bindCollections();
   $('#grid') && ($('#grid').onclick = e => { const k = e.target.closest('.card-k'); if (k) return bookMenu(k.dataset.k, k); const c = e.target.closest('.bcard'); if (c) showBook(c.dataset.id); });
   bindUpload();
   ensureCovers(books, () => view.dataset.page === 'library' && showLibrary());
