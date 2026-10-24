@@ -116,7 +116,7 @@ async function bookMenu(id, anchor) {
     { a: 'edit', icon: 'edit', text: 'Өңдеу' },
     { a: 'addver', icon: 'file-plus', text: 'Нұсқа қосу' },
     b.status !== 'done' ? { a: 'done', icon: 'check', text: 'Оқыдым деп белгілеу' } : { a: 'reading', icon: 'book-open', text: 'Қайта оқып жатырмын' },
-    { a: 'listen', icon: 'headphones', text: 'Тыңдау' }, { a: 'speed', icon: 'zap', text: 'Жылдам оқу' }, { a: 'chat', icon: 'chat', text: 'ЖИ-мен талқылау' }, { a: 'audio', icon: 'sliders', text: 'Аудио баптау (mp3)' },
+    { a: 'listen', icon: 'headphones', text: 'Тыңдау' }, { a: 'speed', icon: 'zap', text: 'Жылдам оқу' }, { a: 'chat', icon: 'chat', text: 'ЖИ-мен талқылау' }, { a: 'audio', icon: 'music', text: 'Аудио жасау (mp3)' },
     { a: 'del', icon: 'trash', text: 'Жою', cls: 'danger' },
   ], async a => {
     if (a === 'edit') openEdit(id);
@@ -124,7 +124,7 @@ async function bookMenu(id, anchor) {
     if (a === 'chat') showChat(id);
     if (a === 'audio') showAudio(id);
     if (a === 'listen') Player.open(b);
-    if (a === 'speed') showSpeed(id);
+    if (a === 'speed') continueReading(b, true);
     if (a === 'del') deleteBook(id);
     if (a === 'done' || a === 'reading') { applyStatus(b, a); await put('books', b); refresh(); }
   });

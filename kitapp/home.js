@@ -140,7 +140,7 @@ async function showLibrary() {
     $('#lChips').innerHTML = row.map(chip).join('');
     const list = books.filter(sel[2]).sort((a, c) => (c.lastOpened || c.added) - (a.lastOpened || a.added));
     $('#grid').innerHTML = list.length ? list.map(b => bookCard(b, d)).join('')
-      : `<div class="empty" style="grid-column:1/-1">${books.length ? (cur === 'audio' ? 'Аудиокітап жоқ. Кітап бетінен «Аудио баптау» арқылы mp3 жаса.' : 'Бұл сүзгі бойынша кітап жоқ') : 'Кітапхана бос. «+» арқылы бірінші кітабыңды қос.'}</div>`;
+      : `<div class="empty" style="grid-column:1/-1">${books.length ? (cur === 'audio' ? 'Аудиокітап жоқ. Кітап бетінен «Аудио жасау» арқылы mp3 жаса.' : 'Бұл сүзгі бойынша кітап жоқ') : 'Кітапхана бос. «+» арқылы бірінші кітабыңды қос.'}</div>`;
   };
   draw();
   $('#lChips').onclick = e => { const f = e.target.closest('[data-f]')?.dataset.f; if (f) { cur = f; draw(); } };
@@ -159,11 +159,12 @@ async function showLibrary() {
 }
 
 // Соңғы оқыған нұсқаны ашады (жоқ болса — түпнұсқаны).
-async function continueReading(b) {
+async function continueReading(b, speed) {
   const vs = await byBook('versions', b.id);
   if (!vs.length) return showBook(b.id);
   const v = vs.find(x => x.id === b.lastVersion) || vs.find(x => x.kind === 'original') || vs[0];
-  openReader(b, v);
+  await openReader(b, v);
+  if (speed) readerSpeed();
 }
 
 // Файлдарды тікелей таңдап қосу: әр файл жеке кітап болады, атауы мен мұқабасы файлдан.

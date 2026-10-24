@@ -3,8 +3,9 @@
 
 const size = n => n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' ГБ' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(n / 1024)) + ' КБ';
 
-async function showProfile() {
-  setNav('profile');
+async function showProfile(focus) {
+  setNav('profile'); view.dataset.page = 'profile';
+  const S2 = spGet();
   const [books, vs, au, ss, dr] = await Promise.all([all('books'), all('versions'), all('audio'), all('sessions'), all('drills')]);
   const { data: { session } } = await sb.auth.getSession();
   const est = (await navigator.storage?.estimate?.().catch(() => null)) || {};
@@ -32,6 +33,10 @@ async function showProfile() {
       <div class="fgrid"><label>Күнделікті оқу мақсаты (минут) <input id="pGoal" type="number" min="1" max="600" value="${goal}"></label>
       <label>Жылдық мақсат (кітап) <input id="pYear" type="number" min="1" max="500" value="${+(localStorage.kYearGoal || 12)}"></label></div></div>
 
+    <div class="glass list"><button class="lrow" id="pSpeed">${ic('zap', 22)}<span>Жылдам оқу жаттығуы<br><small class="muted">Бастапқы қарқын ${S2.baseline} сөз/мин · ${Math.min(S2.unlocked, 6)}/6 кезең ашық</small></span>${ic('chevron-right', 18)}</button></div>
+
+    ${audioSettingsHTML()}
+
     <div class="glass sec" id="pDl"><h3>${ic('drive')} Жүктелгендер</h3>
       <div class="bar-p" style="height:10px;border-radius:99px"><i style="width:${est.quota ? Math.min(100, est.usage / est.quota * 100) : 0}%;border-radius:99px"></i></div>
       <small style="color:var(--mute)">${est.usage != null ? `Қолданылған: ${size(est.usage)}${est.quota ? ` / ${size(est.quota)}` : ''}. ` : ''}Кітап файлдары ${size(fileTotal)}, аудио ${size(audioTotal)}. Бәрі тек осы құрылғыда сақталады.</small>
@@ -50,6 +55,9 @@ async function showProfile() {
     <div class="glass sec"><h3>Жылдам оқу және аналитика</h3>
       <small style="color:var(--mute)">Оқу уақытының статистикасы «Аналитика» бетінде, жылдам оқу баптаулары кітаптың «Жылдам оқу» бетінде.</small></div>`;
 
+  $('#pSpeed').onclick = showSpeed;
+  bindAudioSettings();
+  if (focus === 'audio') $('#audioSet').scrollIntoView({ block: 'start' });
   $('#thSeg').onclick = e => { const t = e.target.closest('[data-t]')?.dataset.t; if (!t) return; localStorage.kTheme = t; applyTheme(); showProfile(); };
   $('#pGoal').onchange = e => { localStorage.kGoal = Math.max(1, +e.target.value || 20); toast('Мақсат сақталды'); };
   $('#pYear').onchange = e => { localStorage.kYearGoal = Math.max(1, +e.target.value || 12); toast('Мақсат сақталды'); };

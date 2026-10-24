@@ -75,7 +75,7 @@ async function showBook(id) {
       <div class="bk-more">
         <button class="chip glass" id="speedBtn">${ic('zap', 16)} Жылдам оқу</button>
         <button class="chip glass" id="chatBtn">${ic('chat', 16)} ЖИ-мен талқылау</button>
-        <button class="chip glass" id="audioBtn">${ic('sliders', 16)} Аудио баптау</button>
+        <button class="chip glass" id="audioBtn">${ic('music', 16)} Аудио жасау</button>
       </div>
       <div class="bk-st">
         <div class="seg glass" id="bs">${Object.entries(STATUS).map(([k, v]) => `<button data-s="${k}" class="${b.status === k ? 'on' : ''}">${v}</button>`).join('')}</div>
@@ -117,7 +117,7 @@ async function showBook(id) {
   $('#bListen').onclick = () => Player.open(b);
   $('#chatBtn').onclick = () => showChat(id);
   $('#audioBtn').onclick = () => showAudio(id);
-  $('#speedBtn').onclick = () => showSpeed(id);
+  $('#speedBtn').onclick = () => continueReading(b, true);
   $('#prepBtn') && ($('#prepBtn').onclick = () => renderPrep(b, vs.find(x => x.kind === 'original') || vs[0], () => showBook(id), () => showBook(id), 'бөлімдер'));
   $('#sumMore') && ($('#sumMore').onclick = e => { $('#sum').classList.toggle('clamp'); e.target.textContent = $('#sum').classList.contains('clamp') ? 'Толығырақ' : 'Жасыру'; });
   $('#chAll') && ($('#chAll').onclick = e => { $('#chs').classList.add('open'); e.target.remove(); });
@@ -249,6 +249,7 @@ function zoom(d) {
   if (R.kind === 'epub') { R.font = Math.max(70, Math.min(220, R.font + d * 10)); localStorage.kFont = R.font; R.rend.themes.fontSize(R.font + '%'); }
   else { R.zoom = Math.max(.6, Math.min(3, R.zoom + d * .2)); renderPdf(R.page); }
 }
+$('#rSpeed').onclick = () => readerSpeed();
 $('#rNotes').onclick = () => { const p = $('#rPanel'); p.hidden = !p.hidden; };
 $('#rClose').onclick = async () => {
   clearTimeout(pT);

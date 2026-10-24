@@ -307,3 +307,6 @@ dialog.bsheet{margin:auto auto 0;width:100%;max-width:640px;max-height:80vh;bord
 .fs-grip{width:40px;height:5px;border-radius:99px;background:color-mix(in srgb,var(--ink) 25%,transparent);margin:.2rem auto .8rem}
 .bsheet h3{font-size:1.4rem}.bsheet h4{color:var(--mute);font-size:.85rem;font-weight:600;margin:1rem 0 .5rem}
 @media(min-width:900px){.chips-row{margin:0 0 1.1rem;padding:0}.chips-scroll{margin-right:0;padding-right:0}}
+.lrow span small{font-size:.8rem;white-space:normal}
+#pSpeed span{white-space:normal}
+@media(max-width:430px){.r-title{visibility:hidden}.sp-bar b{font-size:.95rem}}

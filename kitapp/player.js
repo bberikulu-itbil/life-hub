@@ -40,7 +40,7 @@ function speakFrom(k) {
 
 function pPlay() {
   if (!P.b) return;
-  if (P.mode === 'tts' && (!speechOK || !getVoices().length)) { toast('Бұл бөлімнің mp3 файлы жоқ, ал браузер дауысы табылмады. «Аудио баптау» бетінде mp3 жаса.'); pRender(); return; }
+  if (P.mode === 'tts' && (!speechOK || !getVoices().length)) { toast('Бұл бөлімнің mp3 файлы жоқ, ал браузер дауысы табылмады. Кітап бетінен «Аудио жасау» арқылы mp3 жаса.'); pRender(); return; }
   P.playing = true;
   if (P.mode === 'mp3') paud.play().catch(() => { P.playing = false; pRender(); });
   else speakFrom(Sp.i);

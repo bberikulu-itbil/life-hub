@@ -91,7 +91,42 @@ function saveBlob(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-/* ---------- Аудио баптаулары және mp3 жасау беті. Тыңдау — жаһандық плеерде (player.js). ---------- */
+/* ---------- Аудио баптаулары (Профильде): дауыстар және әдепкі жылдамдық ---------- */
+function audioSettingsHTML() {
+  const g = localStorage.kGender || 'f', r = +(localStorage.kRate || 1);
+  return `<div class="glass sec" id="audioSet"><h3>${ic('headphones', 18)} Аудио баптаулары</h3>
+    <small class="muted">Бөлімнің mp3 файлы болса, плеер соны ойнатады; болмаса браузер дауысымен оқиды.</small>
+    <div class="fgrid">
+      <label>Бұлттық дауыс (mp3 жасау) <select id="aGender"><option value="f" ${g === 'f' ? 'selected' : ''}>Әйел (Айгүл)</option><option value="m" ${g === 'm' ? 'selected' : ''}>Ер (Дәулет)</option></select></label>
+      <label>Браузер дауысы (файлсыз) <select id="aVoice"></select></label>
+      <label>Тыңдау жылдамдығы <select id="aRate">${RATES.map(x => `<option value="${x}" ${x === r ? 'selected' : ''}>${x}×</option>`).join('')}</select></label>
+    </div>
+    <div class="row"><button id="aTry">${ic('play', 16)} Бұлттық дауысты тыңдап көру</button><button id="aTryB">${ic('volume', 16)} Браузер дауысын тыңдау</button></div>
+    <small id="aVoiceNote" class="muted"></small></div>`;
+}
+function bindAudioSettings() {
+  const SAMPLE = 'Сәлеметсіз бе! Бұл Kitapp қосымшасының дауысы. Кітапты тыңдауға дайынбыз.';
+  $('#aGender').onchange = e => localStorage.kGender = e.target.value;
+  $('#aRate').onchange = e => { localStorage.kRate = e.target.value; P.rate = +e.target.value; paud.playbackRate = P.rate; };
+  const fill = () => {
+    if (!$('#aVoice')) return;
+    const vl = getVoices();
+    $('#aVoice').innerHTML = vl.length ? vl.map(x => `<option value="${esc(x.voiceURI)}" ${x.voiceURI === localStorage.kVoice ? 'selected' : ''}>${esc(x.name)} (${esc(x.lang)})</option>`).join('') : '<option>Дауыс табылмады</option>';
+    $('#aVoiceNote').textContent = vl.some(x => x.lang.toLowerCase().startsWith('kk')) ? '' : 'Бұл құрылғыда қазақ браузер дауысы жоқ: mp3 жоқ бөлімдер түрік не орыс дауысымен нашар оқылады. Сапалы нәтиже үшін кітап бетінен «Аудио жасау» арқылы mp3 жаса.';
+  };
+  fill();
+  if (speechOK) speechSynthesis.onvoiceschanged = fill;
+  $('#aVoice').onchange = e => localStorage.kVoice = e.target.value;
+  $('#aTryB').onclick = () => { const vo = getVoices(); if (!vo.length) return toast('Браузер дауысы табылмады'); speak(SAMPLE, { voice: vo.find(x => x.voiceURI === localStorage.kVoice) || vo[0], rate: +(localStorage.kRate || 1) }); };
+  $('#aTry').onclick = async e => {
+    const btn = e.currentTarget; btn.disabled = true;
+    try { const a = new Audio(URL.createObjectURL(await ttsPiece(SAMPLE, localStorage.kGender || 'f'))); a.playbackRate = +(localStorage.kRate || 1); a.play(); }
+    catch (err) { toast(err.message); }
+    btn.disabled = false;
+  };
+}
+
+/* ---------- Кітаптың mp3 файлдарын жасау беті. Тыңдау — жаһандық плеерде (player.js). ---------- */
 async function showAudio(bookId, versionId) {
   setNav('lib'); view.dataset.page = 'audio';
   const b = await get('books', bookId);
@@ -102,47 +137,26 @@ async function showAudio(bookId, versionId) {
   const vs = (await byBook('versions', bookId)).filter(isReady);
   const chs = await audioChapters(v);
   const files = new Map((await byBook('audio', bookId)).filter(a => a.versionId === v.id && a.ci < chs.length).map(a => [a.ci, a]));
-  let gender = localStorage.kGender || 'f';
+  const gender = localStorage.kGender || 'f';
   const picked = new Set(), Q = { running: false, stop: false };
   const dur = i => files.get(i)?.dur || estSecs(chs[i].text);
   const total = chs.reduce((a, _, i) => a + dur(i), 0);
 
   view.innerHTML = `
     <button class="back" id="aBack">${ic('back', 22)} Артқа</button>
-    <header class="hd"><h1>Аудиокітап</h1></header>
+    <header class="hd"><h1>Аудио жасау</h1></header>
     <div class="glass sec ab-hero">${coverHTML(b, 'cv-sm')}<div><b>${esc(b.title)}</b><small>${esc(b.author || '')}</small>
       <small>${chs.length} бөлім · ${fmtT(total)} · ${files.size}/${chs.length} mp3 дайын</small>
       <button class="primary" id="aListen">${ic('headphones', 18)} Тыңдау</button></div></div>
     ${vs.length > 1 ? `<label>Нұсқа <select id="aVer">${vs.map(x => `<option value="${x.id}" ${x.id === v.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>` : ''}
-    <div class="glass sec"><h3>${ic('volume', 18)} Дауыстар</h3>
-      <small style="color:var(--mute)">Бөлімнің mp3 файлы болса, плеер соны ойнатады; болмаса браузер дауысымен оқиды.</small>
-      <div class="fgrid">
-        <label>Бұлттық дауыс (mp3) <select id="aGender"><option value="f" ${gender === 'f' ? 'selected' : ''}>Әйел (Айгүл)</option><option value="m" ${gender === 'm' ? 'selected' : ''}>Ер (Дәулет)</option></select></label>
-        <label>Браузер дауысы (файлсыз) <select id="aVoice"></select></label>
-      </div>
-      <div class="row"><button id="aTry">${ic('play', 16)} Бұлттық дауысты тыңдап көру</button></div>
-      <small id="aVoiceNote" style="color:var(--mute)"></small>
-    </div>
+    <div class="glass sec row" style="justify-content:space-between"><small class="muted">${ic('volume', 15)} Бұлттық дауыс: ${gender === 'm' ? 'Ер (Дәулет)' : 'Әйел (Айгүл)'}. Дауыстар Профильде өзгертіледі.</small>
+      <button class="ghost" id="aVoices">${ic('sliders', 16)} Аудио баптаулары</button></div>
     <div class="glass sec" id="aList"></div>`;
 
   $('#aBack').onclick = () => { Q.stop = true; showBook(bookId); };
   $('#aListen').onclick = () => Player.open(b);
   $('#aVer') && ($('#aVer').onchange = e => { Q.stop = true; showAudio(bookId, e.target.value); });
-  $('#aGender').onchange = e => { gender = e.target.value; localStorage.kGender = gender; };
-  const fillVoices = () => {
-    const vl = getVoices();
-    $('#aVoice').innerHTML = vl.length ? vl.map(x => `<option value="${esc(x.voiceURI)}" ${x.voiceURI === localStorage.kVoice ? 'selected' : ''}>${esc(x.name)} (${esc(x.lang)})</option>`).join('') : '<option>Дауыс жоқ</option>';
-    $('#aVoiceNote').textContent = vl.some(x => x.lang.toLowerCase().startsWith('kk')) ? '' : 'Бұл құрылғыда қазақ браузер дауысы жоқ: mp3 жоқ бөлімдер түрік не орыс дауысымен нашар оқылады. Сапалы нәтиже үшін бөлімдерге mp3 жаса.';
-  };
-  fillVoices();
-  if (speechOK) speechSynthesis.onvoiceschanged = () => $('#aVoice') && fillVoices();
-  $('#aVoice').onchange = e => localStorage.kVoice = e.target.value;
-  $('#aTry').onclick = async e => {
-    const btn = e.currentTarget; btn.disabled = true;
-    try { const a = new Audio(URL.createObjectURL(await ttsPiece(chs[0].text.slice(0, 160), gender))); a.play(); }
-    catch (err) { toast(err.message); }
-    btn.disabled = false;
-  };
+  $('#aVoices').onclick = () => showProfile('audio');
 
   const missing = () => chs.map((_, i) => i).filter(i => !files.has(i));
   const chars = idxs => idxs.reduce((a, i) => a + chs[i].text.length, 0);
