@@ -105,3 +105,15 @@ body{padding-bottom:calc(var(--navh) + env(safe-area-inset-bottom))}
 .bars i{display:block;width:100%;background:var(--acc);border-radius:4px 4px 0 0}
 .bars .goal{position:absolute;left:0;right:0;border-top:1px dashed var(--warn)}
 .lbls{display:flex;gap:3px}.lbls div{flex:1;text-align:center;font-size:.62rem;color:var(--mute);line-height:1.1;min-height:1.6rem}
+
+/* жылдам оқу */
+.sp-ov{position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+.sp-bar{display:flex;gap:.6rem;align-items:center;padding:.6rem .8rem;border-bottom:1px solid var(--line)}
+.sp-main{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;user-select:none;cursor:pointer;min-height:0}
+.sp-ctx{min-height:3.2rem;max-height:6rem;overflow:auto;padding:.4rem 1rem;text-align:center;color:var(--mute);font-size:.95rem}
+.sp-foot{padding:.8rem 1rem calc(.8rem + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+.orp{display:grid;grid-template-columns:1fr auto 1fr;width:100%;align-items:baseline;white-space:pre}
+.orp .l{text-align:right}.orp .r{text-align:left}.orp .p{color:var(--warn);font-weight:700}
+.chunk{padding:0 1rem}
+.pacer{max-width:720px;padding:1rem;line-height:1.9;text-align:left;cursor:default}
+.pacer .hl{background:color-mix(in srgb,var(--acc) 40%,transparent);border-radius:4px}

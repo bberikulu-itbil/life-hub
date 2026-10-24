@@ -42,7 +42,7 @@ $('#editForm').onsubmit = async e => {
 
 async function deleteBook(id) {
   if (!confirm('Кітап, барлық нұсқасы, конспект, ескертпелер және оқу статистикасы жойылады. Жалғастырамыз ба?')) return;
-  for (const n of ['versions', 'notes', 'sessions']) for (const r of await byBook(n, id)) await del(n, r.id);
+  for (const n of ['versions', 'notes', 'sessions', 'drills']) for (const r of await byBook(n, id)) await del(n, r.id);
   await dropChunks(id); await del('chats', id); await del('konspekt', id); await del('books', id);
   showLibrary();
 }
@@ -58,7 +58,7 @@ async function bookMenu(id, anchor) {
   const m = document.createElement('div'); m.className = 'menu';
   m.innerHTML = `<button data-a="edit">✏️ Өңдеу</button>
     ${b.status !== 'done' ? '<button data-a="done">✅ Оқыдым деп белгілеу</button>' : '<button data-a="reading">📖 Қайта оқып жатырмын</button>'}
-    <button data-a="chat">💬 ЖИ-мен талқылау</button><button data-a="audio">🎧 Аудио</button>
+    <button data-a="chat">💬 ЖИ-мен талқылау</button><button data-a="audio">🎧 Аудио</button><button data-a="speed">⚡ Жылдам оқу</button>
     <button data-a="del" class="danger">🗑 Жою</button>`;
   document.body.append(m);
   const r = anchor.getBoundingClientRect();
@@ -70,6 +70,7 @@ async function bookMenu(id, anchor) {
     if (a === 'edit') openEdit(id);
     if (a === 'chat') showChat(id);
     if (a === 'audio') showAudio(id);
+    if (a === 'speed') showSpeed(id);
     if (a === 'del') deleteBook(id);
     if (a === 'done' || a === 'reading') { applyStatus(b, a); await put('books', b); refresh(id); }
   };

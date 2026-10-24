@@ -43,3 +43,28 @@ test("daysAgo crosses month borders and remaining needs enough data", () => {
   assert.equal(KS.remaining(3600, 25), 3600 / 25 * 75);
   assert.equal(KS.fmtDur(5400), "1 сағ 30 мин");
 });
+
+const KSP = createRequire(import.meta.url)("../kitapp/kspeed.js");
+
+test("orp picks a letter inside the word, skipping leading punctuation", () => {
+  assert.equal(KSP.orp("а"), 0);
+  assert.equal(KSP.orp("кітап"), 1);
+  assert.equal(KSP.orp("«кітап»"), 2);
+  assert.equal(KSP.orp("информатика"), 3);
+});
+
+test("chunkAt stops at a sentence end and delayFor slows down there", () => {
+  const w = ["Бүгін", "жақсы", "күн.", "Ертең", "жаңбыр"];
+  assert.deepEqual(KSP.chunkAt(w, 0, 4).words, ["Бүгін", "жақсы", "күн."]);
+  assert.equal(KSP.chunkAt(w, 5, 2), null);
+  assert.ok(KSP.delayFor(["күн."], 300) > KSP.delayFor(["күн"], 300));
+  assert.equal(KSP.delayFor(["күн."], 300, KSP.opts(0, false)), 200);
+});
+
+test("stagesFor grows with the baseline and every stage is faster than the last start", () => {
+  const s = KSP.stagesFor(200);
+  assert.equal(s[0].from, 200);
+  assert.ok(s.every((x) => x.to > x.from));
+  assert.ok(KSP.stagesFor(300)[3].from > s[3].from);
+  assert.equal(KSP.rampWpm(200, 300, 2), 300);
+});
