@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="kk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kitapp</title>
+<meta name="theme-color" content="#1f6f5c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <button class="brand" id="home">📚 Kitapp</button>
+  <div class="top-actions">
+    <button class="ghost" id="themeBtn" title="Тақырып">🌓</button>
+    <button class="primary" id="addBtn">+ Кітап қосу</button>
+  </div>
+</header>
+
+<main id="view"></main>
+
+<!-- Кітап қосу -->
+<dialog id="addDlg">
+  <form method="dialog" id="addForm">
+    <h3>Жаңа кітап</h3>
+    <label>Атауы <input name="title" required></label>
+    <label>Авторы <input name="author"></label>
+    <label>Файл (PDF немесе EPUB) <input name="file" type="file" accept=".pdf,.epub,application/pdf,application/epub+zip" multiple></label>
+    <label>Нұсқа аты <input name="vname" placeholder="мыс: Қазақша, Түпнұсқа, Қысқартылған"></label>
+    <div class="row end">
+      <button type="button" class="ghost" id="addCancel">Бас тарту</button>
+      <button class="primary" value="ok">Сақтау</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Оқығыш -->
+<section id="reader" hidden>
+  <div class="r-bar">
+    <button class="ghost" id="rClose">← Артқа</button>
+    <div class="r-title" id="rTitle"></div>
+    <div class="r-tools">
+      <button class="ghost" id="rMinus">A−</button>
+      <button class="ghost" id="rPlus">A+</button>
+      <button class="ghost" id="rNotes">📝</button>
+    </div>
+  </div>
+  <div class="r-body">
+    <div id="rStage"></div>
+    <aside id="rPanel" hidden>
+      <h4>Ескертпелер</h4>
+      <textarea id="rNoteText" placeholder="Осы жерге ескертпе жаз…"></textarea>
+      <button class="primary" id="rNoteSave">Ескертпені сақтау</button>
+      <div id="rNoteList"></div>
+    </aside>
+  </div>
+  <div class="r-foot">
+    <button class="ghost" id="rPrev">‹</button>
+    <div class="r-pos"><span id="rPosText"></span>
+      <input type="range" id="rSlider" min="0" max="100" value="0"></div>
+    <button class="ghost" id="rNext">›</button>
+  </div>
+</section>
+
+<div id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
