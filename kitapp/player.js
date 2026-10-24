@@ -192,7 +192,7 @@ mini.onclick = async e => {
 async function updateMini() {
   if (P.b) return pRender();
   const cur = db ? currentBook(await all('books')) : null;
-  if (!cur || view.dataset.page === 'book') { mini.hidden = true; document.body.classList.remove('has-mini'); return; }
+  if (!cur || ['book', 'home'].includes(view.dataset.page)) { mini.hidden = true; document.body.classList.remove('has-mini'); return; }
   const pct = bookPct(cur, await byBook('versions', cur.id));
   mini.dataset.book = cur.id; mini.hidden = false; document.body.classList.add('has-mini');
   mini.innerHTML = `<div class="mini-p"><i style="width:${pct}%"></i></div><div class="mini-cv">${coverHTML(cur, 'cv-xs')}</div>

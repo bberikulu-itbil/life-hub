@@ -44,7 +44,7 @@ const view = $('#view');
 const INFO = [['pages', 'Бет саны'], ['year', 'Шыққан жылы'], ['isbn', 'ISBN'], ['publisher', 'Баспа'], ['lang', 'Тілі'], ['genre', 'Жанры'], ['source', 'Қайдан алынды'], ['startDate', 'Оқи бастаған күні'], ['finishDate', 'Аяқтаған күні']];
 
 async function showBook(id) {
-  if (['home', 'list', 'groups'].includes(view.dataset.page)) showBook.back = rerender; // «Артқа» осы бетке қайтарады
+  if (['home', 'library', 'list', 'groups'].includes(view.dataset.page)) showBook.back = rerender; // «Артқа» осы бетке қайтарады
   setNav('lib'); view.dataset.page = 'book'; rerender = () => showBook(id);
   const b = await get('books', id);
   if (!b) return showLibrary();
@@ -147,7 +147,7 @@ async function showBook(id) {
 
 /* ---------- Кітап қосу ---------- */
 const dlg = $('#addDlg');
-$('#addBtn').onclick = () => { $('#addForm').reset(); dlg.showModal(); };
+const openAdd = () => { $('#addForm').reset(); dlg.showModal(); };
 $('#addCancel').onclick = () => dlg.close();
 $('#addForm').querySelector('[name=file]').onchange = e => {
   const f = e.target.files[0], t = $('#addForm [name=title]');
@@ -296,8 +296,8 @@ function setNav(v) {
 }
 $('#nav').onclick = e => {
   const v = e.target.closest('[data-v]')?.dataset.v; if (!v) return;
-  ({ lib: showLibrary, stats: showStats, chat: () => showChat(null), profile: showProfile })[v]();
+  ({ home: showHome, lib: showLibrary, stats: showStats, chat: () => showChat(null), profile: showProfile })[v]();
   scrollTo(0, 0);
 };
 
-addEventListener('DOMContentLoaded', () => openDB().then(showLibrary));
+addEventListener('DOMContentLoaded', () => openDB().then(showHome));

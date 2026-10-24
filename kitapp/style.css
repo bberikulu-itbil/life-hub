@@ -291,3 +291,6 @@ body.has-mini .composer{bottom:calc(158px + env(safe-area-inset-bottom))}
 .pacer{max-width:720px;padding:1rem;line-height:1.9;text-align:left;cursor:default}
 .pacer .hl{background:color-mix(in srgb,var(--acc) 35%,transparent);border-radius:4px}
 details.sec summary{cursor:pointer}
+.icon-btn.primary{border:0}
+.hd small{display:block;font-size:.95rem}
+@media(min-width:1050px){.home-grid .home-side:first-child{order:0}}

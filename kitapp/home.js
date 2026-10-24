@@ -2,7 +2,7 @@
 /* Kitapp: басты бет («Кітаптарым»), жинақтар тізімі және кітаптар торы. */
 
 const MONTH_IN = ['қаңтарда', 'ақпанда', 'наурызда', 'сәуірде', 'мамырда', 'маусымда', 'шілдеде', 'тамызда', 'қыркүйекте', 'қазанда', 'қарашада', 'желтоқсанда'];
-let rerender = () => showLibrary(); // ⋮ мәзірінен кейін қазіргі бетті жаңарту үшін
+let rerender = () => showHome(); // ⋮ мәзірінен кейін қазіргі бетті жаңарту үшін
 
 const authorsOf = b => String(b.author || '').split(/\s*(?:[,;&]|\bжәне\b)\s*/).map(s => s.trim()).filter(Boolean);
 const bookPct = (b, vs) => Math.max(0, ...vs.filter(v => v.bookId === b.id).map(v => v.pct || 0));
@@ -26,20 +26,29 @@ const COLLECTIONS = [
   ['audio', 'headphones', 'Аудиосы барлар', (b, d) => d.withAudio.has(b.id)],
 ];
 
-/* ---------- Басты бет ---------- */
-async function showLibrary() {
-  setNav('lib'); rerender = () => showLibrary(); view.dataset.page = 'home';
+const shelf = (title, list) => list.length ? `<div class="sec bare"><h3>${title}</h3><div class="hscroll">${list.map(x => `<button class="mini-card" data-b="${x.id}">${coverHTML(x)}<span>${esc(x.title)}</span></button>`).join('')}</div></div>` : '';
+const uploadBox = () => `<button class="upload" id="hUp">${ic('cloud-up', 34)}<b>Кітапты PDF немесе EPUB форматында жүктеу</b><small>Мұқаба, автор, сипаттама файлдан өзі алынады</small></button>
+  <input type="file" id="hFile" accept=".pdf,.epub,application/pdf,application/epub+zip" multiple hidden>`;
+function bindUpload() {
+  $('#hUp').onclick = () => $('#hFile').click();
+  $('#hFile').onchange = e => quickAdd([...e.target.files]);
+}
+
+/* ---------- Басты бет: статистика, қазір оқып жатқан кітап, сөрелер ---------- */
+async function showHome() {
+  setNav('home'); rerender = () => showHome(); view.dataset.page = 'home';
   const d = await libData(), { books, vs } = d;
   const S = KS.summarize(d.ss), now = new Date();
   const ym = KS.dayKey(now).slice(0, 7), year = String(now.getFullYear());
   const monthDays = Object.entries(S.byDay).filter(([k, s]) => k.startsWith(ym) && s >= 60).length;
   const yGoal = +(localStorage.kYearGoal || 12), yDone = books.filter(b => b.status === 'done' && (b.finishDate || '').startsWith(year)).length;
   const cur = currentBook(books), pct = cur ? bookPct(cur, vs) : 0;
-  const tags = new Set(books.flatMap(b => b.tags || [])), authors = new Set(books.flatMap(authorsOf));
-  const row = (k, icon, text, n) => `<button class="lrow" data-c="${k}">${ic(icon, 22)}<span>${text}</span><em>${n}</em>${ic('chevron-right', 18)}</button>`;
+  const reading = books.filter(b => b.status === 'reading' && b.id !== cur?.id).sort((a, c) => (c.lastOpened || 0) - (a.lastOpened || 0));
+  const recent = [...books].sort((a, c) => c.added - a.added).slice(0, 12);
+  const hour = now.getHours(), hello = hour < 12 ? 'Қайырлы таң' : hour < 18 ? 'Қайырлы күн' : 'Қайырлы кеш';
 
   view.innerHTML = `
-    <header class="hd"><h1>Кітаптарым</h1><button class="icon-btn glass" id="hSearch" aria-label="Іздеу">${ic('search', 20)}</button></header>
+    <header class="hd"><div><small class="muted">${hello}</small><h1>Басты бет</h1></div><button class="icon-btn glass" id="hSearch" aria-label="Іздеу">${ic('search', 20)}</button></header>
     <div class="home-grid">
       <div class="home-main">
         <button class="glass stat-card" id="hStats">
@@ -53,27 +62,19 @@ async function showLibrary() {
           <button class="hero-cv" data-a="read" aria-label="Оқуды жалғастыру">${coverHTML(cur, 'cv-lg')}</button>
           <div class="hero-p"><div class="bar-p"><i style="width:${pct}%"></i></div><small>Бүкіл кітаптан ${pct}%</small></div>
           <div class="row" style="justify-content:center"><button class="primary" data-a="read">${ic('book-open', 18)} Оқу</button><button data-a="listen">${ic('headphones', 18)} Тыңдау</button></div>
-        </div>` : ''}
+        </div>` : `<div class="glass sec"><h3>Кітапханаң бос</h3><p class="muted">Бірінші кітабыңды жүкте: мұқабасы мен ақпараты файлдан өзі алынады.</p></div>`}
       </div>
       <div class="home-side">
-        <div class="glass list">
-          ${COLLECTIONS.map(([k, i, t, f]) => row(k, i, t, books.filter(b => f(b, d)).length)).join('')}
-          ${row('shelves', 'shelves', 'Менің сөрелерім', tags.size)}
-          ${row('authors', 'users', 'Авторлар', authors.size)}
-        </div>
-        <button class="upload" id="hUp">${ic('cloud-up', 34)}<b>Кітапты PDF немесе EPUB форматында жүктеу</b><small>Мұқаба, автор, сипаттама файлдан өзі алынады</small></button>
-        <input type="file" id="hFile" accept=".pdf,.epub,application/pdf,application/epub+zip" multiple hidden>
+        ${shelf('Оқып жатырмын', reading)}
+        ${shelf('Жақында қосылғандар', recent)}
+        ${uploadBox()}
       </div>
     </div>`;
 
-  $('#hSearch').onclick = () => showList('all', null, true);
+  $('#hSearch').onclick = () => { showList.q = ''; showList('all', null, true); };
   $('#hStats').onclick = showStats;
-  view.querySelector('.list').onclick = e => {
-    const c = e.target.closest('[data-c]')?.dataset.c; if (!c) return;
-    c === 'shelves' || c === 'authors' ? showGroups(c) : showList(c);
-  };
-  $('#hUp').onclick = () => $('#hFile').click();
-  $('#hFile').onchange = e => quickAdd([...e.target.files]);
+  view.querySelectorAll('[data-b]').forEach(x => x.onclick = () => showBook(x.dataset.b));
+  bindUpload();
   const hero = view.querySelector('.hero');
   if (hero) hero.onclick = async e => {
     const a = e.target.closest('[data-a]'); if (!a) return showBook(cur.id);
@@ -82,7 +83,44 @@ async function showLibrary() {
     if (a.dataset.a === 'read') return continueReading(cur);
     if (a.dataset.a === 'listen') return Player.open(cur);
   };
-  ensureCovers(books, () => view.dataset.page === 'home' && showLibrary());
+  ensureCovers(books, () => view.dataset.page === 'home' && showHome());
+}
+
+/* ---------- Кітапхана: жинақтар және барлық кітап ---------- */
+async function showLibrary() {
+  setNav('lib'); rerender = () => showLibrary(); view.dataset.page = 'library';
+  const d = await libData(), { books } = d;
+  const tags = new Set(books.flatMap(b => b.tags || [])), authors = new Set(books.flatMap(authorsOf));
+  const row = (k, icon, text, n) => `<button class="lrow" data-c="${k}">${ic(icon, 22)}<span>${text}</span><em>${n}</em>${ic('chevron-right', 18)}</button>`;
+  const recent = [...books].sort((a, c) => (c.lastOpened || c.added) - (a.lastOpened || a.added));
+
+  view.innerHTML = `
+    <header class="hd"><h1>Кітапхана</h1><div class="row" style="flex-wrap:nowrap">
+      <button class="icon-btn glass" id="lSearch" aria-label="Іздеу">${ic('search', 20)}</button>
+      <button class="icon-btn primary" id="lAdd" aria-label="Кітап қосу">${ic('plus', 22)}</button></div></header>
+    <div class="home-grid">
+      <div class="home-side">
+        <div class="glass list">
+          ${COLLECTIONS.map(([k, i, t, f]) => row(k, i, t, books.filter(b => f(b, d)).length)).join('')}
+          ${row('shelves', 'shelves', 'Менің сөрелерім', tags.size)}
+          ${row('authors', 'users', 'Авторлар', authors.size)}
+        </div>
+        ${uploadBox()}
+      </div>
+      <div class="home-main">
+        ${recent.length ? `<div class="sec bare"><h3>Барлық кітап · ${recent.length}</h3><div class="grid" id="grid">${recent.map(b => bookCard(b, d)).join('')}</div></div>` : ''}
+      </div>
+    </div>`;
+
+  $('#lSearch').onclick = () => { showList.q = ''; showList('all', null, true); };
+  $('#lAdd').onclick = openAdd;
+  view.querySelector('.list').onclick = e => {
+    const c = e.target.closest('[data-c]')?.dataset.c; if (!c) return;
+    c === 'shelves' || c === 'authors' ? showGroups(c) : showList(c);
+  };
+  $('#grid') && ($('#grid').onclick = e => { const k = e.target.closest('.card-k'); if (k) return bookMenu(k.dataset.k, k); const c = e.target.closest('.bcard'); if (c) showBook(c.dataset.id); });
+  bindUpload();
+  ensureCovers(books, () => view.dataset.page === 'library' && showLibrary());
 }
 
 // Соңғы оқыған нұсқаны ашады (жоқ болса — түпнұсқаны).
@@ -106,7 +144,7 @@ async function quickAdd(files) {
     await enrichBook(b).catch(() => {});
     last = id;
   }
-  files.length === 1 ? showBook(last) : showLibrary();
+  files.length === 1 ? showBook(last) : rerender();
 }
 
 /* ---------- Кітаптар торы ---------- */
