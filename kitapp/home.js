@@ -105,29 +105,55 @@ async function showHome() {
 }
 
 /* ---------- Кітапхана: жинақтар және барлық кітап ---------- */
+// Кітапхана сүзгілері: түрі, күйі, жанры, сөресі. Кілт: 'all' | 'books' | 'audio' | статус | 'g:жанр' | 't:сөре'.
+function libFilters(d) {
+  const has = new Set(d.vs.map(v => v.bookId));
+  const base = [['all', 'Барлығы', () => true], ['books', 'Кітаптар', b => has.has(b.id)], ['audio', 'Аудиокітаптар', b => d.withAudio.has(b.id)]];
+  const status = COLLECTIONS.filter(c => ['reading', 'done', 'plan'].includes(c[0])).map(([k, , t, f]) => [k, t, b => f(b, d)]);
+  const genres = [...new Set(d.books.map(b => (b.genre || '').trim()).filter(Boolean))].sort((a, c) => a.localeCompare(c, 'kk')).map(g => ['g:' + g, g, b => (b.genre || '').trim() === g]);
+  const tags = [...new Set(d.books.flatMap(b => b.tags || []))].sort((a, c) => a.localeCompare(c, 'kk')).map(t => ['t:' + t, '#' + t, b => (b.tags || []).includes(t)]);
+  return { groups: [['Түрі', base], ['Күйі', status], ['Жанры', genres], ['Сөрелер', tags]], all: [...base, ...status, ...genres, ...tags] };
+}
+
 async function showLibrary() {
   setNav('lib'); rerender = () => showLibrary(); view.dataset.page = 'library';
-  const d = await libData(), { books } = d;
-  const recent = [...books].sort((a, c) => (c.lastOpened || c.added) - (a.lastOpened || a.added));
+  const d = await libData(), { books } = d, F = libFilters(d);
+  let cur = F.all.find(f => f[0] === localStorage.kLibF) ? localStorage.kLibF : 'all';
+  const chip = ([k, t]) => `<button class="fchip ${k === cur ? 'on' : ''}" data-f="${esc(k)}">${esc(t)}</button>`;
 
   view.innerHTML = `
     <header class="hd"><h1>Кітапхана</h1><div class="row" style="flex-wrap:nowrap">
       <button class="icon-btn glass" id="lSearch" aria-label="Іздеу">${ic('search', 20)}</button>
       <button class="icon-btn primary" id="lAdd" aria-label="Кітап қосу">${ic('plus', 22)}</button></div></header>
-    <div class="home-grid">
-      <div class="home-side">
-        ${collectionsHTML(d, ['all', 'reading', 'done', 'plan', 'audio', 'shelves', 'authors'])}
-        ${uploadBox()}
-      </div>
-      <div class="home-main">
-        ${recent.length ? `<div class="sec bare"><h3>Барлық кітап · ${recent.length}</h3><div class="grid" id="grid">${recent.map(b => bookCard(b, d)).join('')}</div></div>` : ''}
-      </div>
+    <div class="chips-row"><button class="fchip sq" id="lAll" aria-label="Барлық сүзгілер">${ic('grid', 18)}</button><div id="lChips" class="chips-scroll"></div></div>
+    <div class="grid" id="grid"></div>
+    <div class="home-grid" style="margin-top:1.4rem">
+      <div class="sec bare"><h3>Жинақтар</h3>${collectionsHTML(d, ['all', 'reading', 'done', 'plan', 'audio', 'shelves', 'authors'])}</div>
+      <div>${uploadBox()}</div>
     </div>`;
 
+  const draw = () => {
+    localStorage.kLibF = cur;
+    // таңдалған сүзгі әрдайым көрінсін: қатардың басына қоямыз
+    const row = F.all.slice(0, 6), sel = F.all.find(f => f[0] === cur);
+    if (!row.includes(sel)) row.splice(1, 0, sel);
+    $('#lChips').innerHTML = row.map(chip).join('');
+    const list = books.filter(sel[2]).sort((a, c) => (c.lastOpened || c.added) - (a.lastOpened || a.added));
+    $('#grid').innerHTML = list.length ? list.map(b => bookCard(b, d)).join('')
+      : `<div class="empty" style="grid-column:1/-1">${books.length ? (cur === 'audio' ? 'Аудиокітап жоқ. Кітап бетінен «Аудио баптау» арқылы mp3 жаса.' : 'Бұл сүзгі бойынша кітап жоқ') : 'Кітапхана бос. «+» арқылы бірінші кітабыңды қос.'}</div>`;
+  };
+  draw();
+  $('#lChips').onclick = e => { const f = e.target.closest('[data-f]')?.dataset.f; if (f) { cur = f; draw(); } };
+  $('#lAll').onclick = () => {
+    const D = $('#fDlg');
+    D.querySelector('.fs-body').innerHTML = F.groups.filter(g => g[1].length).map(([t, items]) => `<h4>${t}</h4><div class="fwrap">${items.map(chip).join('')}</div>`).join('');
+    D.onclick = e => { const f = e.target.closest('[data-f]')?.dataset.f; if (f) { cur = f; draw(); D.close(); } else if (e.target === D) D.close(); };
+    D.showModal();
+  };
   $('#lSearch').onclick = () => { showList.q = ''; showList('all', null, true); };
   $('#lAdd').onclick = openAdd;
   bindCollections();
-  $('#grid') && ($('#grid').onclick = e => { const k = e.target.closest('.card-k'); if (k) return bookMenu(k.dataset.k, k); const c = e.target.closest('.bcard'); if (c) showBook(c.dataset.id); });
+  $('#grid').onclick = e => { const k = e.target.closest('.card-k'); if (k) return bookMenu(k.dataset.k, k); const c = e.target.closest('.bcard'); if (c) showBook(c.dataset.id); };
   bindUpload();
   ensureCovers(books, () => view.dataset.page === 'library' && showLibrary());
 }

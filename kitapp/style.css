@@ -294,3 +294,16 @@ details.sec summary{cursor:pointer}
 .icon-btn.primary{border:0}
 .hd small{display:block;font-size:.95rem}
 @media(min-width:1050px){.home-grid .home-side:first-child{order:0}}
+
+/* кітапхана сүзгілері */
+.chips-row{display:flex;gap:.5rem;align-items:center;margin:0 -16px 1.1rem;padding:0 16px}
+.chips-scroll{display:flex;gap:.5rem;overflow-x:auto;scrollbar-width:none;padding:2px 16px 2px 0;margin-right:-16px}
+.chips-scroll::-webkit-scrollbar{display:none}
+.fchip{flex:none;white-space:nowrap;padding:.55rem 1.05rem;border-radius:14px;font-size:.95rem;background:var(--glass);border:1px solid var(--gb)}
+.fchip.sq{padding:.55rem .7rem}
+.fchip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.fwrap{display:flex;flex-wrap:wrap;gap:.5rem}
+dialog.bsheet{margin:auto auto 0;width:100%;max-width:640px;max-height:80vh;border-radius:26px 26px 0 0;padding:.5rem 1.2rem calc(1.2rem + env(safe-area-inset-bottom));animation:kUp .28s ease-out}
+.fs-grip{width:40px;height:5px;border-radius:99px;background:color-mix(in srgb,var(--ink) 25%,transparent);margin:.2rem auto .8rem}
+.bsheet h3{font-size:1.4rem}.bsheet h4{color:var(--mute);font-size:.85rem;font-weight:600;margin:1rem 0 .5rem}
+@media(min-width:900px){.chips-row{margin:0 0 1.1rem;padding:0}.chips-scroll{margin-right:0;padding-right:0}}
