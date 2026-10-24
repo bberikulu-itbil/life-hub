@@ -11,13 +11,13 @@ const STATUS = { plan: 'Жоспарда', reading: 'Оқып жатырмын',
 /* ---------- IndexedDB ---------- */
 let db;
 const openDB = () => new Promise((res, rej) => {
-  const r = indexedDB.open('kitapp', 3);
+  const r = indexedDB.open('kitapp', 4);
   r.onupgradeneeded = () => {
     const d = r.result;
     // Әр қойма жоқ болса ғана құрылады, сондықтан кез келген ескі нұсқадан көтерілуге болады.
     const mk = (n, key, idx) => { if (!d.objectStoreNames.contains(n)) { const o = d.createObjectStore(n, { keyPath: key }); if (idx) o.createIndex(idx, idx); } };
     mk('books', 'id'); mk('versions', 'id', 'bookId'); mk('notes', 'id', 'bookId'); mk('konspekt', 'bookId');
-    mk('chunks', 'id', 'bookId'); mk('chats', 'bookId'); mk('audio', 'id', 'bookId');
+    mk('chunks', 'id', 'bookId'); mk('chats', 'bookId'); mk('audio', 'id', 'bookId'); mk('sessions', 'id', 'bookId');
   };
   r.onsuccess = () => { db = r.result; res(); };
   r.onerror = () => rej(r.error);
@@ -43,22 +43,22 @@ const view = $('#view');
 let filter = { q: '', status: '' };
 
 async function showLibrary() {
+  setNav('lib');
   const [books, versions] = await Promise.all([all('books'), all('versions')]);
   books.sort((a, b) => b.added - a.added);
   view.innerHTML = `
     <div class="bar">
       <input id="q" placeholder="Кітап немесе автор іздеу…" value="${esc(filter.q)}">
       <select id="fs"><option value="">Барлығы</option>${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${filter.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
-      <button id="chatAll" title="Бүкіл кітапхана бойынша чат">💬</button>
     </div>
     <div class="grid" id="grid"></div>`;
   const draw = () => {
     const q = filter.q.toLowerCase();
-    const list = books.filter(b => (!filter.status || b.status === filter.status) && (`${b.title} ${b.author}`.toLowerCase().includes(q)));
+    const list = books.filter(b => (!filter.status || b.status === filter.status) && (`${b.title} ${b.author} ${b.genre || ''} ${(b.tags || []).join(' ')}`.toLowerCase().includes(q)));
     $('#grid').innerHTML = list.length ? list.map(b => {
       const vs = versions.filter(v => v.bookId === b.id);
       const pct = Math.max(0, ...vs.map(v => v.pct || 0));
-      return `<div class="card" data-id="${b.id}">
+      return `<div class="card" data-id="${b.id}"><button class="kebab card-k" data-k="${b.id}" aria-label="Мәзір">⋮</button>
         <div class="cover" style="${cover(b.title)}">${esc(b.title)}</div>
         <div class="bar-p"><i style="width:${pct}%"></i></div>
         <div class="meta">${esc(b.author || '—')}<br><span class="badge">${STATUS[b.status]}</span> · ${vs.length} нұсқа</div></div>`;
@@ -67,12 +67,12 @@ async function showLibrary() {
   draw();
   $('#q').oninput = e => { filter.q = e.target.value; draw(); };
   $('#fs').onchange = e => { filter.status = e.target.value; draw(); };
-  $('#chatAll').onclick = () => showChat(null);
-  $('#grid').onclick = e => { const c = e.target.closest('.card'); if (c) showBook(c.dataset.id); };
+  $('#grid').onclick = e => { const k = e.target.closest('.kebab'); if (k) return bookMenu(k.dataset.k, k); const c = e.target.closest('.card'); if (c) showBook(c.dataset.id); };
 }
 
 /* ---------- Кітап беті ---------- */
 async function showBook(id) {
+  setNav('lib');
   const b = await get('books', id);
   if (!b) return showLibrary();
   const [vs, notes, ks] = await Promise.all([byBook('versions', id), byBook('notes', id), get('konspekt', id)]);
@@ -80,12 +80,14 @@ async function showBook(id) {
   view.innerHTML = `
     <button class="ghost" id="back">← Кітапхана</button>
     <div class="sec">
-      <label>Атауы <input id="bt" value="${esc(b.title)}"></label>
-      <label>Авторы <input id="ba" value="${esc(b.author)}"></label>
-      <div class="row">
+      <div class="row" style="align-items:flex-start;flex-wrap:nowrap"><div style="flex:1;min-width:0"><h2 style="margin:0;word-break:break-word">${esc(b.title)}</h2>
+        <div style="color:var(--mute)">${esc(b.author || 'Автор көрсетілмеген')}</div></div>
+        <button class="kebab" id="bMenu" aria-label="Мәзір">⋮</button></div>
+      <div class="chips">${chips(b)}</div>
+      ${b.summary ? `<p style="margin:.6rem 0 0">${esc(b.summary)}</p>` : ''}
+      <div class="row" style="margin-top:.6rem">
         <select id="bs" style="width:auto">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${b.status === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
         <span class="stars" id="stars">${[1, 2, 3, 4, 5].map(n => `<button data-n="${n}" class="${n <= (b.rating || 0) ? 'on' : ''}">★</button>`).join('')}</span>
-        <button class="danger" id="delBook" style="margin-left:auto">Кітапты жою</button>
       </div>
     </div>
     <div class="row"><button class="primary" id="chatBtn" style="flex:1">💬 ЖИ-мен талқылау</button><button class="primary" id="audioBtn" style="flex:1">🎧 Аудио</button></div>
@@ -109,17 +111,9 @@ async function showBook(id) {
   $('#chatBtn').onclick = () => showChat(id);
   $('#audioBtn').onclick = () => showAudio(id);
   const save = async p => { Object.assign(b, p); await put('books', b); };
-  $('#bt').onchange = e => save({ title: e.target.value.trim() || b.title });
-  $('#ba').onchange = e => save({ author: e.target.value.trim() });
-  $('#bs').onchange = e => save({ status: e.target.value });
+  $('#bMenu').onclick = e => bookMenu(id, e.currentTarget);
+  $('#bs').onchange = async e => { applyStatus(b, e.target.value); await put('books', b); showBook(id); };
   $('#stars').onclick = async e => { const n = +e.target.dataset.n; if (!n) return; await save({ rating: n === b.rating ? 0 : n }); showBook(id); };
-  $('#delBook').onclick = async () => {
-    if (!confirm('Кітап, барлық нұсқасы, конспект және ескертпелер жойылады. Жалғастырамыз ба?')) return;
-    for (const v of vs) await del('versions', v.id);
-    for (const n of notes) await del('notes', n.id);
-    await dropChunks(id); await del('chats', id);
-    await del('konspekt', id); await del('books', id); showLibrary();
-  };
   $('#addVer').onclick = () => $('#verFile').click();
   $('#verFile').onchange = async e => { await addVersions(id, [...e.target.files]); showBook(id); };
   $('#vers').onclick = async e => {
@@ -174,7 +168,8 @@ async function openReader(b, v) {
   Object.assign(R, { book: b, ver: v, kind: v.type, font: +(localStorage.kFont || 100) });
   $('#rTitle').textContent = `${b.title} · ${v.name}`;
   stage.innerHTML = ''; rEl.hidden = false; $('#rPanel').hidden = true;
-  if (b.status === 'plan') { b.status = 'reading'; put('books', b); }
+  if (b.status === 'plan') { applyStatus(b, 'reading'); put('books', b); }
+  startTrack(b, v);
   const buf = await v.blob.arrayBuffer();
   try {
     if (v.type === 'pdf') await openPdf(buf); else await openEpub(buf);
@@ -230,6 +225,7 @@ function applyEpubTheme() {
 
 let pT;
 function progress(pos, pct, label) {
+  touchRead();
   $('#rPosText').textContent = label;
   R.cur = { pos, pct, label };
   clearTimeout(pT);
@@ -254,6 +250,7 @@ $('#rNotes').onclick = () => { const p = $('#rPanel'); p.hidden = !p.hidden; };
 $('#rClose').onclick = async () => {
   clearTimeout(pT);
   if (R.cur) { R.ver.pos = R.cur.pos; R.ver.pct = R.cur.pct; await put('versions', R.ver); }
+  await endTrack();
   if (R.rend) { R.rend.destroy(); R.rend = null; }
   if (R.pdf) { R.pdf.destroy(); R.pdf = null; }
   rEl.hidden = true; stage.innerHTML = ''; showBook(R.book.id);
@@ -285,4 +282,12 @@ $('#themeBtn').onclick = () => {
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 navigator.storage?.persist?.(); // iOS/Chrome-ға деректерді өздігінен өшірмеуді сұрау
 
-openDB().then(showLibrary);
+/* ---------- Мәзір (телефонда төменде, компьютерде сол жақта) ---------- */
+const setNav = v => document.querySelectorAll('#nav [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+$('#nav').onclick = e => {
+  const v = e.target.closest('[data-v]')?.dataset.v; if (!v) return;
+  $('#aud')?.pause(); if (typeof stopSpeech === 'function') stopSpeech(); // көрініс ауысқанда аудио қалып қоймасын
+  ({ lib: showLibrary, stats: showStats, chat: () => showChat(null) })[v]();
+};
+
+addEventListener('DOMContentLoaded', () => openDB().then(showLibrary));

@@ -50,6 +50,7 @@ async function genAudio(v, ci, text, gender, onProg) {
 }
 
 async function showAudio(bookId, versionId) {
+  setNav('lib');
   const b = await get('books', bookId);
   const vs = (await byBook('versions', bookId)).filter(v => v.chapters?.length);
   const v = vs.find(x => x.id === versionId) || vs[0];

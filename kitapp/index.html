@@ -10,13 +10,16 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="top">
-  <button class="brand" id="home">📚 Kitapp</button>
-  <div class="top-actions">
-    <button class="ghost" id="themeBtn" title="Тақырып">🌓</button>
-    <button class="primary" id="addBtn">+ Кітап қосу</button>
-  </div>
-</header>
+<header class="top"><button class="brand" id="home">📚 Kitapp</button></header>
+
+<nav id="nav" aria-label="Негізгі мәзір">
+  <button class="nav-brand" data-v="lib">📚 <span>Kitapp</span></button>
+  <button data-v="lib">📚<span>Кітапхана</span></button>
+  <button data-v="stats">📊<span>Аналитика</span></button>
+  <button id="addBtn" class="fab">＋<span>Кітап қосу</span></button>
+  <button data-v="chat">💬<span>Чат</span></button>
+  <button id="themeBtn" class="nav-theme">🌓<span>Тақырып</span></button>
+</nav>
 
 <main id="view"></main>
 
@@ -32,6 +35,30 @@
       <button type="button" class="ghost" id="addCancel">Бас тарту</button>
       <button class="primary" value="ok">Сақтау</button>
     </div>
+  </form>
+</dialog>
+
+<!-- Кітапты өңдеу -->
+<dialog id="editDlg">
+  <form method="dialog" id="editForm">
+    <h3>Кітапты өңдеу</h3>
+    <div class="fgrid">
+      <label class="wide">Атауы <input name="title" required></label>
+      <label>Авторы <input name="author"></label>
+      <label>Жанры <input name="genre" list="genres" placeholder="роман, ғылыми, өмірбаян…"></label>
+      <label>Шыққан жылы <input name="year" type="number" min="0" max="2100"></label>
+      <label>Тілі <select name="lang"><option value="">—</option><option value="kk">Қазақша</option><option value="ru">Орысша</option><option value="en">Ағылшынша</option><option value="tr">Түрікше</option><option value="other">Басқа</option></select></label>
+      <label>Бет саны <input name="pages" type="number" min="1"></label>
+      <label>ISBN <input name="isbn"></label>
+      <label>Қайдан алынды <select name="source"><option value="">—</option><option>Электронды</option><option>Қағаз (өзімдікі)</option><option>Кітапхана</option><option>Сыйлыққа</option><option>Басқа</option></select></label>
+      <label>Күйі <select name="status"><option value="plan">Жоспарда</option><option value="reading">Оқып жатырмын</option><option value="done">Оқыдым</option></select></label>
+      <label>Оқи бастаған күні <input name="startDate" type="date"></label>
+      <label>Аяқтаған күні <input name="finishDate" type="date"></label>
+      <label class="wide">Тегтер (үтірмен) <input name="tags" placeholder="психология, өзін дамыту"></label>
+      <label class="wide">Не үшін оқимын? Мақсат, қысқаша сипаттама <textarea name="summary" rows="3"></textarea></label>
+    </div>
+    <datalist id="genres"><option>Роман</option><option>Ғылыми</option><option>Өмірбаян</option><option>Өзін дамыту</option><option>Тарих</option><option>Информатика</option><option>Поэзия</option></datalist>
+    <div class="row end"><button type="button" class="ghost" id="editCancel">Бас тарту</button><button class="primary" value="ok">Сақтау</button></div>
   </form>
 </dialog>
 
@@ -70,8 +97,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script src="rag.js"></script>
+<script src="kstats.js"></script>
 <script src="app.js"></script>
 <script src="chat.js"></script>
 <script src="audio.js"></script>
+<script src="stats.js"></script>
+<script src="edit.js"></script>
 </body>
 </html>

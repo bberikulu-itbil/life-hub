@@ -95,6 +95,7 @@ async function errText(error) {
 }
 
 async function showChat(bookId) {
+  setNav(bookId ? 'lib' : 'chat');
   const b = bookId ? await get('books', bookId) : null;
   const key = bookId || ALL;
   const vs = bookId ? await byBook('versions', bookId) : [];
