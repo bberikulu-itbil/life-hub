@@ -11,17 +11,13 @@ const STATUS = { plan: 'Жоспарда', reading: 'Оқып жатырмын',
 /* ---------- IndexedDB ---------- */
 let db;
 const openDB = () => new Promise((res, rej) => {
-  const r = indexedDB.open('kitapp', 2);
+  const r = indexedDB.open('kitapp', 3);
   r.onupgradeneeded = () => {
     const d = r.result;
-    if (!d.objectStoreNames.contains('books')) {
-    d.createObjectStore('books', { keyPath: 'id' });
-    d.createObjectStore('versions', { keyPath: 'id' }).createIndex('bookId', 'bookId');
-    d.createObjectStore('notes', { keyPath: 'id' }).createIndex('bookId', 'bookId');
-    d.createObjectStore('konspekt', { keyPath: 'bookId' });
-    }
-    d.createObjectStore('chunks', { keyPath: 'id' }).createIndex('bookId', 'bookId');
-    d.createObjectStore('chats', { keyPath: 'bookId' });
+    // Әр қойма жоқ болса ғана құрылады, сондықтан кез келген ескі нұсқадан көтерілуге болады.
+    const mk = (n, key, idx) => { if (!d.objectStoreNames.contains(n)) { const o = d.createObjectStore(n, { keyPath: key }); if (idx) o.createIndex(idx, idx); } };
+    mk('books', 'id'); mk('versions', 'id', 'bookId'); mk('notes', 'id', 'bookId'); mk('konspekt', 'bookId');
+    mk('chunks', 'id', 'bookId'); mk('chats', 'bookId'); mk('audio', 'id', 'bookId');
   };
   r.onsuccess = () => { db = r.result; res(); };
   r.onerror = () => rej(r.error);
@@ -92,7 +88,7 @@ async function showBook(id) {
         <button class="danger" id="delBook" style="margin-left:auto">Кітапты жою</button>
       </div>
     </div>
-    <button class="primary" id="chatBtn" style="width:100%">💬 Кітапты ЖИ-мен талқылау</button>
+    <div class="row"><button class="primary" id="chatBtn" style="flex:1">💬 ЖИ-мен талқылау</button><button class="primary" id="audioBtn" style="flex:1">🎧 Аудио</button></div>
     <div class="sec"><h3>Нұсқалар</h3><div id="vers">${vs.length ? vs.map(v => `
       <div class="ver" data-id="${v.id}">
         <div><b>${esc(v.name)}</b> <span class="badge">${v.type.toUpperCase()}</span><br><small style="color:var(--mute)">${(v.blob.size / 1048576).toFixed(1)} МБ · ${v.pct || 0}% оқылды</small></div>
@@ -107,10 +103,11 @@ async function showBook(id) {
     </div>
     <div class="sec"><h3>Ескертпелер</h3>${notes.length ? notes.map(n => `
       <div class="note" data-id="${n.id}"><small>${esc(n.ref)} · ${esc(n.vname || '')}</small><div>${esc(n.text).replace(/\n/g, '<br>')}</div><button class="ghost danger" data-a="dn">жою</button></div>`).join('') : '<div class="empty">Оқығанда 📝 арқылы қосасың</div>'}</div>
-    <div class="sec"><h3>Жақында</h3><div class="tabs-soon"><span>🎧 Аудио</span><span>⚡ Жылдам оқу</span></div></div>`;
+    <div class="sec"><h3>Жақында</h3><div class="tabs-soon"><span>⚡ Жылдам оқу</span></div></div>`;
 
   $('#back').onclick = showLibrary;
   $('#chatBtn').onclick = () => showChat(id);
+  $('#audioBtn').onclick = () => showAudio(id);
   const save = async p => { Object.assign(b, p); await put('books', b); };
   $('#bt').onchange = e => save({ title: e.target.value.trim() || b.title });
   $('#ba').onchange = e => save({ author: e.target.value.trim() });

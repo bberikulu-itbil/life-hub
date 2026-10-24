@@ -54,3 +54,9 @@ dialog::backdrop{background:#0008}
 .msg button{margin-top:.4rem;font-size:.8rem;padding:.2rem .6rem}
 .composer{position:sticky;bottom:0;background:var(--bg);padding:.6rem 0 calc(.6rem + env(safe-area-inset-bottom))}
 .composer textarea{margin-bottom:.4rem}
+.seg{display:flex;gap:.4rem;margin:.6rem 0}.seg button{flex:1}.seg .on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.player{position:sticky;bottom:0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:.6rem;margin-top:1rem;display:flex;flex-direction:column;gap:.4rem}
+.player audio{width:100%}
+.ch{display:flex;gap:.6rem;align-items:center;justify-content:space-between;padding:.6rem 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.ch.now{background:color-mix(in srgb,var(--acc) 12%,transparent);border-radius:8px;padding-inline:.4rem}
+[hidden]{display:none!important}
