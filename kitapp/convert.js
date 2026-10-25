@@ -60,8 +60,8 @@ async function epubStructure(v, ctl) {
         if (id && byFrag.has(id)) { open(byFrag.get(id), true); byFrag.delete(id); }
         if (!e.matches(BLOCK) || e.parentElement?.closest(BLOCK)) continue;
         const t = e.textContent.replace(/\s+/g, ' ').trim(); if (!t) continue;
-        const isHead = /^H[1-6]$/.test(e.tagName);
-        if (!cur) { if (isHead && /^H[1-3]$/.test(e.tagName) && t.length < 150) { open(t, false); continue; } else open(null, false); }
+        const tag = e.localName.toLowerCase(), isHead = /^h[1-6]$/.test(tag); // XHTML-де тег аты кіші әріппен
+        if (!cur) { if (isHead && /^h[1-3]$/.test(tag) && t.length < 150) { open(t, false); continue; } else open(null, false); }
         if (isHead && (!cur.paras.length) && (!cur.title || KC.tidy(t).toLowerCase() === KC.tidy(cur.title).toLowerCase() || t.length < 150)) { if (!cur.title) cur.title = t; else if (tkey(t) !== tkey(cur.title) && !cur.fromToc) cur.title += '. ' + t; continue; }
         if (i < 4 && !started && /ISBN|©|баспасы|издательство|all rights reserved/i.test(t)) { removed.front++; continue; }
         cur.paras.push(t);
