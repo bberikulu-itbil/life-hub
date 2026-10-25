@@ -75,7 +75,8 @@ async function extractParts(v, ctl) {
     for (let i = 0; i < items.length; i++) {
       if (ctl.stopped) { book.destroy(); throw STOP; }
       const c = await items[i].load(book.load.bind(book));
-      parts.push({ ref: `бөлім ${i + 1}`, text: cleanText((c?.querySelector?.('body') || c)?.textContent || '') }); // <title> оқылмасын
+      const body = c?.querySelector?.('body') || c;
+      parts.push({ ref: `бөлім ${i + 1}`, text: cleanText(body?.textContent || ''), heads: [...(body?.querySelectorAll?.('h2,h3,h4,h5,h6') || [])].map(h => h.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean) }); // <title> оқылмасын
       items[i].unload(); ctl.prog((i + 1) / items.length * .9, `Бөлім ${i + 1} / ${items.length}`);
       if (i % 4 === 0) await tick();
     }
@@ -88,6 +89,8 @@ async function extractParts(v, ctl) {
 async function indexVersion(b, v, ctl = { prog() {}, stopped: false }) {
   const { parts, chapters } = await extractParts(v, ctl);
   if (parts.reduce((a, p) => a + p.text.length, 0) < 200) throw new Error('Мәтін табылмады. Бұл скан PDF болуы мүмкін: оған OCR (суреттен мәтін оқу) керек, ол әзірге жоқ.');
+  // тарау ішіндегі тақырыпшалар (EPUB h2–h6): аудиода бөлімнің ішкі мазмұны ретінде көрсетіледі
+  for (const c of chapters) c.subs = parts.slice(c.from, c.to + 1).flatMap(p => p.heads || []).filter(h => tkey(h) !== tkey(c.title));
   ctl.prog(.92, 'Бөлшектеу…'); await tick();
   let n = 0, words = 0;
   const chunks = parts.flatMap((p, pi) => RAG.chunkText(p.text).map(text => { words += KSP.tokenize(text).length; return { id: uid(), bookId: b.id, versionId: v.id, title: b.title, ref: p.ref, pi, text, tf: RAG.tfOf(text), n: n++ }; }));
@@ -97,7 +100,7 @@ async function indexVersion(b, v, ctl = { prog() {}, stopped: false }) {
   const tx = db.transaction('chunks', 'readwrite');
   chunks.forEach(c => tx.objectStore('chunks').put(c));
   await done(tx);
-  Object.assign(v, { indexed: chunks.length, chapters, words, prepV: 2 }); await put('versions', v);
+  Object.assign(v, { indexed: chunks.length, chapters, words, prepV: 3 }); await put('versions', v);
   ctl.prog(1, 'Дайын');
 }
 

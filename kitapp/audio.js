@@ -10,7 +10,7 @@ function stopSpeech() { Sp.gen++; Sp.active = false; if (speechOK) speechSynthes
 // Chrome ұзақ сөйлемді ортасында үзіп тастайды, сондықтан мәтінді қысқа бөліктермен оқимыз.
 function speak(text, { voice, rate, from = 0, onProg, onEnd }) {
   stopSpeech();
-  const gen = Sp.gen; Sp.parts = RAG.chunkText(text, 200); Sp.i = from; Sp.active = true;
+  const gen = Sp.gen; Sp.parts = Array.isArray(text) ? text : RAG.chunkText(text, 200); // плеер өз бөліктерін береді: белгілеу индекстері сәйкес болсын Sp.i = from; Sp.active = true;
   const next = () => {
     if (gen !== Sp.gen) return;
     if (Sp.i >= Sp.parts.length) { Sp.active = false; onEnd?.(); return; }
@@ -29,16 +29,24 @@ const getVoices = () => speechOK ? speechSynthesis.getVoices().sort((a, b) => vo
 // Дыбыстауға кедергі келтіретін белгілерді алып тастау: сілтемелер, [12] сияқты анықтамалар, қайталанған тыныс белгі.
 const ttsText = t => t.replace(/https?:\/\/\S+/g, ' ').replace(/\[\d+(?:[,–-]\s*\d+)*\]/g, ' ').replace(/\.{4,}/g, '…').replace(/\s{2,}/g, ' ').trim();
 
+// Тақырыпшалардың бөлім мәтініндегі орны (таңба нөмірі); табылмағаны алынады
+function subsAt(text, titles = []) {
+  const out = []; let from = 0;
+  for (const t of titles) { const at = text.indexOf(ttsText(t), from); if (at >= 0) { out.push({ title: t, at }); from = at + 1; } }
+  return out;
+}
+
 // Бөлім мәтіндерін жинап, тым қысқа бөлімдерді көрші бөліммен біріктіреді (нәтиже әрдайым бірдей).
 async function audioChapters(v) {
   const cs = (await byBook('chunks', v.bookId)).filter(c => c.versionId === v.id).sort((a, b) => a.n - b.n);
-  const raw = v.chapters.map(ch => ({ title: ch.title, text: ttsText(cs.filter(c => c.pi >= ch.from && c.pi <= ch.to).map(c => c.text).join(' ')) })).filter(c => c.text);
+  const raw = v.chapters.map(ch => { const text = ttsText(cs.filter(c => c.pi >= ch.from && c.pi <= ch.to).map(c => c.text).join(' ')); return { title: ch.title, text, subs: subsAt(text, ch.subs) }; }).filter(c => c.text);
   const out = [];
+  const join = (a, b) => { const off = a.text.length + 1; a.subs.push(...b.subs.map(x => ({ ...x, at: x.at + off }))); a.text += ' ' + b.text; };
   for (const c of raw) {
     const last = out[out.length - 1];
-    if (last && last.text.length < TTS_MIN_CHARS) { last.text += ' ' + c.text; last.title = c.title; } else out.push({ ...c });
+    if (last && last.text.length < TTS_MIN_CHARS) { join(last, c); last.title = c.title; } else out.push({ ...c, subs: [...c.subs] });
   }
-  if (out.length > 1 && out[out.length - 1].text.length < TTS_MIN_CHARS) { const t = out.pop(); out[out.length - 1].text += ' ' + t.text; }
+  if (out.length > 1 && out[out.length - 1].text.length < TTS_MIN_CHARS) join(out[out.length - 2], out.pop());
   return out;
 }
 

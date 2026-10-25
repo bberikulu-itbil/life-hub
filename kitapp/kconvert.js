@@ -200,13 +200,13 @@
 
     // 7. Абзацтар мен тараулар
     const chapters = []; let ch = null, open = false, lastText = '';
-    const start = (title, fromHead) => { ch = { title: tidy(title), paras: [], fromHead }; chapters.push(ch); open = false; };
+    const start = (title, fromHead) => { ch = { title: tidy(title), paras: [], heads: [], fromHead }; chapters.push(ch); open = false; };
     for (let i = 0; i < lines.length; i++) {
       const e = lines[i];
       const st = starts.get(i);
       if (st) { start(st.title, false); if (st.skip) { i += st.skip - 1; lastText = ''; continue; } }
       if (e.head) {
-        if (via !== 'headings') { ch ??= { title: 'Басы', paras: [] }, chapters.includes(ch) || chapters.push(ch); ch.paras.push(tidy(e.t)); open = false; lastText = e.t; continue; } // ішкі тақырыпша
+        if (via !== 'headings') { ch ??= { title: 'Басы', paras: [], heads: [] }, chapters.includes(ch) || chapters.push(ch); ch.paras.push(tidy(e.t)); ch.heads.push(tidy(e.t)); open = false; lastText = e.t; continue; } // ішкі тақырыпша
         if (ch && ch.fromHead && !ch.paras.length) { ch.title = tidy(ch.title + '. ' + e.t); continue; }
         start(e.t, true); lastText = e.t; continue;
       }
@@ -221,17 +221,18 @@
     // 8. Бос тарауларды алып тастау, тым қысқасын келесісіне қосу, тарау табылмаса бөліктерге бөлу
     let res = chapters.filter(c => c.paras.length);
     for (let i = 0; i < res.length - 1; i++) {
-      if (res[i].paras.join(' ').length < 300 && via === 'headings') { res[i + 1].paras.unshift(...res[i].paras); res.splice(i--, 1); }
+      if (res[i].paras.join(' ').length < 300 && via === 'headings') { res[i + 1].paras.unshift(...res[i].paras); res[i + 1].heads.unshift(...res[i].heads); res.splice(i--, 1); }
     }
     if (res.length < 2 && res[0]) {
       const all = res[0].paras, parts = [];
       let cur = [], len = 0;
       for (const p of all) { cur.push(p); len += p.length; if (len >= 4000) { parts.push(cur); cur = []; len = 0; } }
       if (cur.length) parts.push(cur);
-      res = parts.map((paras, i) => ({ title: parts.length > 1 ? `Бөлім ${i + 1}` : res[0].title, paras }));
+      const hs = new Set(res[0].heads);
+      res = parts.map((paras, i) => ({ title: parts.length > 1 ? `Бөлім ${i + 1}` : res[0].title, paras, heads: paras.filter(p => hs.has(p)) }));
       via = 'size';
     }
-    return { chapters: res.map(({ title, paras }) => ({ title, paras })), removed, body, via, toc: entries };
+    return { chapters: res.map(({ title, paras, heads }) => ({ title, paras, heads: heads || [] })), removed, body, via, toc: entries };
   }
 
   const api = { linesFromItems, lineText, structure, joinLine, tidy };

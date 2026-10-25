@@ -53,7 +53,7 @@ async function epubStructure(v, ctl) {
       const marks = toc.get(items[i].href.split('/').pop()) || [], byFrag = new Map(marks.filter(m => m.frag).map(m => [m.frag, m.label]));
       const fileLabel = marks.find(m => !m.frag)?.label;
       let cur = null;
-      const open = (title, fromToc) => { cur = { title, paras: [], fromToc }; chapters.push(cur); if (fromToc) started = true; };
+      const open = (title, fromToc) => { cur = { title, paras: [], heads: [], fromToc }; chapters.push(cur); if (fromToc) started = true; };
       if (fileLabel) open(fileLabel, true);
       for (const e of root.querySelectorAll('*')) {
         const id = e.id || e.getAttribute('name');
@@ -64,7 +64,7 @@ async function epubStructure(v, ctl) {
         if (!cur) { if (isHead && /^h[1-3]$/.test(tag) && t.length < 150) { open(t, false); continue; } else open(null, false); }
         if (isHead && (!cur.paras.length) && (!cur.title || KC.tidy(t).toLowerCase() === KC.tidy(cur.title).toLowerCase() || t.length < 150)) { if (!cur.title) cur.title = t; else if (tkey(t) !== tkey(cur.title) && !cur.fromToc) cur.title += '. ' + t; continue; }
         if (i < 4 && !started && /ISBN|©|баспасы|издательство|all rights reserved/i.test(t)) { removed.front++; continue; }
-        cur.paras.push(t);
+        cur.paras.push(t); if (isHead) cur.heads.push(t); // тарау ішіндегі тақырыпша
       }
       if (!root.querySelector(BLOCK)) { const ps = (root.textContent || '').split(/\n\s*\n/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean); if (ps.length) { if (!cur) open(null, false); cur.paras.push(...ps); } }
       items[i].unload(); ctl.prog((i + 1) / items.length * .5, `Файл ${i + 1} / ${items.length}`);
@@ -73,11 +73,11 @@ async function epubStructure(v, ctl) {
     const out = [];
     for (const c of chapters) {
       if (!c.paras.length) continue;
-      if (!c.title && out.length) { out[out.length - 1].paras.push(...c.paras); continue; }
+      if (!c.title && out.length) { out[out.length - 1].paras.push(...c.paras); out[out.length - 1].heads.push(...c.heads); continue; }
       if (!c.fromToc && !out.length && c.paras.join(' ').length < 400 && chapters.some(x => x.fromToc)) { removed.front += c.paras.length; continue; }
-      out.push({ title: KC.tidy(c.title || 'Басы'), paras: c.paras });
+      out.push({ title: KC.tidy(c.title || 'Басы'), paras: c.paras, heads: c.heads });
     }
-    return { chapters: out.length ? out : chapters.filter(c => c.paras.length).map(c => ({ title: c.title || 'Басы', paras: c.paras })), removed, via: toc.size ? 'toc' : 'headings' };
+    return { chapters: out.length ? out : chapters.filter(c => c.paras.length).map(c => ({ title: c.title || 'Басы', paras: c.paras, heads: c.heads })), removed, via: toc.size ? 'toc' : 'headings' };
   } finally { book.destroy(); }
 }
 const tkey = t => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
@@ -99,7 +99,7 @@ function reviewChapters(st, box) {
     box.oninput = e => { const r = e.target.closest('[data-i]'); if (r && e.target.tagName === 'INPUT') st.chapters[+r.dataset.i].title = e.target.value.trim() || st.chapters[+r.dataset.i].title; };
     box.onclick = e => {
       const a = e.target.closest('[data-a]')?.dataset.a, i = +e.target.closest('[data-i]')?.dataset.i; if (!a) return;
-      if (a === 'up') { st.chapters[i - 1].paras.push(...st.chapters[i].paras); st.chapters.splice(i, 1); }
+      if (a === 'up') { st.chapters[i - 1].paras.push(...st.chapters[i].paras); st.chapters[i - 1].heads = [...(st.chapters[i - 1].heads || []), ...(st.chapters[i].heads || [])]; st.chapters.splice(i, 1); }
       if (a === 'del') { if (st.chapters.length < 2 || !confirm(`«${st.chapters[i].title}» бөлімі таза нұсқаға кірмейді.`)) return; st.chapters.splice(i, 1); }
       draw();
     };
@@ -148,7 +148,10 @@ async function buildEpub(b, chapters) {
   z.file('mimetype', 'application/epub+zip', { compression: 'STORE' });
   z.file('META-INF/container.xml', '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
   const page = (t, body) => `<?xml version="1.0" encoding="utf-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="${lang}"><head><meta charset="utf-8"/><title>${xe(t)}</title></head><body>${body}</body></html>`;
-  chapters.forEach((c, i) => z.file(`OEBPS/c${i}.xhtml`, page(c.title, `<section epub:type="chapter"><h1>${xe(c.title)}</h1>\n${c.paras.map(p => `<p>${xe(p)}</p>`).join('\n')}</section>`)));
+  chapters.forEach((c, i) => {
+    const hk = new Set((c.heads || []).map(tkey)); // ЖИ тазартудан кейін де танылуы үшін әріптері бойынша салыстырамыз
+    z.file(`OEBPS/c${i}.xhtml`, page(c.title, `<section epub:type="chapter"><h1>${xe(c.title)}</h1>\n${c.paras.map(p => hk.has(tkey(p)) ? `<h2>${xe(p)}</h2>` : `<p>${xe(p)}</p>`).join('\n')}</section>`));
+  });
   z.file('OEBPS/nav.xhtml', page('Мазмұны', `<nav epub:type="toc"><h1>Мазмұны</h1><ol>${chapters.map((c, i) => `<li><a href="c${i}.xhtml">${xe(c.title)}</a></li>`).join('')}</ol></nav>`));
   if (b.cover) z.file('OEBPS/cover.jpg', b.cover);
   z.file('OEBPS/content.opf', `<?xml version="1.0" encoding="utf-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id" xml:lang="${lang}">

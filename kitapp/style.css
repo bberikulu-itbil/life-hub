@@ -418,3 +418,7 @@ dialog.bsheet{margin:auto auto 0;width:100%;max-width:640px;max-height:80vh;bord
 .rs-hit mark{background:color-mix(in srgb,var(--star) 45%,transparent);color:inherit;border-radius:3px;padding:0 1px}
 #rSheet label{margin:.9rem 0 .3rem}
 .sp-toc{position:absolute;left:0;right:0;bottom:0;max-height:70vh;border-radius:26px 26px 0 0;display:flex;flex-direction:column;z-index:3;padding-bottom:env(safe-area-inset-bottom);animation:kUp .25s ease-out}
+/* аудио мазмұны: бөлім ішіндегі тақырыпшалар */
+.lrow.sub{padding:.6rem .5rem .6rem 3.1rem;font-size:.94rem;color:var(--mute)}
+.lrow.sub.now span{color:var(--acc);font-weight:600}
+.ps-text h5{margin:1.1rem 0 .4rem;font-size:1rem;font-weight:700}

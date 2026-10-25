@@ -16,7 +16,10 @@ const estSecs = text => text.length / CPS;
 async function pLoad(i, pos) {
   P.i = i; stopSpeech(); paud.pause();
   // мәтін бөліктері екі режимге де керек: браузер дауысы осылармен оқиды, «Мәтін» көрінісі осыларды белгілейді
-  P.parts = RAG.chunkText(P.chs[i].text, 200);
+  // тақырыпша әрқашан жаңа бөліктен басталсын: мәтін солардың орнынан кесіледі
+  const c = P.chs[i], cuts = [0, ...(c.subs || []).map(x => x.at), c.text.length];
+  P.parts = []; P.subPart = [];
+  for (let n = 0; n < cuts.length - 1; n++) { if (n) P.subPart.push(P.parts.length); P.parts.push(...RAG.chunkText(c.text.slice(cuts[n], cuts[n + 1]), 200)); }
   P.cum = [0]; for (const p of P.parts) P.cum.push(P.cum[P.cum.length - 1] + p.length);
   P.textFor = -1; P.hl = -1;
   P.rec = await get('audio', `${P.v.id}:${i}`);
@@ -41,6 +44,14 @@ function curPart() {
   const [t, d] = pTimes(), ch = d ? t / d * P.cum[P.cum.length - 1] : 0;
   return Math.max(0, P.cum.findIndex(c => c > ch) - 1);
 }
+// Бөлім мәтініндегі таңба орны қай мәтін бөлігіне түседі; бөлім ішіндегі қазіргі тақырыпша
+const curSub = () => { const k = curPart(); return (P.chs[P.i].subs || []).filter((_, n) => P.subPart[n] <= k).pop(); };
+async function pSub(i, n) {
+  if (i !== P.i) await pLoad(i);
+  if (P.mode === 'mp3' && !pTimes()[1]) await new Promise(r => paud.addEventListener('loadedmetadata', r, { once: true }));
+  seekPart(P.subPart[n]);
+  if (!P.playing) pPlay();
+}
 function seekPart(k) {
   if (P.mode === 'tts') { Sp.i = k; if (P.playing) speakFrom(k); }
   else { const d = pTimes()[1]; if (d) paud.currentTime = P.cum[k] / P.cum[P.cum.length - 1] * d; }
@@ -50,7 +61,8 @@ function renderText() {
   const box = $('#psText');
   if (P.textFor !== P.i) {
     P.textFor = P.i; P.hl = -1;
-    box.innerHTML = `<h4>${esc(P.chs[P.i].title)}</h4>` + P.parts.map((p, k) => `<span data-k="${k}">${esc(p)} </span>`).join('');
+    const hs = new Map((P.chs[P.i].subs || []).map((x, n) => [P.subPart[n], x.title]));
+    box.innerHTML = `<h4>${esc(P.chs[P.i].title)}</h4>` + P.parts.map((p, k) => `${hs.has(k) ? `<h5>${esc(hs.get(k))}</h5>` : ''}<span data-k="${k}">${esc(p)} </span>`).join('');
   }
   const k = curPart();
   if (k !== P.hl) {
@@ -63,7 +75,7 @@ function renderText() {
 
 function speakFrom(k) {
   const vo = getVoices(), voice = vo.find(x => x.voiceURI === localStorage.kVoice) || vo[0];
-  speak(P.chs[P.i].text, { voice, rate: P.rate, from: k, onEnd: pEnded });
+  speak(P.parts, { voice, rate: P.rate, from: k, onEnd: pEnded });
 }
 
 function pPlay() {
@@ -156,7 +168,8 @@ function pRender() {
     <button class="icon-btn" data-m="toggle" aria-label="${P.playing ? 'Кідірту' : 'Ойнату'}">${ic(P.playing ? 'pause' : 'play', 22, true)}</button>
     <button class="icon-btn" data-m="close" aria-label="Плеерді жабу">${ic('x', 20)}</button>`;
   if (sheet.hidden) return;
-  $('#psCh').textContent = `${P.i + 1}/${P.chs.length} · ${P.chs[P.i].title}`;
+  const sub = curSub();
+  $('#psCh').textContent = `${P.i + 1}/${P.chs.length} · ${P.chs[P.i].title}${sub ? ' › ' + sub.title : ''}`;
   $('#psMode').textContent = P.mode === 'mp3' ? 'mp3 файл' : 'Браузер дауысы';
   const s = $('#psSeek'); s.max = Math.max(1, Math.round(d)); if (!s.matches(':active')) s.value = Math.round(t);
   s.style.setProperty('--p', (d ? t / d * 100 : 0) + '%');
@@ -202,7 +215,13 @@ $('#psRate').onclick = pRate;
 $('#psSeek').onchange = e => pSeek(+e.target.value);
 $('#psSeek').oninput = e => { const d = pTimes()[1]; e.target.style.setProperty('--p', (d ? e.target.value / d * 100 : 0) + '%'); $('#psT0').textContent = fmtT(+e.target.value); };
 $('#psSet').onclick = () => { const id = P.b.id; hideSheet(); showAudio(id); };
-$('#psChs').onclick = $('#psCh').onclick = () => sheetList(`Бөлімдер · ${P.chs.length}`, P.chs.map((c, i) => `<button class="lrow ${i === P.i ? 'now' : ''}" data-i="${i}"><em class="num">${i + 1}</em><span>${esc(c.title)}</span><em>${fmtT(P.durs[i])}</em></button>`).join(''), i => pJump(+i));
+// Мазмұн: бөлімдер және олардың ішіндегі тақырыпшалар
+$('#psChs').onclick = $('#psCh').onclick = () => {
+  const cs = curSub();
+  sheetList(`Мазмұны · ${P.chs.length} бөлім`, P.chs.map((c, i) => `<button class="lrow ${i === P.i && !cs ? 'now' : ''}" data-i="${i}"><em class="num">${i + 1}</em><span>${esc(c.title)}</span><em>${fmtT(P.durs[i])}</em></button>`
+    + (c.subs || []).map((x, n) => `<button class="lrow sub ${i === P.i && x === cs ? 'now' : ''}" data-i="${i}:${n}"><span>${esc(x.title)}</span></button>`).join('')).join(''),
+  v => { const [i, n] = v.split(':').map(Number); n >= 0 ? pSub(i, n) : pJump(i); });
+};
 $('#psSleep').onclick = () => sheetList('Ұйқы таймері', SLEEP.map(([k, t]) => `<button class="lrow" data-i="${k}"><span>${t}</span></button>`).join(''), k => {
   P.sleepEnd = k === 'end'; P.sleepAt = k === 'end' || k === '0' ? 0 : Date.now() + k * 60000;
   toast(k === '0' ? 'Таймер өшірілді' : 'Таймер қойылды'); pRender();

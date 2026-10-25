@@ -129,6 +129,12 @@ test("structure prefers the PDF outline for chapter titles", () => {
   assert.ok(!chapters[0].paras.includes("1-тарау")); // тарау атының қайталануы алынды
 });
 
+test("structure keeps headings inside a chapter as sub-headings", () => {
+  const { chapters } = KC.structure(fakeBook(), [{ title: "Кіріспе", page: 0 }, { title: "Соңы", page: 4 }]);
+  assert.deepEqual(chapters[0].heads, ["2-тарау"]);
+  assert.ok(chapters[0].paras.includes("2-тарау"));
+});
+
 test("chunkAt stops at a chapter boundary", () => {
   const w = ["бір", "екі", "үш", "төрт"];
   assert.deepEqual(KSP.chunkAt(w, 0, 4, new Map([[2, {}]])).words, ["бір", "екі"]);
