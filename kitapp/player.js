@@ -37,6 +37,12 @@ async function pLoad(i, pos) {
     Sp.i = Math.min(pos?.part || 0, Math.max(0, P.parts.length - 1));
   }
   pMeta(); pRender();
+  autoPrep();
+}
+// Тыңдап отырғанда келесі 2 бөлім фонда mp3 болып дайындалады (модель бар болса ғана, сұрақсыз)
+function autoPrep() {
+  if (localStorage.kAutoPrep === '0' || ttsEngine() !== 'issai' || !voiceHave()) return;
+  jobAdd(P.b, P.v, [P.i + 1, P.i + 2].filter(i => i < P.chs.length && !P.has.has(i)), { auto: true });
 }
 
 // Қазір оқылып жатқан мәтін бөлігі: браузер дауысында нақты, mp3-те уақыт үлесі бойынша шамамен
@@ -82,9 +88,9 @@ function speakFrom(k) {
 function pPlay() {
   if (!P.b) return;
   if (P.mode === 'tts' && ttsEngine() === 'browser' && (!speechOK || !getVoices().length)) { toast('Браузер дауысы табылмады. Профильде ISSAI дауысын таңдаңыз.'); pRender(); return; }
-  if (P.mode === 'tts' && ttsEngine() === 'issai' && !issaiHave) {
-    if (!confirm(`ISSAI қазақ дауысының моделі (~${ISSAI_MB} МБ) бір рет жүктеледі, содан кейін интернетсіз жұмыс істейді. Жүктейміз бе?`)) return;
-    toast('ISSAI дауысы жүктелуде… Бірінші сөйлем біраздан кейін басталады');
+  if (P.mode === 'tts' && ttsEngine() === 'issai' && !voiceHave()) {
+    if (!askModel()) return;
+    toast('Дауыс моделі жүктелуде… Бірінші сөйлем біраздан кейін басталады');
   }
   P.playing = true;
   if (P.mode === 'mp3') paud.play().catch(() => { P.playing = false; pRender(); });
@@ -177,7 +183,7 @@ function pRender() {
   $('#psCh').textContent = `${P.i + 1}/${P.chs.length} · ${P.chs[P.i].title}${sub ? ' › ' + sub.title : ''}`;
   // бөлім жүктелген бе (mp3, кідіріссіз, интернетсіз) әлде тікелей оқыла ма — бірден көрінсін
   $('#psMode').innerHTML = P.mode === 'mp3' ? `<span class="au-ok">${ic('check-circle', 14)} Жүктелген · mp3</span>`
-    : `<span class="au-live">${ic('volume', 14)} Жүктелмеген · ${ttsEngine() === 'issai' ? 'ISSAI' : 'браузер'} тікелей оқиды${Sp.wait && P.playing ? ' · дайындалуда…' : ''}</span>`;
+    : `<span class="au-live">${ic('volume', 14)} Жүктелмеген · ${ttsEngine() === 'issai' ? 'ISSAI' : 'браузер'} тікелей оқиды${Sp.wait && P.playing ? ' · сөйлем дайындалуда…' : ''}${jobState(P.v.id, P.i) === 'run' ? ` · mp3 ${Math.round(JB.f * 100)}%` : ''}</span>`;
   const s = $('#psSeek'); s.max = Math.max(1, Math.round(d)); if (!s.matches(':active')) s.value = Math.round(t);
   s.style.setProperty('--p', (d ? t / d * 100 : 0) + '%');
   $('#psT0').textContent = fmtT(t); $('#psT1').textContent = '-' + fmtT(d - t);
@@ -209,6 +215,7 @@ function sheetList(title, rows, onPick) {
 }
 
 $('#psDown').onclick = hideSheet;
+document.addEventListener('kjobs', () => P.b && pRender()); // фондағы дайындау барысы плеерде де көрінсін
 P.textMode = localStorage.kPText === '1';
 $('#psTxt').onclick = () => { P.textMode = !P.textMode; localStorage.kPText = P.textMode ? '1' : '0'; P.textFor = -1; P.hl = -1; pRender(); };
 $('#psText').onclick = e => { const s = e.target.closest('[data-k]'); if (s) seekPart(+s.dataset.k); };
@@ -225,13 +232,19 @@ $('#psSet').onclick = () => { const id = P.b.id; hideSheet(); showAudio(id); };
 // Мазмұн: бөлімдер және олардың ішіндегі тақырыпшалар
 $('#psChs').onclick = $('#psCh').onclick = () => {
   const cs = curSub();
-  const st = i => P.has.has(i) ? `<i class="au-ok" title="Жүктелген">${ic('check-circle', 16)}</i>` : `<i class="au-live" title="Жүктелмеген">${ic('volume', 16)}</i>`;
+  const st = i => P.has.has(i) ? `<i class="au-ok" title="Жүктелген">${ic('check-circle', 16)}</i>` : jobState(P.v.id, i) ? `<i class="au-live" title="Дайындалуда">${ic('refresh', 16)}</i>` : `<i class="au-live" title="Жүктелмеген">${ic('volume', 16)}</i>`;
   const n = P.has.size, miss = P.chs.length - n;
   sheetList(`Мазмұны · ${P.chs.length} бөлім`, `<div class="au-sum"><span class="au-ok">${ic('check-circle', 15)} Жүктелген: ${n}</span><span class="au-live">${ic('volume', 15)} Жүктелмеген: ${miss}</span>
-      ${miss ? `<button class="link" data-i="gen">${ic('download', 15)} Жүктеу</button>` : ''}</div>`
+      ${miss ? `<button class="link" data-i="gen">${ic('download', 15)} Барлығын дайындау · ~${fmtLeft(prepSecs(P.chs.reduce((a, c, i) => a + (P.has.has(i) ? 0 : c.text.length), 0)))}</button>` : ''}</div>`
     + P.chs.map((c, i) => `<button class="lrow ${i === P.i && !cs ? 'now' : ''}" data-i="${i}"><em class="num">${i + 1}</em><span>${esc(c.title)}</span>${st(i)}<em>${fmtT(P.durs[i])}</em></button>`
     + (c.subs || []).map((x, k) => `<button class="lrow sub ${i === P.i && x === cs ? 'now' : ''}" data-i="${i}:${k}"><span>${esc(x.title)}</span>${st(i)}</button>`).join('')).join(''),
-  v => { if (v === 'gen') { const id = P.b.id, vid = P.v.id; hideSheet(); return showAudio(id, vid); } const [i, k] = v.split(':').map(Number); k >= 0 ? pSub(i, k) : pJump(i); });
+  async v => {
+    if (v === 'gen') {
+      if (!askModel()) return;
+      const n = await jobAdd(P.b, P.v, P.chs.map((_, i) => i).filter(i => !P.has.has(i)));
+      return toast(n ? `${n} бөлім фонда дайындалады · ~${fmtLeft(jobsLeft())}. Барысы: Профиль → Дайындау және жүктеу` : 'Барлығы дайын не кезекте');
+    }
+    const [i, k] = v.split(':').map(Number); k >= 0 ? pSub(i, k) : pJump(i); });
 };
 $('#psSleep').onclick = () => sheetList('Ұйқы таймері', SLEEP.map(([k, t]) => `<button class="lrow" data-i="${k}"><span>${t}</span></button>`).join(''), k => {
   P.sleepEnd = k === 'end'; P.sleepAt = k === 'end' || k === '0' ? 0 : Date.now() + k * 60000;

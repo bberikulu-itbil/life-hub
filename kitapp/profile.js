@@ -14,7 +14,7 @@ async function offlineReady() {
 const pageHead = (title) => `<button class="back" id="pBack">${ic('back', 22)} Профиль</button><header class="hd"><h1>${title}</h1></header>`;
 
 async function showProfile(section) {
-  if (section) return showProfileSec(section);
+  if (section) return section === 'jobs' ? showJobs() : showProfileSec(section);
   setNav('profile'); view.dataset.page = 'profile';
   const S2 = spGet();
   const [books, vs, au, ss, dr] = await Promise.all([all('books'), all('versions'), all('audio'), all('sessions'), all('drills')]);
@@ -36,13 +36,14 @@ async function showProfile(section) {
       ${row('speed', 'zap', 'Жылдам оқу', `Бастапқы қарқын ${S2.baseline} сөз/мин · ${Math.min(S2.unlocked, 6)}/6 кезең ашық`)}
       ${row('audio', 'headphones', 'Аудио баптаулары', `${esc(voiceLabel())} · ${+(localStorage.kRate || 1)}× жылдамдық`)}
       ${row('convert', 'layers', 'Кітапты өңдеу', `Таза нұсқа жасау · ЖИ тазарту ${localStorage.kAiClean !== '0' ? 'қосулы' : 'өшірулі'}`)}
+      ${row('jobs', 'download', 'Дайындау және жүктеу', esc(jobsSummary()))}
       ${row('cloud', 'cloud-up', 'Бұлтқа сақтау', !email ? 'Life Hub-қа кіргенде қосылады' : !cloudOn() ? 'өшірулі' : Cl.err ? 'қате: ' + esc(cloudErr(Cl.err)) : clState().last ? `соңғы синхрондау ${new Date(clState().last).toLocaleString('kk', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}` : 'қосулы')}
       ${row('downloads', 'drive', 'Жүктелгендер және интернетсіз', `${est.usage != null ? size(est.usage) + ' · ' : ''}${vs.length} файл, ${au.length} аудио · ${off ? 'интернетсіз дайын' : 'интернетсіз әлі дайын емес'}`)}
     </div>`;
   $('#pApps').onclick = e => openApps(e.currentTarget);
   $('#pList').onclick = e => {
     const p = e.target.closest('[data-p]')?.dataset.p; if (!p) return;
-    p === 'speed' ? showSpeed() : p === 'downloads' ? showDownloads() : showProfileSec(p);
+    p === 'speed' ? showSpeed() : p === 'downloads' ? showDownloads() : p === 'jobs' ? showJobs() : showProfileSec(p);
   };
 }
 
@@ -159,4 +160,49 @@ async function showDownloads() {
     }
     if (a === 'bdel') deleteBook(bk.b.id, again);
   };
+}
+
+/* ---------- Дайындау және жүктеу: дауыс модельдері және аудио дайындау кезегі ---------- */
+async function showJobs() {
+  setNav('profile'); view.dataset.page = 'jobs';
+  await checkModels();
+  const draw = () => {
+    if (view.dataset.page !== 'jobs') { document.removeEventListener('kjobs', tick); onDl.delete(tick); return; }
+    const vo = voiceCur();
+    const models = Object.entries(MODELS).map(([id, m]) => {
+      const d = DL[id], have = haveModels.has(id), pct = d ? Math.round((d.loaded || 0) / (d.total || 1) * 100) : 0;
+      return `<div class="jb-row"><div><b>${m.name}</b>${vo.model === id && ttsEngine() === 'issai' ? ' <span class="badge">таңдалған</span>' : ''}<br>
+        <small class="muted">${d ? `Жүктелуде ${pct}% · ${size(d.loaded || 0)} / ${m.mb} МБ${d.bps ? ` · ~${fmtLeft((d.total - d.loaded) / d.bps)} қалды` : ''}` : have ? `Жүктелген · ${m.mb} МБ · интернетсіз жұмыс істейді` : `Жүктелмеген · ${m.mb} МБ (4G-де ~${fmtLeft(m.mb * 8 / 10)}, Wi-Fi-да ~${fmtLeft(m.mb * 8 / 40)})`}</small>
+        ${d ? `<div class="prog"><i style="width:${pct}%"></i></div>` : ''}</div>
+        ${d ? '' : have ? `<button class="icon-btn danger" data-rm="${id}" aria-label="Өшіру">${ic('trash', 18)}</button>` : `<button class="icon-btn" data-dl="${id}" aria-label="Жүктеу">${ic('download', 18)}</button>`}</div>`;
+    }).join('');
+    const c = JB.cur, left = jobsLeft();
+    $('#jbBody').innerHTML = `
+      <div class="glass sec"><h3>${ic('headphones', 18)} Дауыс модельдері</h3>
+        <small class="muted">Модель бір рет жүктеледі; одан кейін дауыс интернетсіз, тегін жасалады. Осы құрылғыда 10 минут аудио дайындауға: ${Object.entries(MODELS).map(([id, m]) => `${m.name.split(' · ')[1] || 'жоғары сапа'} ~${fmtLeft(10 * 60 * CPS / speedOf(id))}`).join(', ')}.</small>
+        ${models}</div>
+      <div class="glass sec"><h3>${ic('music', 18)} Аудио дайындау</h3>
+        ${c ? `<div class="jb-row"><div><b>${esc(c.title)}</b><br><small class="muted">${esc(c.book)} · ${Math.round(JB.f * 100)}% · бөлімге ~${fmtLeft(prepSecs(c.chars * (1 - JB.f)))} қалды</small>
+            <div class="prog"><i style="width:${Math.round(JB.f * 100)}%"></i></div></div><button class="icon-btn" data-x="${c.key}" aria-label="Тоқтату">${ic('x', 18)}</button></div>
+          <small class="muted">Барлығы ~${fmtLeft(left)} қалды. Бет ауысса да жалғасады; қосымша жабылса, келесі ашқанда жалғасады. Экран сөнбейді.</small>`
+          : `<p class="muted">${JB.err ? 'Тоқтады: ' + esc(JB.err) : JB.q.length ? 'Басталуда…' : 'Қазір ештеңе дайындалып жатқан жоқ. Кітаптың «Аудио жасау» бетінен немесе плеердің «Бөлімдер» тізімінен қосыңыз.'}</p>`}
+        ${JB.err && JB.q.length ? `<button class="primary" id="jbGo">${ic('play', 16)} Жалғастыру</button>` : ''}
+        ${JB.q.length ? `<h4>Кезекте · ${JB.q.length}</h4>${JB.q.map(j => `<div class="jb-row"><div>${esc(j.title)}<br><small class="muted">${esc(j.book)} · ~${fmtLeft(prepSecs(j.chars))}${j.auto ? ' · тыңдау үшін алдын ала' : ''}</small></div><button class="icon-btn" data-x="${j.key}" aria-label="Кезектен алу">${ic('x', 18)}</button></div>`).join('')}
+          <button id="jbStop">${ic('x', 16)} Барлығын тоқтату</button>` : ''}
+        ${JB.done.length ? `<h4>Дайын болғандар</h4>${JB.done.map(j => `<div class="jb-row"><div>${ic('check-circle', 14)} ${esc(j.title)}<br><small class="muted">${esc(j.book)} · ${fmtT(j.dur)} аудио</small></div></div>`).join('')}` : ''}
+      </div>`;
+  };
+  let pend = 0; const tick = () => { pend ||= setTimeout(() => { pend = 0; draw(); }, 300); }; // жүктелу оқиғалары жиі келеді
+  view.innerHTML = `${pageHead('Дайындау және жүктеу')}<div id="jbBody"></div>`;
+  $('#pBack').onclick = () => showProfile();
+  $('#jbBody').onclick = async e => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.dl) { const id = t.dataset.dl; issaiInit(id).then(() => toast('Модель жүктелді'), err => toast(err.message)).finally(draw); setTimeout(draw, 50); }
+    if (t.dataset.rm && confirm('Модель құрылғыдан өшеді. Жасалған mp3 файлдар қалады.')) { await issaiRemove(t.dataset.rm); draw(); }
+    if (t.dataset.x) jobCancel(t.dataset.x);
+    if (t.id === 'jbStop') jobsStopAll();
+    if (t.id === 'jbGo') jobsRun();
+  };
+  document.addEventListener('kjobs', tick); onDl.add(tick);
+  draw();
 }
