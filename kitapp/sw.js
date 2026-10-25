@@ -1,4 +1,4 @@
-const C = 'kitapp-v18';
+const C = 'kitapp-v19';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'rag.js', 'chat.js', 'audio.js', 'ltts.js', 'tts-worker.js', 'vendor/piper/piper.js', 'vendor/piper/piper-o91UDS6e.js', 'icons.js', 'covers.js', 'home.js', 'player.js', 'prep.js', 'shelves.js', 'marks.js', 'brand.js', 'profile.js', 'kstats.js', 'kspeed.js', 'kconvert.js', 'convert.js', 'speed.js', 'stats.js', 'edit.js', 'manifest.webmanifest'];
 // Сыртқы кітапханалар: интернетсіз оқу үшін алдын ала сақталады (нұсқасы бекітілген, өзгермейді).
 const LIBS = [
