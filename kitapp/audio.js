@@ -74,6 +74,13 @@ const blobDuration = blob => new Promise(r => {
 });
 
 async function genAudio(v, ci, text, gender, onProg, ctl) {
+  if (ttsEngine() === 'issai') {
+    const blob = await issaiChapter(text, onProg, ctl);
+    if (!blob) return null;
+    const rec = { id: `${v.id}:${ci}`, bookId: v.bookId, versionId: v.id, ci, gender: 'issai:' + issaiSpeaker(), created: Date.now(), blob, dur: await blobDuration(blob) };
+    await put('audio', rec);
+    return rec;
+  }
   const pieces = RAG.chunkText(text, 3500), blobs = [];
   for (let i = 0; i < pieces.length; i++) {
     if (ctl?.stop) return null;
@@ -97,16 +104,35 @@ function audioSettingsHTML() {
   return `<div class="glass sec" id="audioSet"><h3>${ic('headphones', 18)} Аудио баптаулары</h3>
     <small class="muted">Бөлімнің mp3 файлы болса, плеер соны ойнатады; болмаса браузер дауысымен оқиды.</small>
     <div class="fgrid">
+      <label>mp3 жасайтын қозғалтқыш <select id="aEng"><option value="issai" ${ttsEngine() === 'issai' ? 'selected' : ''}>ISSAI қазақ дауысы (құрылғыда, тегін)</option><option value="cloud" ${ttsEngine() === 'cloud' ? 'selected' : ''}>Бұлттық дауыс (Azure)</option></select></label>
+      <label>ISSAI дикторы <select id="aSpk">${ISSAI_VOICES.map(([i, n]) => `<option value="${i}" ${i === issaiSpeaker() ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
       <label>Бұлттық дауыс (mp3 жасау) <select id="aGender"><option value="f" ${g === 'f' ? 'selected' : ''}>Әйел (Айгүл)</option><option value="m" ${g === 'm' ? 'selected' : ''}>Ер (Дәулет)</option></select></label>
       <label>Браузер дауысы (файлсыз) <select id="aVoice"></select></label>
       <label>Тыңдау жылдамдығы <select id="aRate">${RATES.map(x => `<option value="${x}" ${x === r ? 'selected' : ''}>${x}×</option>`).join('')}</select></label>
     </div>
-    <div class="row"><button id="aTry">${ic('play', 16)} Бұлттық дауысты тыңдап көру</button><button id="aTryB">${ic('volume', 16)} Браузер дауысын тыңдау</button></div>
+    <div class="glass sec" id="aIssai"><small class="muted">ISSAI моделі тексерілуде…</small></div>
+    <div class="row"><button id="aTry">${ic('play', 16)} Таңдалған дауысты тыңдап көру</button><button id="aTryB">${ic('volume', 16)} Браузер дауысын тыңдау</button></div>
     <small id="aVoiceNote" class="muted"></small></div>`;
 }
 function bindAudioSettings() {
   const SAMPLE = 'Сәлеметсіз бе! Бұл Kitapp қосымшасының дауысы. Кітапты тыңдауға дайынбыз.';
   $('#aGender').onchange = e => localStorage.kGender = e.target.value;
+  $('#aEng').onchange = e => localStorage.kTtsEngine = e.target.value;
+  $('#aSpk').onchange = e => localStorage.kIssaiSpk = e.target.value;
+  const drawIssai = async () => {
+    const el = $('#aIssai'); if (!el) return;
+    const ok = await issaiReady();
+    el.innerHTML = `<small class="muted">ISSAI KazakhTTS · CC BY 4.0 · Piper. Модель ${ok ? 'құрылғыда сақталған: интернетсіз жұмыс істейді.' : `әлі жүктелмеген (~${ISSAI_MB} МБ, бір рет).`}</small>
+      <div class="row">${ok ? `<button class="ghost danger" id="aIRm">${ic('trash', 16)} Модельді өшіру</button>` : `<button id="aIDl">${ic('download', 16)} Модельді жүктеу</button>`}</div><div class="prog" hidden><i id="aIf"></i></div>`;
+    $('#aIRm') && ($('#aIRm').onclick = async () => { if (confirm('ISSAI моделі құрылғыдан өшеді.')) { await issaiRemove(); drawIssai(); } });
+    $('#aIDl') && ($('#aIDl').onclick = async e => {
+      e.currentTarget.disabled = true; el.querySelector('.prog').hidden = false;
+      try { await issaiInit(f => { const b = $('#aIf'); if (b) b.style.width = Math.round(f * 100) + '%'; }); toast('ISSAI дауысы дайын'); }
+      catch (err) { toast(err.message); }
+      drawIssai();
+    });
+  };
+  drawIssai();
   $('#aRate').onchange = e => { localStorage.kRate = e.target.value; P.rate = +e.target.value; paud.playbackRate = P.rate; };
   const fill = () => {
     if (!$('#aVoice')) return;
@@ -120,9 +146,11 @@ function bindAudioSettings() {
   $('#aTryB').onclick = () => { const vo = getVoices(); if (!vo.length) return toast('Браузер дауысы табылмады'); speak(SAMPLE, { voice: vo.find(x => x.voiceURI === localStorage.kVoice) || vo[0], rate: +(localStorage.kRate || 1) }); };
   $('#aTry').onclick = async e => {
     const btn = e.currentTarget; btn.disabled = true;
-    try { const a = new Audio(URL.createObjectURL(await ttsPiece(SAMPLE, localStorage.kGender || 'f'))); a.playbackRate = +(localStorage.kRate || 1); a.play(); }
+    try {
+      if (ttsEngine() === 'issai' && !(await issaiReady()) && !confirm(`ISSAI моделі (~${ISSAI_MB} МБ) бір рет жүктеледі. Жалғастырамыз ба?`)) throw new Error('Бас тартылды');
+      const a = new Audio(URL.createObjectURL(ttsEngine() === 'issai' ? await issaiSample(SAMPLE) : await ttsPiece(SAMPLE, localStorage.kGender || 'f'))); a.playbackRate = +(localStorage.kRate || 1); a.play(); }
     catch (err) { toast(err.message); }
-    btn.disabled = false;
+    btn.disabled = false; drawIssai();
   };
 }
 
@@ -149,7 +177,7 @@ async function showAudio(bookId, versionId) {
       <small>${chs.length} бөлім · ${fmtT(total)} · ${files.size}/${chs.length} mp3 дайын</small>
       <button class="primary" id="aListen">${ic('headphones', 18)} Тыңдау</button></div></div>
     ${vs.length > 1 ? `<label>Нұсқа <select id="aVer">${vs.map(x => `<option value="${x.id}" ${x.id === v.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>` : ''}
-    <div class="glass sec row" style="justify-content:space-between"><small class="muted">${ic('volume', 15)} Бұлттық дауыс: ${gender === 'm' ? 'Ер (Дәулет)' : 'Әйел (Айгүл)'}. Дауыстар Профильде өзгертіледі.</small>
+    <div class="glass sec row" style="justify-content:space-between"><small class="muted">${ic('volume', 15)} ${ttsEngine() === 'issai' ? `ISSAI: ${ISSAI_VOICES.find(x => x[0] === issaiSpeaker())?.[1] || ''}, құрылғыда, тегін` : `Бұлттық дауыс: ${gender === 'm' ? 'Ер (Дәулет)' : 'Әйел (Айгүл)'}`}. Дауыстар Профильде өзгертіледі.</small>
       <button class="ghost" id="aVoices">${ic('sliders', 16)} Аудио баптаулары</button></div>
     <div class="glass sec" id="aList"></div>`;
 
@@ -183,8 +211,17 @@ async function showAudio(bookId, versionId) {
   const runQueue = async idxs => {
     const todo = idxs.filter(i => !files.has(i)), sum = chars(todo);
     if (!todo.length) return;
-    if (!confirm(`${todo.length} бөлім үшін ~${sum.toLocaleString('kk')} таңба дауысқа айналады. Бұл қызмет лимитін жейді. Жалғастырамыз ба?`)) return;
+    const local = ttsEngine() === 'issai';
+    if (!confirm(local
+      ? `${todo.length} бөлім (~${sum.toLocaleString('kk')} таңба) осы құрылғыда дыбысталады. Бұл бірнеше минутқа созылуы мүмкін, бетті жаппаңыз.`
+      : `${todo.length} бөлім үшін ~${sum.toLocaleString('kk')} таңба дауысқа айналады. Бұл қызмет лимитін жейді. Жалғастырамыз ба?`)) return;
     Q.running = true; Q.stop = false; drawList();
+    let lock = null; try { lock = await navigator.wakeLock?.request('screen'); } catch { /* қолдамайды */ }
+    if (local && !(await issaiReady())) {
+      if (!confirm(`Алдымен ISSAI моделі (~${ISSAI_MB} МБ) бір рет жүктеледі. Wi-Fi ұсынылады. Жалғастырамыз ба?`)) { Q.running = false; lock?.release(); return drawList(); }
+      try { await issaiInit(f => { if ($('#qf')) { $('#qf').style.width = Math.round(f * 100) + '%'; $('#ql').textContent = `Дауыс моделі жүктелуде: ${Math.round(f * 100)}%`; } }); }
+      catch (err) { toast(err.message); Q.running = false; lock?.release(); return drawList(); }
+    }
     let doneChars = 0, k = 0;
     for (const i of todo) {
       if (Q.stop) break;
@@ -199,7 +236,7 @@ async function showAudio(bookId, versionId) {
         files.set(i, rec); picked.delete(i); doneChars += chs[i].text.length;
       } catch (err) { console.error(err); toast(`${i + 1}-бөлім: ${err.message}`); break; }
     }
-    Q.running = false; toast(Q.stop ? 'Тоқтатылды' : 'Кезек аяқталды');
+    Q.running = false; lock?.release(); toast(Q.stop ? 'Тоқтатылды' : 'Кезек аяқталды');
     if ($('#aList')) drawList();
   };
 
