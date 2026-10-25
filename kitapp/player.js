@@ -24,6 +24,7 @@ async function pLoad(i, pos) {
   P.textFor = -1; P.hl = -1;
   P.rec = await get('audio', `${P.v.id}:${i}`);
   P.mode = P.rec ? 'mp3' : 'tts';
+  if (P.rec) P.has.add(i); else P.has.delete(i);
   if (P.mode === 'mp3') {
     if (P.url) URL.revokeObjectURL(P.url);
     P.url = URL.createObjectURL(P.rec.blob); paud.src = P.url;
@@ -75,7 +76,7 @@ function renderText() {
 
 function speakFrom(k) {
   const vo = getVoices(), voice = vo.find(x => x.voiceURI === localStorage.kVoice) || vo[0];
-  speak(P.parts, { voice, rate: P.rate, from: k, el: paud, onEnd: pEnded, onErr: () => { P.playing = false; pRender(); } });
+  speak(P.parts, { voice, rate: P.rate, from: k, el: paud, onWait: pRender, onEnd: pEnded, onErr: () => { P.playing = false; pRender(); } });
 }
 
 function pPlay() {
@@ -174,7 +175,9 @@ function pRender() {
   if (sheet.hidden) return;
   const sub = curSub();
   $('#psCh').textContent = `${P.i + 1}/${P.chs.length} · ${P.chs[P.i].title}${sub ? ' › ' + sub.title : ''}`;
-  $('#psMode').textContent = P.mode === 'mp3' ? 'mp3 файл' : ttsEngine() === 'issai' ? 'ISSAI дауысы' : 'Браузер дауысы';
+  // бөлім жүктелген бе (mp3, кідіріссіз, интернетсіз) әлде тікелей оқыла ма — бірден көрінсін
+  $('#psMode').innerHTML = P.mode === 'mp3' ? `<span class="au-ok">${ic('check-circle', 14)} Жүктелген · mp3</span>`
+    : `<span class="au-live">${ic('volume', 14)} Жүктелмеген · ${ttsEngine() === 'issai' ? 'ISSAI' : 'браузер'} тікелей оқиды${Sp.wait && P.playing ? ' · дайындалуда…' : ''}</span>`;
   const s = $('#psSeek'); s.max = Math.max(1, Math.round(d)); if (!s.matches(':active')) s.value = Math.round(t);
   s.style.setProperty('--p', (d ? t / d * 100 : 0) + '%');
   $('#psT0').textContent = fmtT(t); $('#psT1').textContent = '-' + fmtT(d - t);
@@ -222,9 +225,13 @@ $('#psSet').onclick = () => { const id = P.b.id; hideSheet(); showAudio(id); };
 // Мазмұн: бөлімдер және олардың ішіндегі тақырыпшалар
 $('#psChs').onclick = $('#psCh').onclick = () => {
   const cs = curSub();
-  sheetList(`Мазмұны · ${P.chs.length} бөлім`, P.chs.map((c, i) => `<button class="lrow ${i === P.i && !cs ? 'now' : ''}" data-i="${i}"><em class="num">${i + 1}</em><span>${esc(c.title)}</span><em>${fmtT(P.durs[i])}</em></button>`
-    + (c.subs || []).map((x, n) => `<button class="lrow sub ${i === P.i && x === cs ? 'now' : ''}" data-i="${i}:${n}"><span>${esc(x.title)}</span></button>`).join('')).join(''),
-  v => { const [i, n] = v.split(':').map(Number); n >= 0 ? pSub(i, n) : pJump(i); });
+  const st = i => P.has.has(i) ? `<i class="au-ok" title="Жүктелген">${ic('check-circle', 16)}</i>` : `<i class="au-live" title="Жүктелмеген">${ic('volume', 16)}</i>`;
+  const n = P.has.size, miss = P.chs.length - n;
+  sheetList(`Мазмұны · ${P.chs.length} бөлім`, `<div class="au-sum"><span class="au-ok">${ic('check-circle', 15)} Жүктелген: ${n}</span><span class="au-live">${ic('volume', 15)} Жүктелмеген: ${miss}</span>
+      ${miss ? `<button class="link" data-i="gen">${ic('download', 15)} Жүктеу</button>` : ''}</div>`
+    + P.chs.map((c, i) => `<button class="lrow ${i === P.i && !cs ? 'now' : ''}" data-i="${i}"><em class="num">${i + 1}</em><span>${esc(c.title)}</span>${st(i)}<em>${fmtT(P.durs[i])}</em></button>`
+    + (c.subs || []).map((x, k) => `<button class="lrow sub ${i === P.i && x === cs ? 'now' : ''}" data-i="${i}:${k}"><span>${esc(x.title)}</span>${st(i)}</button>`).join('')).join(''),
+  v => { if (v === 'gen') { const id = P.b.id, vid = P.v.id; hideSheet(); return showAudio(id, vid); } const [i, k] = v.split(':').map(Number); k >= 0 ? pSub(i, k) : pJump(i); });
 };
 $('#psSleep').onclick = () => sheetList('Ұйқы таймері', SLEEP.map(([k, t]) => `<button class="lrow" data-i="${k}"><span>${t}</span></button>`).join(''), k => {
   P.sleepEnd = k === 'end'; P.sleepAt = k === 'end' || k === '0' ? 0 : Date.now() + k * 60000;
@@ -268,7 +275,7 @@ const Player = {
     if (P.b) pPause();
     b.lastOpened = Date.now(); put('books', b);
     const recs = (await byBook('audio', b.id)).filter(a => a.versionId === v.id);
-    Object.assign(P, { b, v, chs, durs: chs.map((c, i) => recs.find(r => r.ci === i)?.dur || estSecs(c.text)) });
+    Object.assign(P, { b, v, chs, durs: chs.map((c, i) => recs.find(r => r.ci === i)?.dur || estSecs(c.text)), has: new Set(recs.map(r => r.ci)) });
     const at = opts.at && opts.vid === v.id && opts.at.ci < chs.length ? opts.at : null; // бетбелгіден ашу
     const resume = !at && ci == null && saved?.vid === v.id && saved.ci < chs.length;
     await pLoad(at ? at.ci : resume ? saved.ci : (ci || 0), at || (resume ? saved : null));

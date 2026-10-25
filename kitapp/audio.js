@@ -15,7 +15,7 @@ const SILENT = (() => { const n = 400, b = new DataView(new ArrayBuffer(44 + n *
 
 // Мәтінді қысқа бөліктермен оқиды (Chrome ұзақ сөйлемді үзіп тастайды; ISSAI қысқа бөлікті тез дайындайды).
 // ISSAI таңдалса: әр бөлік құрылғыда дыбысталып, плеердің audio элементінде ойнайды; келесісі алдын ала дайындалады.
-function speak(text, { voice, rate, from = 0, onProg, onEnd, onErr, el }) {
+function speak(text, { voice, rate, from = 0, onProg, onEnd, onErr, onWait, el }) {
   stopSpeech();
   const gen = Sp.gen; Sp.parts = Array.isArray(text) ? text : RAG.chunkText(text, 200); // плеер өз бөліктерін береді: белгілеу индекстері сәйкес болсын
   Sp.i = from; Sp.active = true;
@@ -28,7 +28,9 @@ function speak(text, { voice, rate, from = 0, onProg, onEnd, onErr, el }) {
     if (Sp.i >= Sp.parts.length) { Sp.active = false; onEnd?.(); return; }
     if (issai) {
       let blob;
+      Sp.wait = true; onWait?.();
       try { blob = await synth(Sp.i); } catch (e) { if (gen === Sp.gen) { toast('ISSAI: ' + e.message); stopSpeech(); onErr?.(e); } return; }
+      Sp.wait = false; onWait?.();
       if (gen !== Sp.gen) return;
       if (Sp.i + 1 < Sp.parts.length) synth(Sp.i + 1);
       pre.delete(Sp.i - 1);

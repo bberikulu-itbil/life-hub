@@ -422,3 +422,10 @@ dialog.bsheet{margin:auto auto 0;width:100%;max-width:640px;max-height:80vh;bord
 .lrow.sub{padding:.6rem .5rem .6rem 3.1rem;font-size:.94rem;color:var(--mute)}
 .lrow.sub.now span{color:var(--acc);font-weight:600}
 .ps-text h5{margin:1.1rem 0 .4rem;font-size:1rem;font-weight:700}
+/* аудио: бөлім жүктелген (mp3) не жүктелмеген (тікелей оқылады) */
+.au-ok{color:var(--acc)}.au-live{color:var(--mute)}
+.lrow>i.au-ok,.lrow>i.au-live{display:inline-flex;flex:none}
+#psMode span{display:inline-flex;align-items:center;gap:.3rem}
+.au-sum{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem;padding:.2rem 1.1rem .6rem;font-size:.9rem}
+.au-sum span{display:inline-flex;align-items:center;gap:.3rem}
+.au-sum .link{margin-left:auto;display:inline-flex;align-items:center;gap:.3rem}
