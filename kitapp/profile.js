@@ -36,6 +36,7 @@ async function showProfile(section) {
       ${row('speed', 'zap', 'Жылдам оқу', `Бастапқы қарқын ${S2.baseline} сөз/мин · ${Math.min(S2.unlocked, 6)}/6 кезең ашық`)}
       ${row('audio', 'headphones', 'Аудио баптаулары', `${(localStorage.kGender || 'f') === 'm' ? 'Дәулет' : 'Айгүл'} дауысы · ${+(localStorage.kRate || 1)}× жылдамдық`)}
       ${row('convert', 'layers', 'Кітапты өңдеу', `Таза нұсқа жасау · ЖИ тазарту ${localStorage.kAiClean !== '0' ? 'қосулы' : 'өшірулі'}`)}
+      ${row('cloud', 'cloud-up', 'Бұлтқа сақтау', !email ? 'Life Hub-қа кіргенде қосылады' : !cloudOn() ? 'өшірулі' : Cl.err ? 'қате: ' + esc(cloudErr(Cl.err)) : clState().last ? `соңғы синхрондау ${new Date(clState().last).toLocaleString('kk', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}` : 'қосулы')}
       ${row('downloads', 'drive', 'Жүктелгендер және интернетсіз', `${est.usage != null ? size(est.usage) + ' · ' : ''}${vs.length} файл, ${au.length} аудио · ${off ? 'интернетсіз дайын' : 'интернетсіз әлі дайын емес'}`)}
     </div>`;
   $('#pApps').onclick = e => openApps(e.currentTarget);
@@ -65,6 +66,17 @@ async function showProfileSec(key) {
     view.innerHTML = `${pageHead('Аудио баптаулары')}${audioSettingsHTML()}
       <div class="glass sec"><small class="muted">Әр кітаптың mp3 файлдары кітап бетіндегі «Аудио жасау» арқылы жасалады. Жасалған аудио құрылғыда сақталады және интернетсіз тыңдалады.</small></div>`;
     bindAudioSettings();
+  }
+  if (key === 'cloud') {
+    const u = await cloudUser(), s = clState();
+    view.innerHTML = `${pageHead('Бұлтқа сақтау')}
+      <div class="glass sec"><h3>${ic('cloud-up', 18)} Life Hub аккаунты</h3>
+        <p class="muted">${u ? `Кітаптар ${esc(u.email || '')} аккаунтына сақталады: файлдар, мұқаба, оқу орны, бетбелгі, ескертпе, конспект және оқу статистикасы. Басқа құрылғыда кірсеңіз, кітапхана сол күйінде ашылады. Аудио mp3 мен дайындалған мәтін әр құрылғыда бөлек жасалады.` : `Бұлтқа сақтау үшін <a href="../">Life Hub</a>-қа кіріңіз.`}</p>
+        <label class="tgl"><input type="checkbox" id="cOn" ${cloudOn() ? 'checked' : ''}><span>Кітапхананы бұлтпен синхрондау<br><small class="muted">Өзгеріс бірнеше секундтан кейін жіберіледі. Бір файлға 50 МБ шегі бар.</small></span></label>
+        <div class="row"><button class="primary" id="cNow" ${u ? '' : 'disabled'}>${ic('cloud-up', 16)} Қазір синхрондау</button></div>
+        <small class="muted" id="cSt">${Cl.err ? 'Соңғы қате: ' + esc(cloudErr(Cl.err)) : s.last ? 'Соңғы синхрондау: ' + new Date(s.last).toLocaleString('kk') : ''}${s.dirty.length ? ` · жіберуді күтіп тұр: ${s.dirty.length} кітап` : ''}</small></div>`;
+    $('#cOn').onchange = e => { localStorage.kCloudOff = e.target.checked ? '0' : '1'; if (e.target.checked) cloudSync({ manual: true }).then(() => showProfileSec('cloud')); };
+    $('#cNow').onclick = async e => { e.currentTarget.disabled = true; $('#cSt').textContent = 'Синхрондалуда…'; await cloudSync({ manual: true }); if (!Cl.err) toast('Бұлтпен синхрондалды'); showProfileSec('cloud'); };
   }
   if (key === 'convert') {
     view.innerHTML = `${pageHead('Кітапты өңдеу')}

@@ -24,11 +24,12 @@ const openDB = () => new Promise((res, rej) => {
 });
 const rq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 const st = (n, m = 'readonly') => db.transaction(n, m).objectStore(n);
-const put = (n, v) => rq(st(n, 'readwrite').put(v));
+// бұлтқа сақталатын қоймалардағы өзгеріс кітапты «жіберілуі керек» деп белгілейді (cloud.js)
+const put = (n, v) => rq(st(n, 'readwrite').put(v)).then(r => { if (SYNC_STORES.includes(n)) cloudDirty(n === 'books' ? v.id : v.bookId); return r; });
 const get = (n, k) => rq(st(n).get(k));
 const all = n => rq(st(n).getAll());
 const byBook = (n, id) => rq(st(n).index('bookId').getAll(id));
-const del = (n, k) => rq(st(n, 'readwrite').delete(k));
+const del = async (n, k) => { const b = SYNC_STORES.includes(n) && n !== 'books' ? (n === 'konspekt' ? k : (await get(n, k))?.bookId) : null; const r = await rq(st(n, 'readwrite').delete(k)); if (b) cloudDirty(b); return r; };
 
 function toast(t) {
   const el = $('#toast'); el.textContent = t; el.hidden = false;
@@ -481,4 +482,4 @@ $('#nav').onclick = e => {
   scrollTo(0, 0);
 };
 
-addEventListener('DOMContentLoaded', () => openDB().then(showHome));
+addEventListener('DOMContentLoaded', () => openDB().then(showHome).then(autoSync));

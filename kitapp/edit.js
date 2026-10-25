@@ -90,9 +90,9 @@ $('#editForm').onsubmit = async e => {
 
 async function deleteBook(id, after) {
   if (!confirm('Кітап, барлық нұсқасы, конспект, ескертпелер және оқу статистикасы жойылады. Жалғастырамыз ба?')) return;
-  for (const n of ['versions', 'notes', 'sessions', 'drills', 'marks']) for (const r of await byBook(n, id)) await del(n, r.id);
-  if (P.b?.id === id) pStop(); // мини-плеер өшкен кітапты көрсетпесін
-  await dropChunks(id); await del('chats', id); await del('konspekt', id); await del('books', id);
+  await cloudRemove(id); // алдымен бұлттан: кезектегі жіберу кітапты қайта жүктемесін
+  Cl.quiet = true;
+  try { await wipeLocal(id); } finally { Cl.quiet = false; }
   try { delete localStorage['kPlay:' + id]; } catch { /* сақтау өшік */ }
   toast('Кітап өшірілді');
   (after || showLibrary)();
