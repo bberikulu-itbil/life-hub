@@ -382,3 +382,9 @@ dialog.bsheet{margin:auto auto 0;width:100%;max-width:640px;max-height:80vh;bord
 .app b{font-size:.82rem;line-height:1.15}.app small{font-size:.68rem;color:var(--mute)}
 .app.here span{outline:3px solid var(--acc);outline-offset:2px}.app.soon{opacity:.45}
 .goal>.row:first-child{flex-wrap:nowrap;gap:.5rem}.goal>.row:first-child h3{flex:1;min-width:0}.gchip{flex:none}
+
+/* мазмұнды тексеру */
+.rv{display:flex;flex-direction:column;margin-top:.6rem;max-height:60vh;overflow:auto}
+.rv-row{display:flex;align-items:center;gap:.5rem;padding:.5rem 0;border-top:1px solid var(--line)}.rv-row:first-child{border-top:0}
+.rv-row .num{font-style:normal;color:var(--mute);min-width:1.6rem;text-align:right}
+.rv-m{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem}.rv-m input{padding:.4rem .6rem}.rv-m small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.75rem}

@@ -140,3 +140,36 @@ test("goalPlan: daily pace, status against the plan, done and late", () => {
   assert.equal(KS.goalPlan(g, 100, now).status, "done");
   assert.equal(KS.goalPlan({ by: "2026-10-05", set, p0: 0 }, 50, now).status, "late");
 });
+
+test("structure uses a table-of-contents page and its page-number offset to find chapters", () => {
+  const P = (items) => KC.linesFromItems(items);
+  const body = (p, title) => {
+    const items = [];
+    let y = 760;
+    if (title) { items.push(it(title, 150, y, 10)); y -= 40; }       // тақырып мәтінмен бірдей өлшемде
+    for (let k = 0; k < 8; k++, y -= 14) items.push(it(`${LINE} ${"абвгдежзик"[p]}${"абвгдеж"[k]}`, 50, y));
+    items.push(it(String(p + 10), 200, 40, 9));                     // басылған нөмір = физикалық + 10
+    return P(items);
+  };
+  const toc = P([it("МАЗМҰНЫ", 150, 780, 12), it("Кіріспе", 50, 740), it("..............", 120, 740), it("10", 330, 740),
+    it("Бірінші бөлім атауы", 50, 720), it("..............", 160, 720), it("12", 330, 720)]);
+  const pages = [toc, body(0, "КІРІСПЕ"), body(1), body(2, "БІРІНШІ БӨЛІМ АТАУЫ"), body(3)];
+  const r = KC.structure(pages);
+  assert.equal(r.via, "toc");
+  assert.deepEqual(r.chapters.map((c) => c.title), ["Кіріспе", "Бірінші бөлім атауы"]);
+  assert.ok(!r.chapters.flatMap((c) => c.paras).some((p) => /МАЗМҰНЫ|КІРІСПЕ|\.{5}/.test(p)));
+});
+
+test("structure puts a drop cap back at the start of its paragraph", () => {
+  const items = [it("Ұ", 50, 732, 34)];
+  let y = 760;
+  for (let k = 0; k < 6; k++, y -= 14) items.push(it(`${k ? "" : "стаз "}${LINE} ${"абвгде"[k]}`, k < 2 ? 80 : 50, y));
+  const r = KC.structure([KC.linesFromItems(items)]);
+  assert.ok(r.chapters[0].paras[0].startsWith("Ұстаз " + LINE));
+});
+
+test("tidy turns all-caps headings into sentence case", () => {
+  assert.equal(KC.tidy("1-ТАРАУ. ТӘУБЕ ЕТУ"), "1-тарау. Тәубе ету");
+  assert.equal(KC.tidy("АЛҒЫ СӨЗ"), "Алғы сөз");
+  assert.equal(KC.tidy("Абай жолы"), "Абай жолы");
+});

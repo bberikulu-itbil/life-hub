@@ -142,7 +142,7 @@ async function versionMenu(v, anchor) {
   const b = await get('books', v.bookId), k = v.kind || 'other';
   popup(anchor, [
     { a: 'open', icon: 'book-open', text: 'Оқу' },
-    ...(v.kind !== 'clean' ? [{ a: 'conv', icon: 'layers', text: 'Таза нұсқа жасау (EPUB)' }] : []),
+    ...(v.kind !== 'clean' ? [{ a: 'conv', icon: 'layers', text: 'Таза нұсқа жасау (EPUB)' }] : [{ a: 'conv', icon: 'list', text: 'Мазмұнды түзету' }, ...(v.sourceId ? [{ a: 'reconv', icon: 'refresh', text: 'Түпнұсқадан қайта жасау' }] : [])]),
     { a: 'prep', icon: 'refresh', text: isReady(v) ? 'Бөлімдерді қайта бөлу' : 'Бөлімдерге бөлу' },
     { a: 'ren', icon: 'edit', text: 'Атауын өзгерту' },
     { sep: 'Түрі' },
@@ -152,6 +152,7 @@ async function versionMenu(v, anchor) {
   ], async a => {
     if (a === 'open') openReader(b, v);
     if (a === 'conv') showConvert(b, v, () => showBook(b.id));
+    if (a === 'reconv') { const src = await get('versions', v.sourceId); src ? showConvert(b, src, () => showBook(b.id)) : toast('Түпнұсқа файл өшірілген'); }
     if (a === 'prep') renderPrep(b, v, () => showBook(b.id), () => showBook(b.id), 'мәтін');
     if (a === 'ren') { const n = prompt('Нұсқа аты', v.name); if (n) { v.name = n.trim(); await put('versions', v); showBook(b.id); } }
     if (a.startsWith('k:')) { v.kind = a.slice(2); await put('versions', v); showBook(b.id); }

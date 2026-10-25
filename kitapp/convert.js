@@ -30,31 +30,81 @@ async function pdfStructure(v, ctl) {
   } finally { pdf.destroy(); }
 }
 
+// EPUB → тараулар. Мазмұндағы #фрагменттер бір файлдың ішінде де тарауды бөледі;
+// мазмұнда жоқ файл (бөлшектенген кітап) алдыңғы тарауға жалғасады; басындағы мұқаба/титул беттері алынады.
+const BLOCK = 'h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,dd,dt';
 async function epubStructure(v, ctl) {
   const book = ePub(await v.blob.arrayBuffer());
   try {
     await book.ready;
-    const toc = new Map();
-    const walk = list => (list || []).forEach(t => { const h = t.href.split('#')[0]; if (!toc.has(h)) toc.set(h, t.label.trim()); walk(t.subitems); });
+    const toc = new Map(); // файл -> [{ frag, label }]
+    const walk = list => (list || []).forEach(t => {
+      const [h, frag = ''] = t.href.split('#'), file = h.split('/').pop();
+      if (!toc.has(file)) toc.set(file, []);
+      if (!toc.get(file).some(x => x.frag === frag)) toc.get(file).push({ frag, label: t.label.replace(/\s+/g, ' ').trim() });
+      walk(t.subitems);
+    });
     walk(book.navigation?.toc);
-    const items = book.spine.spineItems, chapters = [];
+    const items = book.spine.spineItems, chapters = [], removed = { front: 0 };
+    let started = false; // мазмұндағы бірінші тарауға дейінгі қысқа беттер — мұқаба, титул
     for (let i = 0; i < items.length; i++) {
       if (ctl.stopped) throw STOP;
       const root = await items[i].load(book.load.bind(book));
-      const els = [...root.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,blockquote,pre')].filter(e => !e.parentElement.closest('p,li,blockquote'));
-      const paras = []; let title = toc.get(items[i].href) || '';
-      for (const e of els) {
+      const marks = toc.get(items[i].href.split('/').pop()) || [], byFrag = new Map(marks.filter(m => m.frag).map(m => [m.frag, m.label]));
+      const fileLabel = marks.find(m => !m.frag)?.label;
+      let cur = null;
+      const open = (title, fromToc) => { cur = { title, paras: [], fromToc }; chapters.push(cur); if (fromToc) started = true; };
+      if (fileLabel) open(fileLabel, true);
+      for (const e of root.querySelectorAll('*')) {
+        const id = e.id || e.getAttribute('name');
+        if (id && byFrag.has(id)) { open(byFrag.get(id), true); byFrag.delete(id); }
+        if (!e.matches(BLOCK) || e.parentElement?.closest(BLOCK)) continue;
         const t = e.textContent.replace(/\s+/g, ' ').trim(); if (!t) continue;
-        if (/^H[1-3]$/.test(e.tagName) && !title) { title = t; continue; }
-        if (/^H/.test(e.tagName) && t === title) continue;
-        paras.push(t);
+        const isHead = /^H[1-6]$/.test(e.tagName);
+        if (!cur) { if (isHead && /^H[1-3]$/.test(e.tagName) && t.length < 150) { open(t, false); continue; } else open(null, false); }
+        if (isHead && (!cur.paras.length) && (!cur.title || KC.tidy(t).toLowerCase() === KC.tidy(cur.title).toLowerCase() || t.length < 150)) { if (!cur.title) cur.title = t; else if (tkey(t) !== tkey(cur.title) && !cur.fromToc) cur.title += '. ' + t; continue; }
+        if (i < 4 && !started && /ISBN|©|баспасы|издательство|all rights reserved/i.test(t)) { removed.front++; continue; }
+        cur.paras.push(t);
       }
-      if (!els.length) paras.push(...(root.textContent || '').split(/\n\s*\n/).map(s => s.replace(/\s+/g, ' ').trim()).filter(Boolean));
-      if (paras.length) chapters.push({ title: title || `Бөлім ${chapters.length + 1}`, paras });
-      items[i].unload(); ctl.prog((i + 1) / items.length * .5, `Бөлім ${i + 1} / ${items.length}`);
+      if (!root.querySelector(BLOCK)) { const ps = (root.textContent || '').split(/\n\s*\n/).map(x => x.replace(/\s+/g, ' ').trim()).filter(Boolean); if (ps.length) { if (!cur) open(null, false); cur.paras.push(...ps); } }
+      items[i].unload(); ctl.prog((i + 1) / items.length * .5, `Файл ${i + 1} / ${items.length}`);
     }
-    return { chapters, removed: {} };
+    // аты жоқ бөлшектер алдыңғы тарауға жалғасады; кітап басындағы қысқа беттер алынады
+    const out = [];
+    for (const c of chapters) {
+      if (!c.paras.length) continue;
+      if (!c.title && out.length) { out[out.length - 1].paras.push(...c.paras); continue; }
+      if (!c.fromToc && !out.length && c.paras.join(' ').length < 400 && chapters.some(x => x.fromToc)) { removed.front += c.paras.length; continue; }
+      out.push({ title: KC.tidy(c.title || 'Басы'), paras: c.paras });
+    }
+    return { chapters: out.length ? out : chapters.filter(c => c.paras.length).map(c => ({ title: c.title || 'Басы', paras: c.paras })), removed, via: toc.size ? 'toc' : 'headings' };
   } finally { book.destroy(); }
+}
+const tkey = t => String(t || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+
+/* ---------- Мазмұнды тексеру: тарау атын өзгерту, алдыңғыға қосу, өшіру ---------- */
+const VIA = { toc: 'кітаптың мазмұн беті бойынша', outline: 'PDF бетбелгілері бойынша', headings: 'тақырыптар бойынша', size: 'тақырып табылмады, көлемі бойынша бөлінді' };
+function reviewChapters(st, box) {
+  return new Promise(resolve => {
+    const draw = () => {
+      box.innerHTML = `<div class="glass sec"><h3>${ic('list', 18)} Мазмұнды тексер · ${st.chapters.length} тарау</h3>
+        <small class="muted">Тараулар ${VIA[st.via] || 'анықталды'}. Атауын түзе, артық бөлімді өшір немесе алдыңғысына қос.</small>
+        <div class="rv">${st.chapters.map((c, i) => `<div class="rv-row" data-i="${i}"><em class="num">${i + 1}</em>
+          <div class="rv-m"><input value="${esc(c.title)}" aria-label="Тарау атауы"><small class="muted">${c.paras.join(' ').split(/\s+/).length.toLocaleString('kk')} сөз · ${esc(c.paras[0]?.slice(0, 80) || '')}…</small></div>
+          ${i ? `<button class="icon-btn" data-a="up" title="Алдыңғы тарауға қосу" aria-label="Алдыңғы тарауға қосу">${ic('layers', 17)}</button>` : ''}
+          <button class="icon-btn danger" data-a="del" aria-label="Өшіру">${ic('trash', 17)}</button></div>`).join('')}</div>
+        <button class="primary big" id="rvOk" style="width:100%;margin-top:.8rem">${ic('check', 18)} Жалғастыру</button></div>`;
+      box.querySelector('#rvOk').onclick = () => { box.innerHTML = ''; resolve(); };
+    };
+    box.oninput = e => { const r = e.target.closest('[data-i]'); if (r && e.target.tagName === 'INPUT') st.chapters[+r.dataset.i].title = e.target.value.trim() || st.chapters[+r.dataset.i].title; };
+    box.onclick = e => {
+      const a = e.target.closest('[data-a]')?.dataset.a, i = +e.target.closest('[data-i]')?.dataset.i; if (!a) return;
+      if (a === 'up') { st.chapters[i - 1].paras.push(...st.chapters[i].paras); st.chapters.splice(i, 1); }
+      if (a === 'del') { if (st.chapters.length < 2 || !confirm(`«${st.chapters[i].title}» бөлімі таза нұсқаға кірмейді.`)) return; st.chapters.splice(i, 1); }
+      draw();
+    };
+    draw();
+  });
 }
 
 // Әр тарауды ~9000 таңбалық бөліктермен ЖИ-ге жібереді. Жауап түпнұсқадан тым қысқа/ұзын болса — сол бөлікке тимейді.
@@ -114,15 +164,16 @@ async function autoConvert(b, then) {
   const vs = await byBook('versions', b.id);
   if (vs.some(v => v.kind === 'clean')) return then();
   const aiOn = localStorage.kAiClean !== '0' && !!(await sb.auth.getSession()).data.session;
-  const src = vs.find(v => v.type === 'pdf') || (aiOn && vs.find(v => v.type === 'epub'));
+  // PDF әрқашан; EPUB-тың да мазмұны мен артық беттері түзеледі
+  const src = vs.find(v => v.type === 'pdf') || vs.find(v => v.type === 'epub');
   return src ? showConvert(b, src, then) : then();
 }
 
 async function showConvert(b, v, done) {
   setNav('lib'); view.dataset.page = 'convert';
   const session = (await sb.auth.getSession()).data.session;
-  const ai = localStorage.kAiClean !== '0' && !!session;
-  const steps = [['read', 'Мәтінді оқу және тазарту'], ...(ai ? [['ai', 'ЖИ-мен қосымша тазарту']] : []), ['epub', 'EPUB кітап жасау'], ['index', 'Бөлімдерге бөлу']];
+  const ai = localStorage.kAiClean !== '0' && !!session && v.kind !== 'clean'; // таза нұсқаның мазмұнын түзегенде ЖИ қайта жүрмейді
+  const steps = [['read', 'Мәтінді оқу және тазарту'], ['review', 'Мазмұнды тексеру'], ...(ai ? [['ai', 'ЖИ-мен қосымша тазарту']] : []), ['epub', 'EPUB кітап жасау'], ['index', 'Бөлімдерге бөлу']];
   const ctl = { stopped: false, prog(f, label) { if (!$('#cf')) return; $('#cf').style.width = Math.round(f * 100) + '%'; $('#cl').textContent = `${label} · ${Math.round(f * 100)}%`; } };
   const mark = (k, st) => { const el = view.querySelector(`[data-step="${k}"]`); if (el) el.className = 'step ' + st; };
   view.innerHTML = `<header class="hd"><h1>Таза нұсқа</h1></header>
@@ -132,14 +183,17 @@ async function showConvert(b, v, done) {
       <div class="prog"><i id="cf"></i></div><small id="cl" class="muted">Басталуда…</small>
       ${ai ? '' : `<p class="muted" style="margin-top:.6rem">${ic('info', 14)} ${session ? 'ЖИ тазарту Профильде өшірулі.' : 'ЖИ тазарту үшін Life Hub-қа кір; әзірге тек жергілікті тазарту жасалады.'}</p>`}
       <div class="row end" style="margin-top:.6rem"><button id="cStop">${ic('x', 16)} Тоқтату</button></div></div>
-    <div id="cRes"></div>`;
+    <div id="cRev"></div><div id="cRes"></div>`;
   $('#cStop').onclick = () => { ctl.stopped = true; done(); };
   try {
     mark('read', 'run');
     const st = v.type === 'pdf' ? await pdfStructure(v, ctl) : await epubStructure(v, ctl);
     const chars = st.chapters.reduce((a, c) => a + c.paras.join('').length, 0);
     if (chars < 200) throw new Error('Файлдан мәтін табылмады. Бұл скан PDF болуы мүмкін: оған OCR (суреттен мәтін оқу) керек, ол әзірге жоқ.');
-    mark('read', 'ok');
+    mark('read', 'ok'); mark('review', 'run'); ctl.prog(.5, 'Мазмұнды тексер');
+    await reviewChapters(st, $('#cRev'));
+    if (ctl.stopped) return;
+    mark('review', 'ok');
     let aiRes = null;
     if (ai) {
       mark('ai', 'run');

@@ -31,6 +31,7 @@ async function readFileInfo(v) {
   } else {
     const book = ePub(buf);
     try {
+      await book.ready.catch(() => {}); // толық жүктелмей жабылса, epub.js фондағы сұрауларда қате шығарады
       const m = await book.loaded.metadata;
       Object.assign(meta, { title: m.title, author: m.creator, publisher: m.publisher, lang: (m.language || '').slice(0, 2), summary: stripHtml(m.description) });
       const y = String(m.pubdate || '').match(/\d{4}/); if (y) meta.year = +y[0];
