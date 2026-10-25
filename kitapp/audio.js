@@ -1,22 +1,44 @@
 'use strict';
-/* Kitapp: аудио. Екі жол: (1) браузердің ішкі дауысы (файлсыз), (2) бұлттық дауыс: бөлім бойынша mp3 жасап, құрылғыда сақтау. */
+/* Kitapp: аудио. mp3 жоқ бөлім таңдалған дауыспен тікелей оқылады (ISSAI не браузер); «Аудио жасау» бөлімдерді ISSAI-мен mp3 етіп сақтайды. */
 
 const Sp = { gen: 0, i: 0, parts: [], active: false };
 const speechOK = 'speechSynthesis' in window;
 const TTS_MIN_CHARS = 600; // бұдан қысқа бөлім келесімен біріктіріледі (мысалы, «Мазмұны»)
 
-function stopSpeech() { Sp.gen++; Sp.active = false; if (speechOK) speechSynthesis.cancel(); }
+function stopSpeech() { Sp.gen++; Sp.active = false; if (speechOK) speechSynthesis.cancel(); if (Sp.au) { Sp.au.pause(); Sp.au = null; } }
 
-// Chrome ұзақ сөйлемді ортасында үзіп тастайды, сондықтан мәтінді қысқа бөліктермен оқимыз.
-function speak(text, { voice, rate, from = 0, onProg, onEnd }) {
+// 0.05 с үнсіздік: iOS дыбысты тек батырма басылған сәтте рұқсат етеді, сол сәтте элементті «ашып» қоямыз
+const SILENT = (() => { const n = 400, b = new DataView(new ArrayBuffer(44 + n * 2)), w = (o, s) => [...s].forEach((c, i) => b.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); b.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 1, true);
+  b.setUint32(24, 8000, true); b.setUint32(28, 16000, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true); w(36, 'data'); b.setUint32(40, n * 2, true);
+  return URL.createObjectURL(new Blob([b], { type: 'audio/wav' })); })();
+
+// Мәтінді қысқа бөліктермен оқиды (Chrome ұзақ сөйлемді үзіп тастайды; ISSAI қысқа бөлікті тез дайындайды).
+// ISSAI таңдалса: әр бөлік құрылғыда дыбысталып, плеердің audio элементінде ойнайды; келесісі алдын ала дайындалады.
+function speak(text, { voice, rate, from = 0, onProg, onEnd, onErr, el }) {
   stopSpeech();
-  const gen = Sp.gen; Sp.parts = Array.isArray(text) ? text : RAG.chunkText(text, 200); // плеер өз бөліктерін береді: белгілеу индекстері сәйкес болсын Sp.i = from; Sp.active = true;
-  const next = () => {
+  const gen = Sp.gen; Sp.parts = Array.isArray(text) ? text : RAG.chunkText(text, 200); // плеер өз бөліктерін береді: белгілеу индекстері сәйкес болсын
+  Sp.i = from; Sp.active = true;
+  const step = () => { if (gen !== Sp.gen) return; Sp.i++; onProg?.(Sp.i / Sp.parts.length); next(); };
+  const issai = ttsEngine() === 'issai', au = issai ? (Sp.au = el || (Sp.own ??= new Audio())) : null, pre = new Map();
+  const synth = i => { if (!pre.has(i)) pre.set(i, issaiSample(Sp.parts[i])); return pre.get(i); };
+  if (au) { au.src = SILENT; au.play().catch(() => {}); }
+  const next = async () => {
     if (gen !== Sp.gen) return;
     if (Sp.i >= Sp.parts.length) { Sp.active = false; onEnd?.(); return; }
+    if (issai) {
+      let blob;
+      try { blob = await synth(Sp.i); } catch (e) { if (gen === Sp.gen) { toast('ISSAI: ' + e.message); stopSpeech(); onErr?.(e); } return; }
+      if (gen !== Sp.gen) return;
+      if (Sp.i + 1 < Sp.parts.length) synth(Sp.i + 1);
+      pre.delete(Sp.i - 1);
+      if (au.src.startsWith('blob:') && au.src !== SILENT) URL.revokeObjectURL(au.src);
+      au.src = URL.createObjectURL(blob); au.playbackRate = rate; au.addEventListener('ended', step, { once: true }); // onended-ке тимейміз: оны плеердің mp3 режимі қолданады
+      au.play().catch(e => { if (gen === Sp.gen) { toast('Дыбыс ойнамады: ' + e.message); stopSpeech(); onErr?.(e); } });
+      return;
+    }
     const u = new SpeechSynthesisUtterance(Sp.parts[Sp.i]);
     u.rate = rate; u.lang = voice?.lang || 'kk-KZ'; if (voice) u.voice = voice;
-    const step = () => { if (gen !== Sp.gen) return; Sp.i++; onProg?.(Sp.i / Sp.parts.length); next(); };
     u.onend = step; u.onerror = step;
     speechSynthesis.speak(u);
   };
@@ -52,28 +74,6 @@ async function audioChapters(v) {
 
 const fileName = (b, i, c) => `${b.title} - ${i + 1}. ${c.title}`.replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 120) + '.mp3';
 
-// Бір бөлікті (<=3500 таңба) дыбыстау: уақытша қатеде 3 рет қайталайды, 4xx қатеде бірден тоқтайды.
-async function ttsPiece(text, gender) {
-  let last;
-  for (let a = 0; a < 3; a++) {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) throw new Error('Алдымен Life Hub-қа кір');
-    try {
-      const res = await fetch(`${SB_URL}/functions/v1/book-tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}`, apikey: SB_KEY },
-        body: JSON.stringify({ text, gender }),
-      });
-      if (res.ok) return await res.blob();
-      const msg = (await res.json().catch(() => ({}))).error || `HTTP ${res.status}`;
-      if (res.status < 500 && res.status !== 429) throw Object.assign(new Error(msg), { fatal: true });
-      last = new Error(msg);
-    } catch (e) { if (e.fatal) throw e; last = e; }
-    await sleep(1500 * (a + 1));
-  }
-  throw last;
-}
-
 // mp3 ұзақтығы (секунд); анықталмаса 0.
 const blobDuration = blob => new Promise(r => {
   const a = new Audio(), u = URL.createObjectURL(blob), fin = d => { URL.revokeObjectURL(u); r(isFinite(d) ? d : 0); };
@@ -81,22 +81,10 @@ const blobDuration = blob => new Promise(r => {
   setTimeout(() => fin(0), 8000);
 });
 
-async function genAudio(v, ci, text, gender, onProg, ctl) {
-  if (ttsEngine() === 'issai') {
-    const blob = await issaiChapter(text, onProg, ctl);
-    if (!blob) return null;
-    const rec = { id: `${v.id}:${ci}`, bookId: v.bookId, versionId: v.id, ci, gender: 'issai:' + issaiSpeaker(), created: Date.now(), blob, dur: await blobDuration(blob) };
-    await put('audio', rec);
-    return rec;
-  }
-  const pieces = RAG.chunkText(text, 3500), blobs = [];
-  for (let i = 0; i < pieces.length; i++) {
-    if (ctl?.stop) return null;
-    onProg(i / pieces.length, `${i + 1}/${pieces.length}`);
-    blobs.push(await ttsPiece(pieces[i], gender));
-  }
-  const blob = new Blob(blobs, { type: 'audio/mpeg' });
-  const rec = { id: `${v.id}:${ci}`, bookId: v.bookId, versionId: v.id, ci, gender, created: Date.now(), blob, dur: await blobDuration(blob) };
+async function genAudio(v, ci, text, onProg, ctl) {
+  const blob = await issaiChapter(text, onProg, ctl);
+  if (!blob) return null;
+  const rec = { id: `${v.id}:${ci}`, bookId: v.bookId, versionId: v.id, ci, gender: 'issai:' + issaiSpeaker(), created: Date.now(), blob, dur: await blobDuration(blob) };
   await put('audio', rec);
   return rec;
 }
@@ -106,27 +94,22 @@ function saveBlob(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-/* ---------- Аудио баптаулары (Профильде): дауыстар және әдепкі жылдамдық ---------- */
+/* ---------- Аудио баптаулары (Профильде): бір дауыс таңдауы және жылдамдық ---------- */
+const voiceLabel = () => ttsEngine() === 'issai' ? `ISSAI · ${ISSAI_VOICES.find(x => x[0] === issaiSpeaker())?.[1] || ''}` : `Браузер · ${getVoices().find(x => x.voiceURI === localStorage.kVoice)?.name || 'әдепкі'}`;
 function audioSettingsHTML() {
-  const g = localStorage.kGender || 'f', r = +(localStorage.kRate || 1);
-  return `<div class="glass sec" id="audioSet"><h3>${ic('headphones', 18)} Аудио баптаулары</h3>
-    <small class="muted">Бөлімнің mp3 файлы болса, плеер соны ойнатады; болмаса браузер дауысымен оқиды.</small>
+  const r = +(localStorage.kRate || 1);
+  return `<div class="glass sec" id="audioSet"><h3>${ic('headphones', 18)} Дауыс</h3>
+    <small class="muted">Таңдалған дауыс кітапты тыңдағанда да, «Аудио жасау» кезінде де қолданылады. mp3 файлдарды тек ISSAI жасайды.</small>
     <div class="fgrid">
-      <label>mp3 жасайтын қозғалтқыш <select id="aEng"><option value="issai" ${ttsEngine() === 'issai' ? 'selected' : ''}>ISSAI қазақ дауысы (құрылғыда, тегін)</option><option value="cloud" ${ttsEngine() === 'cloud' ? 'selected' : ''}>Бұлттық дауыс (Azure)</option></select></label>
-      <label>ISSAI дикторы <select id="aSpk">${ISSAI_VOICES.map(([i, n]) => `<option value="${i}" ${i === issaiSpeaker() ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
-      <label>Бұлттық дауыс (mp3 жасау) <select id="aGender"><option value="f" ${g === 'f' ? 'selected' : ''}>Әйел (Айгүл)</option><option value="m" ${g === 'm' ? 'selected' : ''}>Ер (Дәулет)</option></select></label>
-      <label>Браузер дауысы (файлсыз) <select id="aVoice"></select></label>
+      <label>Дауыс <select id="aVoiceSel"></select></label>
       <label>Тыңдау жылдамдығы <select id="aRate">${RATES.map(x => `<option value="${x}" ${x === r ? 'selected' : ''}>${x}×</option>`).join('')}</select></label>
     </div>
-    <div class="glass sec" id="aIssai"><small class="muted">ISSAI моделі тексерілуде…</small></div>
-    <div class="row"><button id="aTry">${ic('play', 16)} Таңдалған дауысты тыңдап көру</button><button id="aTryB">${ic('volume', 16)} Браузер дауысын тыңдау</button></div>
-    <small id="aVoiceNote" class="muted"></small></div>`;
+    <div class="row"><button class="primary" id="aTry">${ic('play', 16)} Тыңдап көру</button></div>
+    <small id="aVoiceNote" class="muted"></small></div>
+    <div class="glass sec" id="aIssai"><small class="muted">ISSAI моделі тексерілуде…</small></div>`;
 }
 function bindAudioSettings() {
   const SAMPLE = 'Сәлеметсіз бе! Бұл Kitapp қосымшасының дауысы. Кітапты тыңдауға дайынбыз.';
-  $('#aGender').onchange = e => localStorage.kGender = e.target.value;
-  $('#aEng').onchange = e => localStorage.kTtsEngine = e.target.value;
-  $('#aSpk').onchange = e => localStorage.kIssaiSpk = e.target.value;
   const drawIssai = async () => {
     const el = $('#aIssai'); if (!el) return;
     const ok = await issaiReady();
@@ -141,24 +124,29 @@ function bindAudioSettings() {
     });
   };
   drawIssai();
-  $('#aRate').onchange = e => { localStorage.kRate = e.target.value; P.rate = +e.target.value; paud.playbackRate = P.rate; };
   const fill = () => {
-    if (!$('#aVoice')) return;
-    const vl = getVoices();
-    $('#aVoice').innerHTML = vl.length ? vl.map(x => `<option value="${esc(x.voiceURI)}" ${x.voiceURI === localStorage.kVoice ? 'selected' : ''}>${esc(x.name)} (${esc(x.lang)})</option>`).join('') : '<option>Дауыс табылмады</option>';
-    $('#aVoiceNote').textContent = vl.some(x => x.lang.toLowerCase().startsWith('kk')) ? '' : 'Бұл құрылғыда қазақ браузер дауысы жоқ: mp3 жоқ бөлімдер түрік не орыс дауысымен нашар оқылады. Сапалы нәтиже үшін кітап бетінен «Аудио жасау» арқылы mp3 жаса.';
+    const sel = $('#aVoiceSel'); if (!sel) return;
+    const vl = getVoices(), cur = ttsEngine() === 'issai' ? 'i:' + issaiSpeaker() : 'b:' + (localStorage.kVoice || '');
+    sel.innerHTML = `<optgroup label="ISSAI қазақ дауысы (құрылғыда, тегін)">${ISSAI_VOICES.map(([i, n]) => `<option value="i:${i}">${n}</option>`).join('')}</optgroup>`
+      + (vl.length ? `<optgroup label="Браузер дауысы">${vl.map(x => `<option value="b:${esc(x.voiceURI)}">${esc(x.name)} (${esc(x.lang)})</option>`).join('')}</optgroup>` : '');
+    sel.value = cur; if (sel.selectedIndex < 0) sel.selectedIndex = 0;
+    $('#aVoiceNote').textContent = ttsEngine() === 'browser' && !vl.some(x => x.lang.toLowerCase().startsWith('kk')) ? 'Бұл құрылғыда қазақ браузер дауысы жоқ: мәтін түрік не орыс дауысымен нашар оқылады. ISSAI дауысын таңдаған дұрыс.' : '';
   };
   fill();
   if (speechOK) speechSynthesis.onvoiceschanged = fill;
-  $('#aVoice').onchange = e => localStorage.kVoice = e.target.value;
-  $('#aTryB').onclick = () => { const vo = getVoices(); if (!vo.length) return toast('Браузер дауысы табылмады'); speak(SAMPLE, { voice: vo.find(x => x.voiceURI === localStorage.kVoice) || vo[0], rate: +(localStorage.kRate || 1) }); };
-  $('#aTry').onclick = async e => {
-    const btn = e.currentTarget; btn.disabled = true;
-    try {
-      if (ttsEngine() === 'issai' && !(await issaiReady()) && !confirm(`ISSAI моделі (~${ISSAI_MB} МБ) бір рет жүктеледі. Жалғастырамыз ба?`)) throw new Error('Бас тартылды');
-      const a = new Audio(URL.createObjectURL(ttsEngine() === 'issai' ? await issaiSample(SAMPLE) : await ttsPiece(SAMPLE, localStorage.kGender || 'f'))); a.playbackRate = +(localStorage.kRate || 1); a.play(); }
-    catch (err) { toast(err.message); }
-    btn.disabled = false; drawIssai();
+  $('#aVoiceSel').onchange = e => {
+    const [k, v] = [e.target.value.slice(0, 1), e.target.value.slice(2)];
+    if (k === 'i') { localStorage.kTtsEngine = 'issai'; localStorage.kIssaiSpk = v; } else { localStorage.kTtsEngine = 'browser'; localStorage.kVoice = v; }
+    if (P.playing && P.mode === 'tts') speakFrom(Sp.i); // ойнап тұрса, жаңа дауыспен жалғасады
+    fill();
+  };
+  $('#aRate').onchange = e => { localStorage.kRate = e.target.value; P.rate = +e.target.value; paud.playbackRate = P.rate; };
+  $('#aTry').onclick = () => {
+    if (P.playing) pPause();
+    if (ttsEngine() === 'issai' && !issaiHave && !confirm(`ISSAI моделі (~${ISSAI_MB} МБ) бір рет жүктеледі. Жалғастырамыз ба?`)) return;
+    const vo = getVoices();
+    if (ttsEngine() === 'browser' && !vo.length) return toast('Браузер дауысы табылмады');
+    speak(SAMPLE, { voice: vo.find(x => x.voiceURI === localStorage.kVoice) || vo[0], rate: +(localStorage.kRate || 1), onEnd: drawIssai, onErr: drawIssai });
   };
 }
 
@@ -173,7 +161,6 @@ async function showAudio(bookId, versionId) {
   const vs = (await byBook('versions', bookId)).filter(isReady);
   const chs = await audioChapters(v);
   const files = new Map((await byBook('audio', bookId)).filter(a => a.versionId === v.id && a.ci < chs.length).map(a => [a.ci, a]));
-  const gender = localStorage.kGender || 'f';
   const picked = new Set(), Q = { running: false, stop: false };
   const dur = i => files.get(i)?.dur || estSecs(chs[i].text);
   const total = chs.reduce((a, _, i) => a + dur(i), 0);
@@ -185,7 +172,7 @@ async function showAudio(bookId, versionId) {
       <small>${chs.length} бөлім · ${fmtT(total)} · ${files.size}/${chs.length} mp3 дайын</small>
       <button class="primary" id="aListen">${ic('headphones', 18)} Тыңдау</button></div></div>
     ${vs.length > 1 ? `<label>Нұсқа <select id="aVer">${vs.map(x => `<option value="${x.id}" ${x.id === v.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>` : ''}
-    <div class="glass sec row" style="justify-content:space-between"><small class="muted">${ic('volume', 15)} ${ttsEngine() === 'issai' ? `ISSAI: ${ISSAI_VOICES.find(x => x[0] === issaiSpeaker())?.[1] || ''}, құрылғыда, тегін` : `Бұлттық дауыс: ${gender === 'm' ? 'Ер (Дәулет)' : 'Әйел (Айгүл)'}`}. Дауыстар Профильде өзгертіледі.</small>
+    <div class="glass sec row" style="justify-content:space-between"><small class="muted">${ic('volume', 15)} mp3 дауысы: ISSAI · ${ISSAI_VOICES.find(x => x[0] === issaiSpeaker())?.[1] || ''} (құрылғыда, тегін). Дауыс Профильде өзгертіледі.</small>
       <button class="ghost" id="aVoices">${ic('sliders', 16)} Аудио баптаулары</button></div>
     <div class="glass sec" id="aList"></div>`;
 
@@ -219,13 +206,10 @@ async function showAudio(bookId, versionId) {
   const runQueue = async idxs => {
     const todo = idxs.filter(i => !files.has(i)), sum = chars(todo);
     if (!todo.length) return;
-    const local = ttsEngine() === 'issai';
-    if (!confirm(local
-      ? `${todo.length} бөлім (~${sum.toLocaleString('kk')} таңба) осы құрылғыда дыбысталады. Бұл бірнеше минутқа созылуы мүмкін, бетті жаппаңыз.`
-      : `${todo.length} бөлім үшін ~${sum.toLocaleString('kk')} таңба дауысқа айналады. Бұл қызмет лимитін жейді. Жалғастырамыз ба?`)) return;
+    if (!confirm(`${todo.length} бөлім (~${sum.toLocaleString('kk')} таңба) ISSAI дауысымен осы құрылғыда дыбысталады. Бұл бірнеше минутқа созылуы мүмкін, бетті жаппаңыз.`)) return;
     Q.running = true; Q.stop = false; drawList();
     let lock = null; try { lock = await navigator.wakeLock?.request('screen'); } catch { /* қолдамайды */ }
-    if (local && !(await issaiReady())) {
+    if (!(await issaiReady())) {
       if (!confirm(`Алдымен ISSAI моделі (~${ISSAI_MB} МБ) бір рет жүктеледі. Wi-Fi ұсынылады. Жалғастырамыз ба?`)) { Q.running = false; lock?.release(); return drawList(); }
       try { await issaiInit(f => { if ($('#qf')) { $('#qf').style.width = Math.round(f * 100) + '%'; $('#ql').textContent = `Дауыс моделі жүктелуде: ${Math.round(f * 100)}%`; } }); }
       catch (err) { toast(err.message); Q.running = false; lock?.release(); return drawList(); }
@@ -235,7 +219,7 @@ async function showAudio(bookId, versionId) {
       if (Q.stop) break;
       k++;
       try {
-        const rec = await genAudio(v, i, chs[i].text, gender, (f, l) => {
+        const rec = await genAudio(v, i, chs[i].text, (f, l) => {
           if (!$('#qf')) return;
           $('#qf').style.width = Math.round((doneChars + chs[i].text.length * f) / sum * 100) + '%';
           $('#ql').textContent = `${k}/${todo.length} бөлім, «${chs[i].title}» ${l}`;

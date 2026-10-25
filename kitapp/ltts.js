@@ -7,7 +7,9 @@ const ISSAI_MODEL_URL = 'https://huggingface.co/diffusionstudio/piper-voices/res
 const ISSAI_MB = 128;
 // speaker_id_map: модельдің ішкі нөмірлері
 const ISSAI_VOICES = [[3, 'Рая (әйел)'], [1, 'Исеке (ер)'], [4, 'Әйел дауысы 2'], [5, 'Әйел дауысы 3'], [2, 'Әйел дауысы 4'], [0, 'Ер дауысы 2']];
-const ttsEngine = () => localStorage.kTtsEngine || 'issai';
+// Бір таңдау: ISSAI дикторы (әдепкі) немесе браузер дауысы. mp3 файлдарды әрқашан ISSAI жасайды.
+const ttsEngine = () => localStorage.kTtsEngine === 'browser' ? 'browser' : 'issai';
+let issaiHave = false; // модель құрылғыда бар ма (батырма басылған сәтте синхронды тексеру үшін)
 const issaiSpeaker = () => +(localStorage.kIssaiSpk ?? 3);
 
 let ttsW = null, ttsSeq = 0;
@@ -28,12 +30,13 @@ function ttsWorker() {
 }
 const ttsCall = (msg, transfer) => new Promise((res, rej) => { const id = ++ttsSeq; ttsWait.set(id, { res, rej }); ttsWorker().postMessage({ ...msg, id }, transfer || []); });
 
-async function issaiReady() { try { return !!(await (await caches.open('kitapp-tts-models')).match(ISSAI_MODEL_URL)); } catch { return false; } }
-async function issaiRemove() { try { await (await caches.open('kitapp-tts-models')).delete(ISSAI_MODEL_URL); } catch { /* жоқ */ } ttsW?.terminate(); ttsW = null; }
+async function issaiReady() { try { return issaiHave = !!(await (await caches.open('kitapp-tts-models')).match(ISSAI_MODEL_URL)); } catch { return false; } }
+issaiReady();
+async function issaiRemove() { issaiHave = false; try { await (await caches.open('kitapp-tts-models')).delete(ISSAI_MODEL_URL); } catch { /* жоқ */ } ttsW?.terminate(); ttsW = null; }
 // Модельді жүктеп, іске қосу. onProg(0..1)
 async function issaiInit(onProg) {
   onModelDl = (l, t) => onProg?.(t ? l / t : 0);
-  try { await ttsCall({ t: 'init' }); } finally { onModelDl = null; }
+  try { await ttsCall({ t: 'init' }); issaiHave = true; } finally { onModelDl = null; }
 }
 
 // lamejs mp3 кодері: бірінші қажет болғанда жүктеледі

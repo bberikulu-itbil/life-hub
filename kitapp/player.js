@@ -75,12 +75,16 @@ function renderText() {
 
 function speakFrom(k) {
   const vo = getVoices(), voice = vo.find(x => x.voiceURI === localStorage.kVoice) || vo[0];
-  speak(P.parts, { voice, rate: P.rate, from: k, onEnd: pEnded });
+  speak(P.parts, { voice, rate: P.rate, from: k, el: paud, onEnd: pEnded, onErr: () => { P.playing = false; pRender(); } });
 }
 
 function pPlay() {
   if (!P.b) return;
-  if (P.mode === 'tts' && (!speechOK || !getVoices().length)) { toast('Бұл бөлімнің mp3 файлы жоқ, ал браузер дауысы табылмады. Кітап бетінен «Аудио жасау» арқылы mp3 жаса.'); pRender(); return; }
+  if (P.mode === 'tts' && ttsEngine() === 'browser' && (!speechOK || !getVoices().length)) { toast('Браузер дауысы табылмады. Профильде ISSAI дауысын таңдаңыз.'); pRender(); return; }
+  if (P.mode === 'tts' && ttsEngine() === 'issai' && !issaiHave) {
+    if (!confirm(`ISSAI қазақ дауысының моделі (~${ISSAI_MB} МБ) бір рет жүктеледі, содан кейін интернетсіз жұмыс істейді. Жүктейміз бе?`)) return;
+    toast('ISSAI дауысы жүктелуде… Бірінші сөйлем біраздан кейін басталады');
+  }
   P.playing = true;
   if (P.mode === 'mp3') paud.play().catch(() => { P.playing = false; pRender(); });
   else speakFrom(Sp.i);
@@ -170,7 +174,7 @@ function pRender() {
   if (sheet.hidden) return;
   const sub = curSub();
   $('#psCh').textContent = `${P.i + 1}/${P.chs.length} · ${P.chs[P.i].title}${sub ? ' › ' + sub.title : ''}`;
-  $('#psMode').textContent = P.mode === 'mp3' ? 'mp3 файл' : 'Браузер дауысы';
+  $('#psMode').textContent = P.mode === 'mp3' ? 'mp3 файл' : ttsEngine() === 'issai' ? 'ISSAI дауысы' : 'Браузер дауысы';
   const s = $('#psSeek'); s.max = Math.max(1, Math.round(d)); if (!s.matches(':active')) s.value = Math.round(t);
   s.style.setProperty('--p', (d ? t / d * 100 : 0) + '%');
   $('#psT0').textContent = fmtT(t); $('#psT1').textContent = '-' + fmtT(d - t);

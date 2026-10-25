@@ -34,7 +34,7 @@ async function showProfile(section) {
     <div class="glass list" id="pList">
       ${row('theme', 'sun', 'Сыртқы түр және мақсаттар', `${theme} тақырып · ${curLogo().name.toLowerCase()} белгіше · күніне ${+(localStorage.kGoal || 20)} мин · жылына ${+(localStorage.kYearGoal || 12)} кітап`)}
       ${row('speed', 'zap', 'Жылдам оқу', `Бастапқы қарқын ${S2.baseline} сөз/мин · ${Math.min(S2.unlocked, 6)}/6 кезең ашық`)}
-      ${row('audio', 'headphones', 'Аудио баптаулары', `${(localStorage.kGender || 'f') === 'm' ? 'Дәулет' : 'Айгүл'} дауысы · ${+(localStorage.kRate || 1)}× жылдамдық`)}
+      ${row('audio', 'headphones', 'Аудио баптаулары', `${esc(voiceLabel())} · ${+(localStorage.kRate || 1)}× жылдамдық`)}
       ${row('convert', 'layers', 'Кітапты өңдеу', `Таза нұсқа жасау · ЖИ тазарту ${localStorage.kAiClean !== '0' ? 'қосулы' : 'өшірулі'}`)}
       ${row('cloud', 'cloud-up', 'Бұлтқа сақтау', !email ? 'Life Hub-қа кіргенде қосылады' : !cloudOn() ? 'өшірулі' : Cl.err ? 'қате: ' + esc(cloudErr(Cl.err)) : clState().last ? `соңғы синхрондау ${new Date(clState().last).toLocaleString('kk', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}` : 'қосулы')}
       ${row('downloads', 'drive', 'Жүктелгендер және интернетсіз', `${est.usage != null ? size(est.usage) + ' · ' : ''}${vs.length} файл, ${au.length} аудио · ${off ? 'интернетсіз дайын' : 'интернетсіз әлі дайын емес'}`)}
