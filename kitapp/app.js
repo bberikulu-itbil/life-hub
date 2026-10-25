@@ -1,7 +1,7 @@
 'use strict';
 /* Kitapp 1-кезең: кітапхана, PDF/EPUB оқығыш, нұсқалар, конспект, ескертпелер. Деректер IndexedDB-де. */
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/lib/pdf.worker.min.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

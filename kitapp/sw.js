@@ -1,9 +1,8 @@
-const C = 'kitapp-v19';
-const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'rag.js', 'chat.js', 'audio.js', 'ltts.js', 'tts-worker.js', 'vendor/piper/piper.js', 'vendor/piper/piper-o91UDS6e.js', 'icons.js', 'covers.js', 'home.js', 'player.js', 'prep.js', 'shelves.js', 'marks.js', 'brand.js', 'profile.js', 'kstats.js', 'kspeed.js', 'kconvert.js', 'convert.js', 'speed.js', 'stats.js', 'edit.js', 'manifest.webmanifest'];
+const C = 'kitapp-v20';
+const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'rag.js', 'chat.js', 'audio.js', 'ltts.js', 'tts-worker.js', 'vendor/piper/piper.js', 'vendor/piper/piper-o91UDS6e.js', 'icons.js', 'covers.js', 'home.js', 'player.js', 'prep.js', 'shelves.js', 'marks.js', 'brand.js', 'profile.js', 'kstats.js', 'kspeed.js', 'kconvert.js', 'convert.js', 'speed.js', 'stats.js', 'edit.js', 'manifest.webmanifest',
+  'vendor/lib/pdf.min.js', 'vendor/lib/pdf.worker.min.js', 'vendor/lib/epub.min.js', 'vendor/lib/jszip.min.js']; // кітап ашуға міндетті: CDN-сіз, қосымшамен бірге
 // Сыртқы кітапханалар: интернетсіз оқу үшін алдын ала сақталады (нұсқасы бекітілген, өзгермейді).
 const LIBS = [
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js',
   'https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js',
 ];

@@ -3,7 +3,7 @@
    тақырып және мақсаттар, жылдам оқу (speed.js), аудио баптаулары, кітапты өңдеу, жүктелгендер және интернетсіз режим. */
 
 const size = n => !n ? '0 КБ' : n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' ГБ' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(n / 1024)) + ' КБ';
-const LIBS = ['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'];
+const LIBS = ['vendor/lib/pdf.min.js', 'vendor/lib/pdf.worker.min.js', 'vendor/lib/epub.min.js', 'vendor/lib/jszip.min.js'];
 
 // Интернетсіз ашылуға керек файлдар кэште бар ма
 async function offlineReady() {
