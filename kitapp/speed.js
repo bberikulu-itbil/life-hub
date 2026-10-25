@@ -26,7 +26,7 @@ async function loadWords(v) {
 function runDrill(cfg, words, start, S, done) {
   const WIN = 70, total = cfg.mins * 60000, o = KSP.opts(S.punct, S.long);
   const ov = document.createElement('div'); ov.className = 'sp-ov';
-  ov.innerHTML = `<div class="sp-bar"><button id="spX" aria-label="Жабу">${ic('x')}</button><div class="sp-t"><b>${esc(cfg.title)}</b><small id="spC"></small></div><span id="spW" style="color:var(--mute)"></span><span style="flex:1"></span><button id="spM">−</button><button id="spP">+</button></div>
+  ov.innerHTML = `<div class="sp-bar"><button id="spX" aria-label="Жабу">${ic('x')}</button><div class="sp-t"><b>${esc(cfg.title)}</b><small id="spC"></small></div><span id="spW" style="color:var(--mute)"></span><span style="flex:1"></span>${cfg.marks?.size ? `<button id="spToc" aria-label="Мазмұны">${ic('list', 18)}</button>` : ''}<button id="spM">−</button><button id="spP">+</button></div>
     <div class="sp-main" id="spMain" style="font-family:${FF[S.family]};font-size:${S.font}px"></div><div class="sp-ctx" id="spCtx"></div>
     <div class="sp-foot"><div class="bar-p"><i id="spBar" style="width:0"></i></div><div class="row" style="justify-content:center;margin-top:.6rem"><button id="spB" aria-label="10 сөз артқа">${ic('skip-back')} 10</button><button id="spPlay" class="primary" aria-label="Ойнату">${ic('play')}</button><button id="spF" aria-label="10 сөз алға">10 ${ic('skip-forward')}</button></div></div>`;
   document.body.append(ov);
@@ -85,6 +85,20 @@ function runDrill(cfg, words, start, S, done) {
   setCh();
   q('#spX').onclick = finish; q('#spPlay').onclick = () => playing ? pause() : play();
   q('#spB').onclick = () => jump(-10); q('#spF').onclick = () => jump(10);
+  // Мазмұн: тарауды таңдап, сол жерден жалғастыру
+  const toc = q('#spToc');
+  if (toc) toc.onclick = () => {
+    pause();
+    const cur = markAt(cfg.marks, i), list = [...cfg.marks].sort((a, b) => a[0] - b[0]);
+    const box = document.createElement('div'); box.className = 'sp-toc glass';
+    box.innerHTML = `<div class="psl-hd"><b>Мазмұны</b><button class="icon-btn" data-x aria-label="Жабу">${ic('x', 20)}</button></div><div class="psl-body">${list.map(([k, m]) => `<button class="lrow ${cur?.k === k ? 'now' : ''}" data-k="${k}"><em class="num">${m.n}</em><span>${esc(m.title)}</span><em>${Math.round(k / words.length * 100)}%</em></button>`).join('')}</div>`;
+    ov.append(box); box.querySelector('.now')?.scrollIntoView({ block: 'center' });
+    box.onclick = e => {
+      if (e.target.closest('[data-x]')) return box.remove();
+      const k = e.target.closest('[data-k]')?.dataset.k; if (k == null) return;
+      box.remove(); i = +k; shown = -1; setCh(); maxI = Math.max(maxI, i); play();
+    };
+  };
   q('#spM').onclick = () => { adj -= 10; stat(); }; q('#spP').onclick = () => { adj += 10; stat(); };
   main.onclick = () => playing ? pause() : play();
   (async () => {

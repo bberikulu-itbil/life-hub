@@ -181,27 +181,38 @@ $('#addForm').onsubmit = async e => {
 };
 
 /* ---------- Оқығыш ---------- */
-const R = { book: null, ver: null, kind: null, pdf: null, rend: null, page: 1, total: 1, font: 100, zoom: 1 };
+const R = { book: null, ver: null, kind: null, pdf: null, rend: null, page: 1, total: 1, zoom: 1, toc: [] };
 const rEl = $('#reader'), stage = $('#rStage');
+const RS_DEF = { font: 100, family: 'serif', lh: 1.6, theme: 'auto' };
+const rs = () => ({ ...RS_DEF, font: +(localStorage.kFont || 100), ...JSON.parse(localStorage.kReader || '{}') });
+const PAPER = { light: ['#fbfbfd', '#1b2130'], sepia: ['#f4ecdc', '#3b2f1e'], dark: ['#161b26', '#e3e8f0'] };
+const FAMILY = { serif: 'Georgia, "Times New Roman", serif', sans: '-apple-system, system-ui, sans-serif' };
 
 async function openReader(b, v) {
-  Object.assign(R, { book: b, ver: v, kind: v.type, font: +(localStorage.kFont || 100) });
-  $('#rTitle').textContent = `${b.title} · ${v.name}`;
-  stage.innerHTML = ''; rEl.hidden = false; $('#rPanel').hidden = true;
+  if (!rEl.hidden) await cleanupReader(); // басқа кітап/нұсқа ашылса — алдыңғысын жабамыз
+  Object.assign(R, { book: b, ver: v, kind: v.type, toc: [], cur: null, book_epub: null });
+  $('#rTitle').textContent = b.title; $('#rAuthor').textContent = b.author || v.name;
+  $('#rCh').textContent = ''; $('#rLeft').textContent = ''; $('#rPosText').textContent = '';
+  stage.innerHTML = ''; rEl.hidden = false; rEl.classList.remove('bare'); $('#rPanel').hidden = true;
+  if (!history.state?.kReader) history.pushState({ kReader: 1 }, ''); // Android/браузер «артқа» батырмасы оқығышты жабады
+  applyPaper();
   if (b.status === 'plan') applyStatus(b, 'reading');
   b.lastOpened = Date.now(); b.lastVersion = v.id; put('books', b);
   startTrack(b, v);
-  const buf = await v.blob.arrayBuffer();
   try {
+    const buf = await v.blob.arrayBuffer();
     if (v.type === 'pdf') await openPdf(buf); else await openEpub(buf);
   } catch (err) { console.error(err); stage.innerHTML = `<div class="empty">Файлды ашу мүмкін болмады: ${esc(err.message)}</div>`; }
   refreshNotes();
 }
 
+/* --- PDF --- */
 async function openPdf(buf) {
   R.pdf = await pdfjsLib.getDocument({ data: buf }).promise;
   R.total = R.pdf.numPages;
-  const s = $('#rSlider'); s.min = 1; s.max = R.total;
+  const s = $('#rSlider'); s.min = 1; s.max = R.total; s.step = 1;
+  R.toc = (await pdfOutline(R.pdf)).map(o => ({ title: o.title, page: o.page + 1 }));
+  if (R.toc.length < 2 && R.ver.chapters?.length) R.toc = R.ver.chapters.map(c => ({ title: c.title, page: c.from + 1 }));
   await renderPdf(Math.min(R.ver.pos?.page || 1, R.total));
 }
 async function renderPdf(n) {
@@ -215,45 +226,95 @@ async function renderPdf(n) {
   c.width = vp.width; c.height = vp.height; c.style.width = vp.width / dpr + 'px';
   await p.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
   stage.scrollTop = 0;
+  const ci = R.toc.filter(t => t.page <= R.page).length - 1, next = R.toc[ci + 1]?.page ?? R.total + 1;
+  if (R.toc.length) chapterInfo(R.toc[ci]?.title || '', next - R.page - 1);
+  else { chapterInfo('', -1); $('#rLeft').textContent = R.total > R.page ? `кітапта ${R.total - R.page} бет қалды` : 'соңғы бет'; }
   progress({ page: R.page }, Math.round(R.page / R.total * 100), `${R.page} / ${R.total}`);
   $('#rSlider').value = R.page;
 }
 
+/* --- EPUB --- */
 async function openEpub(buf) {
   const book = ePub(buf);
+  R.book_epub = book;
   stage.innerHTML = '<div class="epub"></div>';
   R.rend = book.renderTo(stage.firstChild, { width: '100%', height: '100%', flow: 'paginated', spread: 'none' });
-  R.rend.themes.fontSize(R.font + '%');
   applyEpubTheme();
   R.rend.on('relocated', loc => {
     const pct = book.locations.length() ? Math.round(book.locations.percentageFromCfi(loc.start.cfi) * 100) : (R.ver.pct || 0);
+    const file = loc.start.href.split('/').pop(), t = R.toc.filter(x => x.file === file);
+    chapterInfo(t[0]?.title || R.toc.filter(x => x.spine <= loc.start.index).pop()?.title || '', (loc.start.displayed?.total || 0) - (loc.start.displayed?.page || 0));
     progress({ cfi: loc.start.cfi }, pct, pct + '%');
     $('#rSlider').value = pct;
   });
-  const s = $('#rSlider'); s.min = 0; s.max = 100;
+  bindGestures(R.rend);
+  const s = $('#rSlider'); s.min = 0; s.max = 100; s.step = 1;
+  await book.ready;
+  const flat = (list, lvl = 0) => (list || []).flatMap(t => [{ title: t.label.replace(/\s+/g, ' ').trim(), href: t.href, file: t.href.split('#')[0].split('/').pop(), spine: book.spine.get(t.href.split('#')[0])?.index ?? 0, lvl }, ...flat(t.subitems, lvl + 1)]);
+  R.toc = flat(book.navigation?.toc);
   await R.rend.display(R.ver.pos?.cfi || undefined);
-  book.ready.then(() => book.locations.generate(1200)).then(() => {
-    if (R.rend?.currentLocation()?.start) { const pct = Math.round(book.locations.percentageFromCfi(R.rend.currentLocation().start.cfi) * 100); progress({ cfi: R.rend.currentLocation().start.cfi }, pct, pct + '%'); }
-  });
-  R.book_epub = book;
+  book.locations.generate(1200).then(() => {
+    const st = R.rend?.currentLocation()?.start;
+    if (st) { const pct = Math.round(book.locations.percentageFromCfi(st.cfi) * 100); progress({ cfi: st.cfi }, pct, pct + '%'); $('#rSlider').value = pct; }
+  }).catch(() => {});
 }
 function applyEpubTheme() {
   if (!R.rend) return;
-  const dark = document.documentElement.dataset.theme === 'dark';
-  R.rend.themes.override('color', dark ? '#e9edf5' : '#1b2130');
-  R.rend.themes.override('background', dark ? '#161b26' : '#fbfbfd');
+  const o = rs(), [bg, fg] = paperColors();
+  R.rend.themes.fontSize(o.font + '%');
+  R.rend.themes.override('color', fg); R.rend.themes.override('background', bg);
+  R.rend.themes.override('font-family', FAMILY[o.family]); R.rend.themes.override('line-height', String(o.lh));
+}
+const paperColors = () => { const t = rs().theme; return PAPER[t === 'auto' ? (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light') : t]; };
+function applyPaper() {
+  const [bg, fg] = paperColors(), t = rs().theme;
+  rEl.style.setProperty('--paper', bg); rEl.style.setProperty('--rink', fg);
+  rEl.dataset.paper = t === 'auto' ? (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light') : t;
+  applyEpubTheme();
+}
+
+function chapterInfo(title, left) {
+  $('#rCh').textContent = title || R.book.title;
+  $('#rLeft').textContent = left > 0 ? `тараудың соңына ${left} бет` : left === 0 ? 'тараудың соңғы беті' : '';
 }
 
 let pT;
 function progress(pos, pct, label) {
   touchRead();
-  $('#rPosText').textContent = label;
+  $('#rPosText').textContent = `Бүкіл кітаптан ${pct}%${R.kind === 'pdf' ? ` · ${label}` : ''}`;
   R.cur = { pos, pct, label };
   clearTimeout(pT);
   pT = setTimeout(async () => { R.ver.pos = pos; R.ver.pct = pct; await put('versions', R.ver); }, 400);
 }
 
-const go = d => R.kind === 'pdf' ? renderPdf(R.page + d) : (d > 0 ? R.rend.next() : R.rend.prev());
+const go = d => R.kind === 'pdf' ? renderPdf(R.page + d) : (d > 0 ? R.rend?.next() : R.rend?.prev());
+const toggleBars = () => { rEl.classList.toggle('bare'); setTimeout(() => R.rend?.resize?.(), 260); };
+
+// Беттің шетін басу — бет ауыстыру, ортасы — жолақтарды жасыру; саусақпен сырғыту — бет ауыстыру
+function zoneTap(x, w) { if (x < w * .28) go(-1); else if (x > w * .72) go(1); else toggleBars(); }
+function bindGestures(rend) {
+  let sx = 0, sy = 0, st = 0;
+  const down = e => { const t = e.changedTouches?.[0] || e; sx = t.screenX; sy = t.screenY; st = Date.now(); };
+  const up = (e, tap) => {
+    const t = e.changedTouches?.[0] || e, dx = t.screenX - sx, dy = t.screenY - sy;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) return go(dx < 0 ? 1 : -1);
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && Date.now() - st < 400) tap(t);
+  };
+  if (rend) {
+    rend.on('touchstart', down);
+    rend.on('touchend', e => up(e, t => zoneTap(t.screenX - stage.getBoundingClientRect().left - (window.screenX || 0), stage.clientWidth)));
+    rend.on('click', e => { if (!('ontouchstart' in window) && !e.target.closest?.('a')) zoneTap(e.clientX - (rend.manager?.container?.scrollLeft || 0), stage.clientWidth); });
+  }
+}
+stage.addEventListener('touchstart', e => { if (R.kind === 'pdf') { const t = e.changedTouches[0]; stage._s = [t.screenX, t.screenY, Date.now()]; } }, { passive: true });
+stage.addEventListener('touchend', e => {
+  if (R.kind !== 'pdf' || !stage._s) return;
+  const t = e.changedTouches[0], [x0, y0, t0] = stage._s, dx = t.screenX - x0, dy = t.screenY - y0;
+  if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.4) go(dx < 0 ? 1 : -1);
+  else if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && Date.now() - t0 < 400) zoneTap(t.clientX - stage.getBoundingClientRect().left, stage.clientWidth);
+});
+stage.addEventListener('click', e => { if (R.kind === 'pdf' && !('ontouchstart' in window)) zoneTap(e.clientX - stage.getBoundingClientRect().left, stage.clientWidth); });
+
 $('#rNext').onclick = () => go(1);
 $('#rPrev').onclick = () => go(-1);
 $('#rSlider').onchange = e => {
@@ -261,29 +322,124 @@ $('#rSlider').onchange = e => {
   if (R.kind === 'pdf') renderPdf(v);
   else if (R.book_epub?.locations.length()) R.rend.display(R.book_epub.locations.cfiFromPercentage(v / 100));
 };
-$('#rPlus').onclick = () => zoom(1);
-$('#rMinus').onclick = () => zoom(-1);
-function zoom(d) {
-  if (R.kind === 'epub') { R.font = Math.max(70, Math.min(220, R.font + d * 10)); localStorage.kFont = R.font; R.rend.themes.fontSize(R.font + '%'); }
-  else { R.zoom = Math.max(.6, Math.min(3, R.zoom + d * .2)); renderPdf(R.page); }
-}
-$('#rSpeed').onclick = () => readerSpeed();
-$('#rMark').onclick = () => readerMark();
-$('#rNotes').onclick = () => { const p = $('#rPanel'); p.hidden = !p.hidden; };
-$('#rClose').onclick = async () => {
+
+// Жабу: алдымен экранды жасырамыз, кейін тазалаймыз — epub.js қате берсе де оқығыш жабылады
+async function cleanupReader() {
   clearTimeout(pT);
-  if (R.cur) { R.ver.pos = R.cur.pos; R.ver.pct = R.cur.pct; await put('versions', R.ver); }
-  await endTrack();
-  if (R.rend) { R.rend.destroy(); R.rend = null; }
-  if (R.pdf) { R.pdf.destroy(); R.pdf = null; }
-  rEl.hidden = true; stage.innerHTML = ''; rerender();
-};
+  try { if (R.cur && R.ver) { R.ver.pos = R.cur.pos; R.ver.pct = R.cur.pct; await put('versions', R.ver); } } catch (e) { console.warn(e); }
+  try { await endTrack(); } catch (e) { console.warn(e); }
+  try { R.rend?.destroy(); } catch (e) { console.warn(e); }
+  try { R.book_epub?.destroy(); } catch (e) { console.warn(e); }
+  try { R.pdf?.destroy(); } catch (e) { console.warn(e); }
+  Object.assign(R, { rend: null, pdf: null, book_epub: null });
+  stage.innerHTML = '';
+}
+async function closeReader(after) {
+  if (rEl.hidden) return;
+  rEl.hidden = true; $('#rSheet').open && $('#rSheet').close();
+  await cleanupReader();
+  (after || rerender)();
+}
+$('#rClose').onclick = () => history.state?.kReader ? history.back() : closeReader();
+addEventListener('popstate', () => { if (!rEl.hidden) closeReader(); });
 document.addEventListener('keydown', e => {
-  if (rEl.hidden || /TEXTAREA|INPUT/.test(e.target.tagName)) return;
-  if (e.key === 'ArrowRight' || e.key === 'PageDown') go(1);
+  if (rEl.hidden || /TEXTAREA|INPUT/.test(e.target.tagName) || $('#rSheet').open) return;
+  if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); go(1); }
   if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(-1);
   if (e.key === 'Escape') $('#rClose').click();
 });
+
+/* --- Төменгі парақтар: мәзір, мазмұн, іздеу, мәтін баптаулары --- */
+function rSheet(html, bind) {
+  const D = $('#rSheet'); D.querySelector('.rs-body').innerHTML = html;
+  D.onclick = e => { if (e.target === D) D.close(); };
+  bind?.(D); if (!D.open) D.showModal();
+}
+function showToc() {
+  if (!R.toc.length) return toast('Бұл кітапта мазмұн табылмады');
+  const cur = $('#rCh').textContent;
+  rSheet(`<h3>Мазмұны</h3><div class="rs-list">${R.toc.map((t, i) => `<button class="lrow ${t.title === cur ? 'now' : ''}" data-i="${i}" style="padding-left:${.5 + (t.lvl || 0) * 1.1}rem"><span>${esc(t.title)}</span>${t.page ? `<em>${t.page}</em>` : ''}</button>`).join('')}</div>`, D => {
+    D.querySelector('.now')?.scrollIntoView({ block: 'center' });
+    D.querySelector('.rs-list').onclick = e => {
+      const t = R.toc[+e.target.closest('[data-i]')?.dataset.i]; if (!t) return;
+      D.close(); R.kind === 'pdf' ? renderPdf(t.page) : R.rend.display(t.href);
+    };
+  });
+}
+function showSearch() {
+  rSheet(`<h3>Кітаптан іздеу</h3><label class="search glass">${ic('search', 18)}<input id="rsQ" placeholder="Сөз не тіркес…" enterkeyhint="search"></label><div class="rs-list" id="rsRes"></div>`, D => {
+    const q = D.querySelector('#rsQ'); setTimeout(() => q.focus(), 60);
+    let t;
+    q.oninput = () => { clearTimeout(t); t = setTimeout(() => runSearch(q.value.trim()), 300); };
+  });
+}
+async function runSearch(q) {
+  const box = $('#rsRes'); if (!box) return;
+  if (q.length < 2) { box.innerHTML = ''; return; }
+  if (!isReady(R.ver)) {
+    box.innerHTML = '<small class="muted">Іздеу үшін мәтін бір рет дайындалады…</small>';
+    try { await indexVersion(R.book, R.ver); } catch (err) { box.innerHTML = `<small class="muted">${esc(err.message)}</small>`; return; }
+  }
+  const cs = (await byBook('chunks', R.book.id)).filter(c => c.versionId === R.ver.id).sort((a, b) => a.n - b.n), ql = q.toLowerCase(), hits = [];
+  for (const c of cs) {
+    let k = c.text.toLowerCase().indexOf(ql);
+    while (k >= 0 && hits.length < 60) { hits.push({ c, k }); k = c.text.toLowerCase().indexOf(ql, k + ql.length); }
+    if (hits.length >= 60) break;
+  }
+  const snip = ({ c, k }) => { const a = Math.max(0, k - 50), b = Math.min(c.text.length, k + q.length + 70); return `${a ? '…' : ''}${esc(c.text.slice(a, k))}<mark>${esc(c.text.slice(k, k + q.length))}</mark>${esc(c.text.slice(k + q.length, b))}…`; };
+  box.innerHTML = hits.length ? `<small class="muted">${hits.length >= 60 ? '60+' : hits.length} нәтиже</small>` + hits.map((h, i) => `<button class="rs-hit" data-i="${i}"><small class="muted">${esc(h.c.ref)}</small><span>${snip(h)}</span></button>`).join('') : '<small class="muted">Ештеңе табылмады</small>';
+  box.onclick = e => {
+    const h = hits[+e.target.closest('[data-i]')?.dataset.i]; if (!h) return;
+    $('#rSheet').close();
+    if (R.kind === 'pdf') renderPdf(+(h.c.ref.match(/\d+/)?.[0] || 1));
+    else { const it = R.book_epub.spine.get(h.c.pi); if (it) R.rend.display(it.href); }
+  };
+}
+function showAa() {
+  const o = rs(), seg = (id, opts, cur) => `<div class="seg" id="${id}">${opts.map(([k, t]) => `<button data-v="${k}" class="${String(k) === String(cur) ? 'on' : ''}">${t}</button>`).join('')}</div>`;
+  rSheet(`<h3>Мәтін баптаулары</h3>
+    <div class="row" style="flex-wrap:nowrap;justify-content:space-between"><button id="aaM" class="big" style="flex:1">A−</button><b id="aaV" style="min-width:4.5rem;text-align:center">${R.kind === 'pdf' ? Math.round(R.zoom * 100) : o.font}%</b><button id="aaP" class="big" style="flex:1">A+</button></div>
+    ${R.kind === 'pdf' ? '<small class="muted">PDF-те қаріпті өзгерту мүмкін емес, бет үлкейеді. Ыңғайлы оқу үшін кітаптың «Таза нұсқасын» аш.</small>' : `<label>Қаріп</label>${seg('aaF', [['serif', 'Serif'], ['sans', 'Sans']], o.family)}<label>Жол аралығы</label>${seg('aaL', [[1.4, 'Тығыз'], [1.6, 'Қалыпты'], [1.9, 'Кең']], o.lh)}`}
+    <label>Бет түсі</label>${seg('aaT', [['auto', 'Жүйе'], ['light', 'Ақ'], ['sepia', 'Сепия'], ['dark', 'Қараңғы']], o.theme)}`, D => {
+    const save = p => { localStorage.kReader = JSON.stringify({ ...rs(), ...p }); if (p.font) localStorage.kFont = p.font; applyPaper(); };
+    const size = d => {
+      if (R.kind === 'pdf') { R.zoom = Math.max(.6, Math.min(3, R.zoom + d * .2)); renderPdf(R.page); D.querySelector('#aaV').textContent = Math.round(R.zoom * 100) + '%'; }
+      else { const f = Math.max(70, Math.min(220, rs().font + d * 10)); save({ font: f }); D.querySelector('#aaV').textContent = f + '%'; }
+    };
+    D.querySelector('#aaM').onclick = () => size(-1); D.querySelector('#aaP').onclick = () => size(1);
+    const segBind = (id, k, num) => { const el = D.querySelector('#' + id); if (el) el.onclick = e => { const v = e.target.closest('[data-v]')?.dataset.v; if (v == null) return; save({ [k]: num ? +v : v }); el.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); }; };
+    segBind('aaF', 'family'); segBind('aaL', 'lh', true); segBind('aaT', 'theme');
+  });
+}
+function showMore() {
+  const b = R.book, items = [['about', 'book', 'Кітап туралы'], ...(navigator.share ? [['share', 'share', 'Бөлісу']] : []), ['toc', 'list', 'Мазмұны'], ['search', 'search', 'Кітаптан іздеу'],
+    ['shelf', 'shelves', 'Сөреге қосу'], ['listen', 'headphones', 'Тыңдау'], ['speed', 'zap', 'Жылдам оқу'], ['ai', 'chat', 'ЖИ-мен талқылау'],
+    b.status === 'done' ? ['reading', 'book-open', 'Қайта оқып жатырмын'] : ['done', 'flag', 'Оқыдым деп белгілеу']];
+  rSheet(`<div class="rs-menu">${items.map(([a, i, t]) => `<button class="lrow" data-a="${a}">${ic(i, 22)}<span>${t}</span></button>`).join('')}</div>`, D => {
+    D.querySelector('.rs-menu').onclick = async e => {
+      const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+      if (!['toc', 'search'].includes(a)) D.close();
+      if (a === 'about') closeReader(() => showBook(b.id));
+      if (a === 'share') navigator.share({ title: b.title, text: `«${b.title}»${b.author ? `, ${b.author}` : ''}: оқып жатырмын (${R.cur?.pct || 0}%)` }).catch(() => {});
+      if (a === 'toc') showToc();
+      if (a === 'search') showSearch();
+      if (a === 'shelf') openShelfDlg(b.id);
+      if (a === 'listen') Player.open(b);
+      if (a === 'speed') readerSpeed();
+      if (a === 'ai') closeReader(() => showChat(b.id));
+      if (a === 'done' || a === 'reading') { applyStatus(b, a); await put('books', b); toast(a === 'done' ? 'Оқылды деп белгіленді' : 'Оқып жатырмын'); }
+    };
+  });
+}
+$('#rToc').onclick = showToc;
+$('#rMore').onclick = showMore;
+$('#rAdd').onclick = () => openShelfDlg(R.book.id);
+$('#rAa').onclick = showAa;
+$('#rListen').onclick = () => Player.open(R.book);
+$('#rAi').onclick = () => closeReader(() => showChat(R.book.id));
+$('#rSpeed').onclick = () => readerSpeed();
+$('#rMark').onclick = () => readerMark();
+$('#rNotes').onclick = () => { const p = $('#rPanel'); p.hidden = !p.hidden; };
 
 async function refreshNotes() {
   const ms = (await byBook('marks', R.book.id)).filter(m => m.kind === 'read' && m.versionId === R.ver.id).sort((a, b) => (a.pct || 0) - (b.pct || 0));
@@ -304,6 +460,7 @@ function applyTheme() {
   const d = t === 'system' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : t;
   document.documentElement.dataset.theme = d;
   document.querySelector('meta[name=theme-color]').content = d === 'dark' ? '#1a2030' : '#eef1f7';
+  if (!rEl.hidden) applyPaper();
   applyEpubTheme();
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);

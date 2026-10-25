@@ -1,4 +1,4 @@
-const C = 'kitapp-v15';
+const C = 'kitapp-v16';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'rag.js', 'chat.js', 'audio.js', 'icons.js', 'covers.js', 'home.js', 'player.js', 'prep.js', 'shelves.js', 'marks.js', 'brand.js', 'profile.js', 'kstats.js', 'kspeed.js', 'kconvert.js', 'convert.js', 'speed.js', 'stats.js', 'edit.js', 'manifest.webmanifest'];
 // Сыртқы кітапханалар: интернетсіз оқу үшін алдын ала сақталады (нұсқасы бекітілген, өзгермейді).
 const LIBS = [

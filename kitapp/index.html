@@ -107,18 +107,15 @@
 <!-- Оқығыш -->
 <section id="reader" hidden>
   <div class="r-bar">
-    <button class="ghost" id="rClose"><i data-ic="back"></i> Артқа</button>
-    <div class="r-title" id="rTitle"></div>
-    <div class="r-tools">
-      <button class="ghost" id="rMinus">A−</button>
-      <button class="ghost" id="rPlus">A+</button>
-      <button class="ghost" id="rMark" aria-label="Бетбелгі қою"><i data-ic="bookmark"></i></button>
-      <button class="ghost" id="rSpeed" aria-label="Жылдам оқу"><i data-ic="zap"></i></button>
-      <button class="ghost" id="rNotes" aria-label="Ескертпелер"><i data-ic="note"></i></button>
-    </div>
+    <button class="icon-btn glass" id="rClose" aria-label="Жабу"><i data-ic="chevron-down" data-s="24"></i></button>
+    <div class="r-tt"><b id="rTitle"></b><small id="rAuthor"></small></div>
+    <button class="icon-btn glass" id="rAdd" aria-label="Сөреге қосу"><i data-ic="plus" data-s="22"></i></button>
+    <button class="icon-btn glass" id="rMore" aria-label="Мәзір"><i data-ic="more" data-s="22"></i></button>
   </div>
   <div class="r-body">
     <div id="rStage"></div>
+    <button class="r-side l" id="rPrev" aria-label="Алдыңғы бет"><i data-ic="chevron-left" data-s="26"></i></button>
+    <button class="r-side r" id="rNext" aria-label="Келесі бет"><i data-ic="chevron-right" data-s="26"></i></button>
     <aside id="rPanel" hidden>
       <h4>Бетбелгілер</h4><div id="rMarks"></div>
       <h4>Ескертпелер</h4>
@@ -128,12 +125,20 @@
     </aside>
   </div>
   <div class="r-foot">
-    <button class="ghost" id="rPrev" aria-label="Алдыңғы"><i data-ic="chevron-left" data-s="22"></i></button>
-    <div class="r-pos"><span id="rPosText"></span>
-      <input type="range" id="rSlider" min="0" max="100" value="0"></div>
-    <button class="ghost" id="rNext" aria-label="Келесі"><i data-ic="chevron-right" data-s="22"></i></button>
+    <div class="rf-row"><button class="rf-ch" id="rToc"><i data-ic="list" data-s="20"></i><span id="rCh"></span></button><small id="rLeft" class="muted"></small></div>
+    <input type="range" id="rSlider" min="0" max="100" value="0" aria-label="Кітаптағы орын">
+    <small class="rf-pct" id="rPosText"></small>
+    <div class="rf-tools">
+      <button class="icon-btn" id="rNotes" aria-label="Ескертпелер мен бетбелгілер"><i data-ic="note" data-s="22"></i></button>
+      <button class="icon-btn" id="rMark" aria-label="Бетбелгі қою"><i data-ic="bookmark" data-s="22"></i></button>
+      <button class="icon-btn rf-aa" id="rAa" aria-label="Мәтін баптаулары">Aa</button>
+      <button class="icon-btn" id="rSpeed" aria-label="Жылдам оқу"><i data-ic="zap" data-s="22"></i></button>
+      <button class="icon-btn" id="rListen" aria-label="Тыңдау"><i data-ic="headphones" data-s="22"></i></button>
+      <button class="icon-btn" id="rAi" aria-label="ЖИ-мен талқылау"><i data-ic="chat" data-s="22"></i></button>
+    </div>
   </div>
 </section>
+<dialog id="rSheet" class="bsheet"><div class="fs-grip"></div><div class="rs-body"></div></dialog>
 
 <!-- Кітапхана сүзгілері (төменнен шығатын терезе) -->
 <dialog id="fDlg" class="bsheet" aria-label="Сүзгілер"><div class="fs-grip"></div><h3>Не іздейміз</h3><div class="fs-body"></div></dialog>
