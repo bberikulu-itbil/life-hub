@@ -109,6 +109,13 @@ test("structure removes page numbers, running headers and footnote marks", () =>
   assert.ok(!/болды 1\b/.test(text));
 });
 
+test("structure survives blank pages (picture pages, empty backs)", () => {
+  const pages = fakeBook();
+  pages.splice(2, 0, [], KC.linesFromItems([it("   ", 50, 700)]));
+  const { chapters } = KC.structure(pages);
+  assert.deepEqual(chapters.map((c) => c.title), ["1-тарау", "2-тарау"]);
+});
+
 test("structure splits chapters by large headings and paragraphs by indent", () => {
   const { chapters } = KC.structure(fakeBook());
   assert.deepEqual(chapters.map((c) => c.title), ["1-тарау", "2-тарау"]);

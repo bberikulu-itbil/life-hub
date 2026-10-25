@@ -117,7 +117,8 @@
 
     // 4. Колонтитулдар: беттің шеткі жолдарында қайталанатын мәтін
     const isNum = l => { const t = lineText(l); return PAGE_NUM.test(t) || PAGE_OF.test(t); };
-    const edgeIdx = ls => { const n = ls.length, s = new Set([0, n - 1]); if (n > 1 && isNum(ls[0])) s.add(1); if (n > 1 && isNum(ls[n - 1])) s.add(n - 2); return s; };
+    // бос бет (сурет, ақ бет) — шеткі жолы жоқ
+    const edgeIdx = ls => { const n = ls.length, s = new Set(n ? [0, n - 1] : []); if (n > 1 && isNum(ls[0])) s.add(1); if (n > 1 && isNum(ls[n - 1])) s.add(n - 2); return s; };
     const edge = new Map();
     pages.forEach((ls, pi) => !isToc.has(pi) && new Set([...edgeIdx(ls)].map(i => norm(lineText(ls[i])))).forEach(k => k && edge.set(k, (edge.get(k) || 0) + 1)));
     const rep = new Set([...edge].filter(([, c]) => N >= 4 && c >= Math.max(3, N * .3)).map(([k]) => k));
