@@ -19,7 +19,11 @@ function brandMatch(brands) {
   return { rows, best: rows.findIndex((r) => r.perDay === min), yearSaving: Math.round((max - min) * 365) };
 }
 
-// Мақсат: { target, saved, months, start } → осы айға керек жарна
+// Мақсат: { id, target, saved (бастапқы жинақ), months, start }; жарналар — { goalId, amount }
+const goalSaved = (g, contribs = []) => g.saved + contribs.reduce((t, c) => t + (c.goalId === g.id ? c.amount : 0), 0);
+const goalsView = (S) => S.goals.map((g) => ({ ...g, saved: goalSaved(g, S.contribs) }));
+
+// → осы айға керек жарна (g.saved — жиналған толық сома, goalsView беретін)
 function goalMonthly(g, today) {
   const [sy, sm] = g.start.split("-").map(Number), [ty, tm] = today.split("-").map(Number);
   const left = Math.max(1, g.months - ((ty - sy) * 12 + (tm - sm)));
@@ -36,7 +40,7 @@ function buysIn(c, from, to, today) {
 // Алдағы айлардың болжамы: тұрақты шығын + циклдік тауарлар + мақсатты жарналар
 function forecast(S, today, count = 3) {
   const [y, m] = today.split("-").map(Number);
-  const goals = S.goals.reduce((t, g) => t + (g.saved >= g.target ? 0 : goalMonthly(g, today)), 0);
+  const goals = goalsView(S).reduce((t, g) => t + (g.saved >= g.target ? 0 : goalMonthly(g, today)), 0);
   return Array.from({ length: count }, (_, i) => {
     const from = Math.max(Date.UTC(y, m - 1 + i, 1) / MS, dnum(today)), to = Date.UTC(y, m + i, 0) / MS;
     const cycles = S.cycles.reduce((t, c) => t + c.price * buysIn(c, from, to, today), 0);
@@ -45,18 +49,67 @@ function forecast(S, today, count = 3) {
   });
 }
 
+// «тамақ», «Тамақ », «ТАМАҚ» — бір санат
+const normCat = (c) => { const t = String(c ?? "").trim(); return t ? t[0].toUpperCase() + t.slice(1).toLowerCase() : "Басқа"; };
+
 // Осы айдың кірісі, шығыны және санат бойынша шығын
 function monthTotals(tx, today) {
   const month = today.slice(0, 7), out = { income: 0, expense: 0, byCat: {} };
   for (const t of tx) {
     if (t.date.slice(0, 7) !== month) continue;
     out[t.kind] += t.amount;
-    if (t.kind === "expense") out.byCat[t.category] = (out.byCat[t.category] || 0) + t.amount;
+    if (t.kind === "expense") { const k = normCat(t.category); out.byCat[k] = (out.byCat[k] || 0) + t.amount; }
   }
   return out;
 }
 
-const balance = (S) => S.settings.capital + S.tx.reduce((t, x) => t + (x.kind === "income" ? x.amount : -x.amount), 0);
+// Қолжетімді қалдық: жарна мақсатқа аударылған ақша, сондықтан одан шығады
+const balance = (S) => S.settings.capital + S.tx.reduce((t, x) => t + (x.kind === "income" ? x.amount : -x.amount), 0) - (S.contribs || []).reduce((t, c) => t + c.amount, 0);
 
-const FS = { addDays, daysBetween, cycleDaysLeft, stockPct, nextBuy, brandMatch, goalMonthly, forecast, monthTotals, balance };
+// ---- Supabase `items` ↔ жергілікті күй ----
+// tx — ассистентпен ортақ `money` (data: kind, amount, category, note, date); қалғаны — fs_* қолданбасына тән
+const APP_OF = { tx: "money", cycles: "fs_cycle", goals: "fs_goal", stock: "fs_stock", matches: "fs_match", contribs: "fs_contrib", settings: "fs_settings" };
+const KEY_OF = Object.fromEntries(Object.entries(APP_OF).map(([k, a]) => [a, k]));
+const localDate = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
+// Жолды жергілікті жазбаға айналдырады; жарамсыз болса — null (интерфейсті бұзбау үшін)
+function fromRow(r) {
+  const k = KEY_OF[r.app], d = r.data || {}, n = (v) => Number.isFinite(Number(v)) && v !== "" && v != null;
+  if (!k) return null;
+  if (k === "tx") return n(d.amount) && (d.kind === "income" || d.kind === "expense")
+    ? { id: r.id, kind: d.kind, amount: Number(d.amount), category: normCat(d.category), note: String(d.note ?? ""), date: /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : localDate(r.created_at) } : null;
+  if (k === "settings") return { key: "settings", item: { capital: Number(d.capital) || 0, income: Number(d.income) || 0, fixed: Number(d.fixed) || 0 }, id: r.id };
+  const ok = { cycles: n(d.price) && n(d.every) && d.every > 0 && typeof d.last === "string", goals: n(d.target) && n(d.saved) && n(d.months) && typeof d.start === "string",
+    stock: n(d.qty), matches: Array.isArray(d.brands) && d.brands.length > 1, contribs: n(d.amount) && typeof d.goalId === "string" }[k];
+  return ok ? { id: r.id, ...d } : null;
+}
+const toRow = (k, e, settingsId) => {
+  if (k === "settings") return { id: settingsId, app: APP_OF[k], data: { capital: e.capital, income: e.income, fixed: e.fixed } };
+  const { id, ...data } = e;
+  return { id, app: APP_OF[k], data: k === "tx" ? { ...data, currency: "KZT" } : data };
+};
+
+// Серверден келген жолдар + әлі жіберілмеген өзгерістер → жаңа күй (сервер негіз, кезектегі өзгеріс үстінен жазылады)
+function mergePull(S, rows) {
+  const next = { tx: [], cycles: [], goals: [], stock: [], matches: [], contribs: [] }, pend = new Map((S.pending || []).map((p) => [p.k + ":" + p.id, p.op]));
+  let settings = null, settingsId = null;
+  for (const r of rows) {
+    const e = fromRow(r);
+    if (!e) continue;
+    if (e.key === "settings") { settings = e.item; settingsId = e.id; continue; }
+    if (pend.get(KEY_OF[r.app] + ":" + e.id) === "del") continue;
+    next[KEY_OF[r.app]].push(e);
+  }
+  for (const p of S.pending || []) { // кезектегі жазбалар сервер нұсқасын ауыстырады
+    if (p.op !== "put" || p.k === "settings") continue;
+    const local = S[p.k].find((x) => x.id === p.id);
+    if (!local) continue;
+    const i = next[p.k].findIndex((x) => x.id === p.id);
+    if (i >= 0) next[p.k][i] = local; else next[p.k].push(local);
+  }
+  const pendingSettings = (S.pending || []).some((p) => p.k === "settings");
+  return { ...next, settings: settings && !pendingSettings ? { ...S.settings, ...settings } : S.settings, settingsId: settingsId || S.settingsId };
+}
+
+const FS = { addDays, daysBetween, cycleDaysLeft, stockPct, nextBuy, brandMatch, goalSaved, goalsView, goalMonthly, forecast, normCat, monthTotals, balance, APP_OF, fromRow, toRow, mergePull };
 if (typeof module !== "undefined") module.exports = FS;

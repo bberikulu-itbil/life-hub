@@ -60,3 +60,53 @@ test("monthTotals және balance", () => {
   assert.deepEqual([m.income, m.expense, m.byCat["Тамақ"], m.byCat["Көлік"]], [5000, 2000, 2000, undefined]);
   assert.equal(FS.balance(s), 10000 + 5000 - 1200 - 800 - 999);
 });
+
+test("normCat: регистр мен бос орын бір санатқа келеді", () => {
+  assert.deepEqual(["тамақ", " ТАМАҚ ", "Тамақ"].map(FS.normCat), ["Тамақ", "Тамақ", "Тамақ"]);
+  assert.equal(FS.normCat("  "), "Басқа");
+  const m = FS.monthTotals([{ kind: "expense", amount: 1, category: "тамақ", date: "2026-10-01" }, { kind: "expense", amount: 2, category: "Тамақ", date: "2026-10-02" }], "2026-10-26");
+  assert.deepEqual(m.byCat, { Тамақ: 3 });
+});
+
+test("жарна: қолжетімді қалдықтан шығады, мақсат жиналған соманы көрсетеді", () => {
+  const s = S({ settings: { capital: 100000, income: 0, fixed: 0 }, goals: [{ id: "g", target: 300000, saved: 20000, months: 3, start: "2026-10-01" }], contribs: [{ goalId: "g", amount: 30000 }, { goalId: "x", amount: 5 }] });
+  assert.equal(FS.balance(s), 100000 - 30000 - 5);
+  assert.equal(FS.goalSaved(s.goals[0], s.contribs), 50000);
+  assert.equal(FS.forecast(s, "2026-10-26", 1)[0].goals, Math.ceil(250000 / 3)); // жарна қалған соманы азайтады
+});
+
+test("fromRow: ассистент жазған money жолы (дата жоқ, аз әріппен, сома жолмен)", () => {
+  const e = FS.fromRow({ id: "a", app: "money", created_at: "2026-10-20T10:00:00+05:00", data: { amount: "2500", kind: "expense", category: "тамақ", currency: "KZT" } });
+  assert.deepEqual(e, { id: "a", kind: "expense", amount: 2500, category: "Тамақ", note: "", date: "2026-10-20" });
+});
+
+test("fromRow: жарамсыз жолдар және бөтен қолданбалар өткізіліп жіберіледі", () => {
+  const r = (app, data) => FS.fromRow({ id: "z", app, data, created_at: "2026-10-01T00:00:00Z" });
+  assert.equal(r("money", { amount: "abc", kind: "expense" }), null);
+  assert.equal(r("money", { amount: 5, kind: "transfer" }), null);
+  assert.equal(r("fs_cycle", { price: 5, every: 0, last: "2026-10-01" }), null);
+  assert.equal(r("lang", { word: "x" }), null);
+});
+
+test("toRow ↔ fromRow: цикл мен tx айналып келеді, tx-ке валюта қосылады", () => {
+  const c = { id: "c1", name: "Паста", price: 1500, every: 45, buffer: 3, cat: "Тұрмыс", last: "2026-10-01" };
+  assert.deepEqual(FS.fromRow({ ...FS.toRow("cycles", c), created_at: "2026-10-01T00:00:00Z" }), c);
+  const t = { id: "t1", kind: "income", amount: 5, category: "Жалақы", note: "", date: "2026-10-05" };
+  const row = FS.toRow("tx", t);
+  assert.equal(row.app, "money"); assert.equal(row.data.currency, "KZT"); assert.equal(row.data.id, undefined);
+  assert.deepEqual(FS.fromRow({ ...row, created_at: "2026-10-05T00:00:00Z" }), t);
+});
+
+test("mergePull: сервер негіз, кезектегі put үстінен жазады, del жасырады, басқа құрылғыда өшкен кетеді", () => {
+  const T = (id, amount) => ({ id, kind: "expense", amount, category: "Тамақ", note: "", date: "2026-10-01" });
+  const row = (id, amount) => FS.toRow("tx", T(id, amount));
+  const S0 = { settings: { capital: 1, income: 2, fixed: 3, hide: true }, settingsId: null, tx: [T("local-edit", 999), T("gone", 1), T("new-local", 7), T("del-me", 4)], cycles: [], goals: [], stock: [], matches: [], contribs: [],
+    pending: [{ k: "tx", id: "local-edit", op: "put" }, { k: "tx", id: "new-local", op: "put" }, { k: "tx", id: "del-me", op: "del" }] };
+  const rows = [row("local-edit", 10), row("del-me", 4), row("remote", 5), { id: "s", app: "fs_settings", created_at: "2026-10-01T00:00:00Z", data: { capital: 50, income: 60, fixed: 70 } }];
+  const m = FS.mergePull(S0, rows);
+  assert.deepEqual(m.tx.map((x) => [x.id, x.amount]).sort(), [["local-edit", 999], ["new-local", 7], ["remote", 5]]);
+  assert.deepEqual(m.settings, { capital: 50, income: 60, fixed: 70, hide: true }); // hide — тек құрылғыда
+  assert.equal(m.settingsId, "s");
+  const m2 = FS.mergePull({ ...S0, pending: [{ k: "settings", id: "s", op: "put" }] }, rows);
+  assert.equal(m2.settings.capital, 1); // жіберілмеген баптау сервердікін ауыстырады
+});

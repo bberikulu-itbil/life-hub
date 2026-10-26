@@ -26,6 +26,7 @@ dialog,#nav{background:var(--glass-2)}
 
 button,.btn{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--gb);background:var(--glass);padding:.5rem .9rem;border-radius:var(--r-btn);
   display:inline-flex;align-items:center;justify-content:center;gap:.4rem;min-height:44px;transition:transform .12s,opacity .2s}
+a.btn{text-decoration:none}
 button:active{transform:scale(.97)}
 button.primary{background:linear-gradient(160deg,var(--acc-2),var(--acc));color:var(--acc-ink);border-color:transparent;box-shadow:var(--shadow-primary)}
 button.ghost{background:transparent;border-color:transparent;padding:.5rem}
