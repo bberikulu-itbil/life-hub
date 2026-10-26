@@ -89,3 +89,30 @@ dialog.sheet{max-height:calc(100dvh - 24px);overflow:auto}
 .own{display:flex;gap:8px;margin-top:8px}
 .own button{flex:none}
 button:disabled{opacity:.45;cursor:default}
+
+.tile{width:34px;height:34px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex:none}
+.tile .ic svg{width:20px;height:20px}
+.tile.add{background:transparent;color:var(--mute);border:2px dashed var(--line)}
+.catgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:.6rem 0}
+.catb{justify-content:flex-start;gap:10px;min-height:56px;border-radius:var(--r-sec);padding:.5rem .7rem;text-align:left}
+.catb span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.paid{font-size:1.5rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.amtchip{background:var(--line);border-radius:12px;padding:.1rem .6rem}
+.kv{display:flex;align-items:center;gap:12px;margin:.6rem 0}
+.pill{display:inline-flex;align-items:center;gap:8px;background:var(--line);border-radius:12px;padding:.25rem .6rem .25rem .3rem}
+.pill .tile{width:26px;height:26px;border-radius:8px;font-size:.8rem}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
+.card2{background:var(--glass-2);border:1px solid var(--gb);border-radius:var(--r-sec);padding:10px 12px;min-height:96px;display:flex;flex-direction:column;justify-content:space-between;gap:4px;min-width:0}
+.card2 .nm{display:flex;align-items:center;gap:6px;font-size:.85rem;min-width:0}
+.card2 .nm i{width:10px;height:10px;border-radius:3px;flex:none}
+.card2 b{font-size:1.05rem;overflow-wrap:anywhere}
+.card2 small{white-space:pre-line;font-size:.75rem}
+.menu{padding:4px 16px}
+.mrow{width:100%;justify-content:flex-start;gap:12px;border:0;background:transparent;border-radius:0;padding:.7rem 0;text-align:left;border-top:1px solid var(--line)}
+.mrow:first-child{border-top:0}
+.mrow .ml{flex:1;min-width:0}
+.mrow .mr{max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow>.ic{color:var(--mute)}
+.tiles2{display:flex;gap:8px;padding:8px}
+.tiles2 button{flex:1;flex-direction:column;border:0;background:transparent;font-size:.9rem}
+.back{padding-left:0;color:var(--acc)}
