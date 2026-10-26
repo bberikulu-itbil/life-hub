@@ -1,4 +1,4 @@
-const C = 'finsaulyq-v1';
+const C = 'finsaulyq-v2';
 const SHELL = ['./', 'index.html', 'style.css', 'core.js', 'app.js', 'manifest.webmanifest', '../brand/tokens.css', '../brand/logos/finsaulyq.svg'];
 self.addEventListener('install', (e) => e.waitUntil(caches.open(C).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith('finsaulyq-') && k !== C).map((k) => caches.delete(k)))).then(() => self.clients.claim())));

@@ -2,7 +2,8 @@
 <html lang="kk" data-app="lifehub">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<script>addEventListener('gesturestart', e => e.preventDefault()); // iOS Safari user-scalable=no-ды елемейді: екі саусақпен үлкейтуді тоқтатамыз</script>
 <title>Life Hub</title>
 <meta name="theme-color" content="#eef1f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#141925" media="(prefers-color-scheme: dark)">
@@ -11,6 +12,7 @@
 <link rel="apple-touch-icon" href="brand/logos/lifehub-180.png">
 <link rel="stylesheet" href="brand/tokens.css">
 <style>
+html{touch-action:manipulation} /* екі рет басқанда үлкеймесін */
 /* Liquid Glass (Life Hub дизайн жүйесі): түсті бұлттар үстінде шыны беттер; акцент — Life Hub графиті, түс қосымша логотиптерінен келеді. */
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 [hidden] { display: none !important; }

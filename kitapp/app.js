@@ -302,6 +302,8 @@ function bindGestures(rend) {
     if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && Date.now() - st < 400) tap(t);
   };
   if (rend) {
+    // EPUB беті iframe ішінде: үлкейтуді сол құжатта да тоқтатамыз
+    rend.hooks.content.register(c => { c.document.documentElement.style.touchAction = 'manipulation'; c.document.addEventListener('gesturestart', e => e.preventDefault()); });
     rend.on('touchstart', down);
     rend.on('touchend', e => up(e, t => zoneTap(t.screenX - stage.getBoundingClientRect().left - (window.screenX || 0), stage.clientWidth)));
     rend.on('click', e => { if (!('ontouchstart' in window) && !e.target.closest?.('a')) zoneTap(e.clientX - (rend.manager?.container?.scrollLeft || 0), stage.clientWidth); });
