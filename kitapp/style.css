@@ -418,6 +418,14 @@ dialog.bsheet{margin:auto auto 0;width:100%;max-width:640px;max-height:80vh;bord
 .rs-hit mark{background:color-mix(in srgb,var(--star) 45%,transparent);color:inherit;border-radius:3px;padding:0 1px}
 #rSheet label{margin:.9rem 0 .3rem}
 .sp-toc{position:absolute;left:0;right:0;bottom:0;max-height:70vh;border-radius:26px 26px 0 0;display:flex;flex-direction:column;z-index:3;padding-bottom:env(safe-area-inset-bottom);animation:kUp .25s ease-out}
+.sp-wpm{white-space:nowrap;font-variant-numeric:tabular-nums;padding:.42rem .65rem;color:var(--acc)}
+.sp-meta{display:flex;justify-content:space-between;color:var(--mute);font-size:.8rem;margin-bottom:.3rem;font-variant-numeric:tabular-nums}
+.sp-speed{display:flex;align-items:center;gap:.65rem;margin:.55rem 0}.sp-speed input{flex:1;padding:0;accent-color:var(--acc)}.sp-speed button{flex:none;min-width:58px}.sp-speed b{flex:1;text-align:center}
+.sp-play{width:64px;height:52px}.sp-options{max-height:82vh}.sp-opt-body{overflow:auto;padding:.4rem 1rem calc(1rem + env(safe-area-inset-bottom))}.sp-opt-body>label{display:block;margin:.9rem 0 .35rem}.sp-opt-body>.primary{width:100%;margin-top:1rem}
+.sp-preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem;margin-top:.7rem}.sp-preset{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:.25rem;padding:.75rem;text-align:left;background:color-mix(in srgb,var(--ink) 4%,transparent);border:2px solid transparent;min-height:116px}.sp-preset .ic{color:var(--acc)}.sp-preset b{font-size:1rem}.sp-preset small{color:var(--mute);line-height:1.35}.sp-preset.on,.sp-preset:hover{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.sp-qhead{display:flex;justify-content:space-between;align-items:flex-start}.sp-qhead h3{margin:0 0 .2rem}.sp-qhead .badge{font-size:.85rem}.app-ver{text-align:center;color:var(--mute);font-size:.8rem;margin:1rem 0 5rem}
+details.sec>summary{display:flex;flex-direction:column;gap:.2rem;list-style:none}details.sec>summary::-webkit-details-marker{display:none}details.sec[open]>summary{padding-bottom:.7rem;border-bottom:1px solid var(--line);margin-bottom:.7rem}
+@media(max-width:560px){.sp-preset-grid{grid-template-columns:1fr}.sp-preset{min-height:0;display:grid;grid-template-columns:auto 1fr;column-gap:.65rem}.sp-preset .ic{grid-row:1/3}.sp-preset small{grid-column:2}.sp-bar{gap:.35rem}.sp-bar>button{padding:.42rem}.sp-wpm{font-size:.78rem}.sp-foot{padding-left:.7rem;padding-right:.7rem}}
 /* аудио мазмұны: бөлім ішіндегі тақырыпшалар */
 .lrow.sub{padding:.6rem .5rem .6rem 3.1rem;font-size:.94rem;color:var(--mute)}
 .lrow.sub.now span{color:var(--acc);font-weight:600}

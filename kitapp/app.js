@@ -3,6 +3,7 @@
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/lib/pdf.worker.min.js';
 
+const APP_VERSION = '0.8.1';
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => crypto.randomUUID();

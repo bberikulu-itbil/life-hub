@@ -39,7 +39,7 @@ async function showProfile(section) {
       ${row('jobs', 'download', 'Дайындау және жүктеу', esc(jobsSummary()))}
       ${row('cloud', 'cloud-up', 'Бұлтқа сақтау', !email ? 'Life Hub-қа кіргенде қосылады' : !cloudOn() ? 'өшірулі' : Cl.err ? 'қате: ' + esc(cloudErr(Cl.err)) : clState().last ? `соңғы синхрондау ${new Date(clState().last).toLocaleString('kk', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}` : 'қосулы')}
       ${row('downloads', 'drive', 'Жүктелгендер және интернетсіз', `${est.usage != null ? size(est.usage) + ' · ' : ''}${vs.length} файл, ${au.length} аудио · ${off ? 'интернетсіз дайын' : 'интернетсіз әлі дайын емес'}`)}
-    </div>`;
+    </div><p class="app-ver">Kitapp ${APP_VERSION}</p>`;
   $('#pApps').onclick = e => openApps(e.currentTarget);
   $('#pList').onclick = e => {
     const p = e.target.closest('[data-p]')?.dataset.p; if (!p) return;

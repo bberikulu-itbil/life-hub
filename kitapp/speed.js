@@ -3,6 +3,11 @@
 
 const SP_DEF = { chapPause: 2, baseline: 200, family: 'serif', font: 56, orp: true, punct: 1, long: true, ramp: true, countdown: true, unlocked: 1, freeMode: 'rsvp', freePer: 1, freeWpm: 260, freeMins: 3 };
 const FF = { serif: 'Georgia,"Times New Roman",serif', sans: 'system-ui,sans-serif', mono: 'ui-monospace,Menlo,monospace' };
+const speedPresets = B => [
+  { id: 'focus', icon: 'book-open', title: 'Жайлы', desc: 'Мәтін көз алдында', mode: 'pacer', per: 3, wpm: Math.max(140, Math.round(B * 1.05 / 10) * 10) },
+  { id: 'flow', icon: 'zap', title: 'Қалыпты', desc: '2 сөзден, бірқалыпты', mode: 'rsvp', per: 2, wpm: Math.max(180, Math.round(B * 1.35 / 10) * 10) },
+  { id: 'sprint', icon: 'flame', title: 'Спринт', desc: 'Зейін мен жылдамдық', mode: 'rsvp', per: 2, wpm: Math.max(240, Math.round(B * 1.8 / 10) * 10) },
+];
 const spGet = () => ({ ...SP_DEF, ...JSON.parse(localStorage.kSpeed || '{}') });
 const spSet = o => { localStorage.kSpeed = JSON.stringify(o); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -25,10 +30,11 @@ async function loadWords(v) {
 /* ---------- Жаттығу терезесі ---------- */
 function runDrill(cfg, words, start, S, done) {
   const WIN = 70, total = cfg.mins * 60000, o = KSP.opts(S.punct, S.long);
+  const D = { mode: cfg.mode, per: cfg.per, font: S.font, orp: S.orp };
   const ov = document.createElement('div'); ov.className = 'sp-ov';
-  ov.innerHTML = `<div class="sp-bar"><button id="spX" aria-label="Жабу">${ic('x')}</button><div class="sp-t"><b>${esc(cfg.title)}</b><small id="spC"></small></div><span id="spW" style="color:var(--mute)"></span><span style="flex:1"></span>${cfg.marks?.size ? `<button id="spToc" aria-label="Мазмұны">${ic('list', 18)}</button>` : ''}<button id="spM">−</button><button id="spP">+</button></div>
+  ov.innerHTML = `<div class="sp-bar"><button id="spX" aria-label="Жабу">${ic('x')}</button><div class="sp-t"><b>${esc(cfg.title)}</b><small id="spC"></small></div><span style="flex:1"></span><button id="spW" class="sp-wpm" aria-label="Жылдамдықты баптау"></button>${cfg.marks?.size ? `<button id="spToc" aria-label="Мазмұны">${ic('list', 18)}</button>` : ''}<button id="spOpt" aria-label="Жаттығу баптаулары">${ic('sliders', 18)}</button></div>
     <div class="sp-main" id="spMain" style="font-family:${FF[S.family]};font-size:${S.font}px"></div><div class="sp-ctx" id="spCtx"></div>
-    <div class="sp-foot"><div class="bar-p"><i id="spBar" style="width:0"></i></div><div class="row" style="justify-content:center;margin-top:.6rem"><button id="spB" aria-label="10 сөз артқа">${ic('skip-back')} 10</button><button id="spPlay" class="primary" aria-label="Ойнату">${ic('play')}</button><button id="spF" aria-label="10 сөз алға">10 ${ic('skip-forward')}</button></div></div>`;
+    <div class="sp-foot"><div class="sp-meta"><span id="spElapsed">0:00</span><span id="spProgress">0%</span></div><div class="bar-p"><i id="spBar" style="width:0"></i></div><div class="sp-speed"><button id="spM" aria-label="10 сөз баяу">−10</button><input id="spRange" type="range" min="80" max="1000" step="10" aria-label="Сөз/мин"><button id="spP" aria-label="10 сөз жылдам">+10</button></div><div class="row" style="justify-content:center;margin-top:.5rem"><button id="spB" aria-label="10 сөз артқа">${ic('skip-back')} 10</button><button id="spPlay" class="primary sp-play" aria-label="Ойнату">${ic('play')}</button><button id="spF" aria-label="10 сөз алға">10 ${ic('skip-forward')}</button></div></div>`;
   document.body.append(ov);
   const q = s => ov.querySelector(s), main = q('#spMain');
   let i = start, maxI = start, adj = 0, playing = false, timer = 0, active = 0, seg = 0, gone = false, ws = -1, shown = start;
@@ -38,17 +44,21 @@ function runDrill(cfg, words, start, S, done) {
   const wpm = () => Math.max(60, (S.ramp ? KSP.rampWpm(cfg.from, cfg.to, el() / total) : cfg.from) + adj);
 
   const show = c => {
-    if (cfg.mode === 'pacer') {
-      if (ws < 0 || i < ws || i >= ws + WIN) { ws = i; main.innerHTML = `<div class="pacer" style="font-size:${Math.max(18, S.font / 2.4)}px">${words.slice(ws, ws + WIN).map((w, k) => `<span data-i="${ws + k}">${esc(w)}</span>`).join(' ')}</div>`; }
+    if (D.mode === 'pacer') {
+      if (ws < 0 || i < ws || i >= ws + WIN) { ws = i; main.innerHTML = `<div class="pacer" style="font-size:${Math.max(18, D.font / 2.4)}px">${words.slice(ws, ws + WIN).map((w, k) => `<span data-i="${ws + k}">${esc(w)}</span>`).join(' ')}</div>`; }
       main.querySelectorAll('.hl').forEach(x => x.classList.remove('hl'));
       for (let j = c.end - c.words.length; j < c.end; j++) main.querySelector(`[data-i="${j}"]`)?.classList.add('hl');
-    } else if (c.words.length === 1 && S.orp) {
+    } else if (c.words.length === 1 && D.orp) {
       const w = c.words[0], k = KSP.orp(w);
       main.innerHTML = `<div class="orp"><span class="l">${esc(w.slice(0, k))}</span><span class="p">${esc(w[k] || '')}</span><span class="r">${esc(w.slice(k + 1))}</span></div>`;
     } else main.innerHTML = `<div class="chunk">${esc(c.words.join(' '))}</div>`;
   };
   // cfg.book: оқығыштан ашылғанда жолақ кітаптағы орынды көрсетеді, уақыт шектеусіз
-  const stat = () => { q('#spW').textContent = Math.round(wpm()) + ' сөз/мин'; q('#spBar').style.width = Math.min(100, (cfg.book ? i / words.length : el() / total) * 100) + '%'; };
+  const stat = () => {
+    const rate = Math.round(wpm()), pct = Math.min(100, (cfg.book ? i / words.length : el() / total) * 100);
+    q('#spW').textContent = rate + ' сөз/мин'; q('#spRange').value = rate; q('#spBar').style.width = pct + '%';
+    q('#spElapsed').textContent = KS.fmtDur(el() / 1000); q('#spProgress').textContent = cfg.book ? `${Math.round(i / words.length * 100)}% · ${i.toLocaleString('kk')}/${words.length.toLocaleString('kk')} сөз` : `${Math.round(pct)}% · ${KS.fmtDur(Math.max(0, (total - el()) / 1000))} қалды`;
+  };
 
   const step = () => {
     if (!playing || gone) return;
@@ -59,7 +69,7 @@ function runDrill(cfg, words, start, S, done) {
       shown = i; setCh();
       if (S.chapPause > 0) { main.innerHTML = `<div class="ch-card"><small>${m.n}-бөлім</small><b>${esc(m.title)}</b></div>`; timer = setTimeout(step, S.chapPause * 1000); return; }
     }
-    const c = KSP.chunkAt(words, i, cfg.per, cfg.marks);
+    const c = KSP.chunkAt(words, i, D.per, cfg.marks);
     if (!c) return finish();
     show(c); stat(); cfg.onStep?.();
     timer = setTimeout(() => { i = c.end; maxI = Math.max(maxI, i); step(); }, KSP.delayFor(c.words, wpm(), o));
@@ -68,11 +78,12 @@ function runDrill(cfg, words, start, S, done) {
   const pause = () => {
     if (!playing) return;
     playing = false; clearTimeout(timer); active += Date.now() - seg; q('#spPlay').innerHTML = ic('play');
-    if (cfg.mode !== 'pacer') q('#spCtx').innerHTML = words.slice(Math.max(start, i - 12), i + 24).map((w, k) => esc(w)).join(' ');
+    if (D.mode !== 'pacer') q('#spCtx').innerHTML = words.slice(Math.max(start, i - 12), i + 24).map(w => esc(w)).join(' ');
+    stat();
   };
-  const jump = d => { i = Math.max(start, Math.min(words.length - 1, i + d)); shown = i; setCh(); const c = KSP.chunkAt(words, i, cfg.per, cfg.marks); if (c) { show(c); if (!playing) q('#spCtx').textContent = ''; } };
+  const jump = d => { i = Math.max(start, Math.min(words.length - 1, i + d)); shown = i; setCh(); const c = KSP.chunkAt(words, i, D.per, cfg.marks); if (c) { show(c); stat(); if (!playing) q('#spCtx').textContent = ''; } };
   const finish = () => {
-    if (gone) return; pause(); gone = true; document.removeEventListener('keydown', onKey); ov.remove();
+    if (gone) return; pause(); gone = true; document.removeEventListener('keydown', onKey); document.removeEventListener('visibilitychange', onVisibility); ov.remove();
     const n = maxI - start, secs = active / 1000;
     done(n >= 20 && secs >= 3 ? { words: n, secs, wpm: n / (secs / 60), endIdx: maxI } : null);
   };
@@ -82,6 +93,8 @@ function runDrill(cfg, words, start, S, done) {
     if (e.key === 'Escape') finish();
   };
   document.addEventListener('keydown', onKey);
+  const onVisibility = () => { if (document.hidden && playing) pause(); };
+  document.addEventListener('visibilitychange', onVisibility);
   setCh();
   q('#spX').onclick = finish; q('#spPlay').onclick = () => playing ? pause() : play();
   q('#spB').onclick = () => jump(-10); q('#spF').onclick = () => jump(10);
@@ -99,7 +112,32 @@ function runDrill(cfg, words, start, S, done) {
       box.remove(); i = +k; shown = -1; setCh(); maxI = Math.max(maxI, i); play();
     };
   };
-  q('#spM').onclick = () => { adj -= 10; stat(); }; q('#spP').onclick = () => { adj += 10; stat(); };
+  const setRate = n => { adj = Math.max(80, Math.min(1000, n)) - (S.ramp ? KSP.rampWpm(cfg.from, cfg.to, el() / total) : cfg.from); stat(); };
+  q('#spM').onclick = () => setRate(wpm() - 10); q('#spP').onclick = () => setRate(wpm() + 10);
+  q('#spRange').oninput = e => setRate(+e.target.value);
+  const openOpts = () => {
+    pause();
+    const box = document.createElement('div'); box.className = 'sp-toc glass sp-options';
+    box.innerHTML = `<div class="psl-hd"><b>Жылдам оқу баптауы</b><button class="icon-btn" data-x>${ic('x', 20)}</button></div><div class="sp-opt-body">
+      <label>Көрсету режимі</label><div class="seg" data-mode><button data-v="rsvp" class="${D.mode === 'rsvp' ? 'on' : ''}">Ортада көрсету</button><button data-v="pacer" class="${D.mode === 'pacer' ? 'on' : ''}">Мәтінмен жүргізу</button></div>
+      <label>Бір уақытта неше сөз</label><div class="seg" data-per>${[1, 2, 3, 4].map(n => `<button data-v="${n}" class="${D.per === n ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <label>Қаріп өлшемі</label><div class="sp-speed"><button data-font="-4">A−</button><b data-font-v>${D.font}px</b><button data-font="4">A+</button></div>
+      <label class="tgl"><input data-orp type="checkbox" ${D.orp ? 'checked' : ''}><span>Бір сөзде көз тоқтайтын әріпті бояу</span></label>
+      <button class="primary" data-ok>Жалғастыру</button></div>`;
+    ov.append(box);
+    box.onclick = e => {
+      if (e.target.closest('[data-x]')) return box.remove();
+      const mode = e.target.closest('[data-mode] [data-v]')?.dataset.v;
+      if (mode) { D.mode = mode; box.querySelectorAll('[data-mode] button').forEach(x => x.classList.toggle('on', x.dataset.v === mode)); ws = -1; }
+      const per = e.target.closest('[data-per] [data-v]')?.dataset.v;
+      if (per) { D.per = +per; box.querySelectorAll('[data-per] button').forEach(x => x.classList.toggle('on', x.dataset.v === per)); }
+      const fd = +e.target.closest('[data-font]')?.dataset.font;
+      if (fd) { D.font = Math.max(24, Math.min(120, D.font + fd)); main.style.fontSize = D.font + 'px'; main.querySelector('.pacer')?.style.setProperty('font-size', Math.max(18, D.font / 2.4) + 'px'); box.querySelector('[data-font-v]').textContent = D.font + 'px'; }
+      if (e.target.matches('[data-orp]')) D.orp = e.target.checked;
+      if (e.target.closest('[data-ok]')) { box.remove(); const c = KSP.chunkAt(words, i, D.per, cfg.marks); if (c) show(c); play(); }
+    };
+  };
+  q('#spOpt').onclick = openOpts; q('#spW').onclick = openOpts;
   main.onclick = () => playing ? pause() : play();
   (async () => {
     if (S.countdown) for (const n of [3, 2, 1]) { main.innerHTML = `<div class="chunk">${n}</div>`; await sleep(700); if (gone) return; }
@@ -137,14 +175,25 @@ async function readerSpeed() {
   const here = R.kind === 'pdf' ? R.page - 1 : (R.rend?.currentLocation()?.start?.index ?? 0);
   const start = firstOfPi[pis.find(p => p >= here)] ?? 0;
   const S = spGet();
-  runDrill({ title: 'Жылдам оқу', mode: S.freeMode, per: S.freePer, from: S.freeWpm, to: S.freeWpm, mins: 24 * 60, book: true, onStep: touchRead, marks: chapterMarks(v, firstOfPi) }, words, start, { ...S, ramp: false }, async res => {
+  const begin = cfg => runDrill({ title: 'Жылдам оқу', mode: cfg.mode, per: cfg.per, from: cfg.wpm, to: cfg.wpm, mins: 24 * 60, book: true, onStep: touchRead, marks: chapterMarks(v, firstOfPi) }, words, start, { ...S, ramp: false }, async res => {
     if (!res) return;
-    await put('drills', { id: uid(), bookId: b.id, versionId: v.id, ts: Date.now(), stage: -2, name: `Оқығышта: ${b.title}`, mode: S.freeMode, per: S.freePer, wpm: Math.round(res.wpm), words: res.words, secs: Math.round(res.secs), comp: null });
+    await put('drills', { id: uid(), bookId: b.id, versionId: v.id, ts: Date.now(), stage: -2, name: `Оқығышта: ${b.title}`, mode: cfg.mode, per: cfg.per, wpm: Math.round(res.wpm), words: res.words, secs: Math.round(res.secs), comp: null });
+    v.speedPos = res.endIdx; await put('versions', v);
     // Оқығышты жылдам оқу тоқтаған жерге көшіру
     const pi = pis.filter(p => firstOfPi[p] <= res.endIdx).pop() ?? here;
     if (R.kind === 'pdf') renderPdf(pi + 1);
     else { const it = R.book_epub?.spine.get(pi); if (it) R.rend.display(it.href); }
     toast(`${Math.round(res.wpm)} сөз/мин · ${res.words} сөз`);
+  });
+  const presets = speedPresets(S.baseline);
+  rSheet(`<h3>${ic('zap', 20)} Жылдам оқу</h3><p class="muted">Режимді таңдаңыз. Жаттығу осы ашық тұрған жерден басталады.</p><div class="sp-preset-grid">
+    ${presets.map((p, i) => `<button class="sp-preset ${i === 1 ? 'on' : ''}" data-p="${p.id}">${ic(p.icon, 22)}<b>${p.title}</b><small>${p.desc}<br>${p.wpm} сөз/мин · ${p.per} сөз</small></button>`).join('')}
+    <button class="sp-preset" data-p="custom">${ic('sliders', 22)}<b>Өз баптауым</b><small>${S.freeWpm} сөз/мин · ${S.freePer} сөз · ${S.freeMode === 'pacer' ? 'мәтінмен' : 'ортада'}</small></button></div>`, D => {
+    D.querySelector('.sp-preset-grid').onclick = e => {
+      const id = e.target.closest('[data-p]')?.dataset.p; if (!id) return;
+      D.close();
+      begin(id === 'custom' ? { mode: S.freeMode, per: S.freePer, wpm: S.freeWpm } : presets.find(p => p.id === id));
+    };
   });
 }
 
@@ -176,12 +225,15 @@ async function showSpeed() {
   const sel = (id, opts, c) => `<select id="${id}">${opts.map(([k, t]) => `<option value="${esc(k)}" ${String(k) === String(c) ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
   const compTxt = d => d.comp == null ? 'оқығышта' : `түсіну ${d.comp}/5`;
   const recent = drills.slice(0, 20).reverse(), top = Math.max(1, ...recent.map(x => x.wpm));
+  const presets = speedPresets(S.baseline);
 
   view.innerHTML = `
     <button class="back" id="sBack">${ic('back', 22)} Профиль</button>
     <header class="hd"><h1>Жылдам оқу</h1></header>
     <div class="stats"><div class="stat"><b>${S.baseline}</b><small>Бастапқы қарқын (сөз/мин)</small></div><div class="stat"><b>${best || '—'}</b><small>Ең жақсы (түсінумен)</small></div>
       <div class="stat"><b>${Math.min(S.unlocked, 6)}/6</b><small>Ашылған кезең</small></div><div class="stat"><b>${drills.length}</b><small>Жаттығу саны</small></div></div>
+    <div class="glass sec sp-quick"><div class="sp-qhead"><div><h3>${ic('play', 18)} Бірден бастау</h3><small class="muted">Мақсатқа қарай бір режимді таңдаңыз</small></div><span class="badge">${posPct}%</span></div>
+      <div class="sp-preset-grid">${presets.map((p, i) => `<button class="sp-preset ${i === 1 ? 'on' : ''}" data-q="${p.id}">${ic(p.icon, 22)}<b>${p.title}</b><small>${p.desc}<br>${p.wpm} сөз/мин · ${p.per} сөз</small></button>`).join('')}</div></div>
     <div class="glass sec"><h3>${ic('book-open', 18)} Жаттығу мәтіні</h3>
       <label>Кітап ${sel('sSrc', vsSorted.map(x => [x.id, `${title(x.bookId)} · ${x.name}${isReady(x) ? '' : ' (дайындалмаған)'}`]), v.id)}</label>
       <label>Қайдан бастау
@@ -200,7 +252,7 @@ async function showSpeed() {
       <label>Қарқын (сөз/мин) <input id="fWpm" type="number" min="80" max="1200" step="10" value="${S.freeWpm}"></label>
       <label>Жаттығу ұзақтығы (мин) ${sel('fMins', [1, 2, 3, 5, 10].map(n => [n, n]), S.freeMins)}</label></div>
       <button class="primary" id="fGo">${ic('play', 16)} Еркін жаттығуды бастау</button></div>
-    <div class="glass sec"><h3>Баптаулар</h3>
+    <details class="glass sec"><summary><b>${ic('sliders', 18)} Кеңейтілген баптаулар</b><small class="muted">Қаріп, кідіріс, ORP және бастапқы қарқын</small></summary>
       <div class="fgrid">
         <label>Қаріп ${sel('oFam', [['serif', 'Serif'], ['sans', 'Sans'], ['mono', 'Mono']], S.family)}</label>
         <label>Қаріп өлшемі (px) <input id="oFont" type="number" min="24" max="120" step="4" value="${S.font}"></label>
@@ -211,7 +263,7 @@ async function showSpeed() {
         <label>Бастар алдында 3-2-1 ${sel('oCount', [[1, 'Иә'], [0, 'Жоқ']], +S.countdown)}</label>
         <label>Бөлім аяқталғанда кідіріс ${sel('oChap', [[0, 'Жоқ'], [1, '1 сек'], [2, '2 сек'], [3, '3 сек'], [5, '5 сек'], [8, '8 сек']], S.chapPause)}</label>
         <label>Бастапқы қарқынды қолмен қою <input id="oBase" type="number" min="80" max="700" step="10" value="${S.baseline}"></label></div>
-      <button class="ghost danger" id="oReset">${ic('refresh', 16)} Кезеңдерді басынан бастау</button></div>
+      <button class="ghost danger" id="oReset">${ic('refresh', 16)} Кезеңдерді басынан бастау</button></details>
     <div class="glass sec"><h3>Тарих</h3>${drills.length ? `<div class="bars" style="height:90px">${recent.map(d => `<div class="col" title="${new Date(d.ts).toLocaleDateString('ru')} · ${d.wpm} сөз/мин · ${compTxt(d)}"><i style="height:${d.wpm / top * 100}%;opacity:${d.comp == null || d.comp >= 3 ? 1 : .35}"></i></div>`).join('')}</div>
       <small class="muted">Соңғы 20 жаттығудың қарқыны; түсіну 3/5-тен төмен болса баған күңгірт.</small>` +
       drills.slice(0, 10).map(d => `<div class="note"><small>${new Date(d.ts).toLocaleDateString('ru')} · ${esc(d.name)}${d.stage !== -2 ? ` · ${esc(title(d.bookId))}` : ''}</small><div>${d.wpm} сөз/мин · ${d.words} сөз · ${compTxt(d)}</div></div>`).join('') : '<div class="empty">Әлі жаттығу жоқ. Бастапқы өлшемнен баста.</div>'}</div>`;
@@ -245,6 +297,11 @@ async function showSpeed() {
   };
   const marks = chapterMarks(v, firstOfPi);
   const launch = cfg => runDrill({ ...cfg, marks }, words, startIdx(), spGet(), after(cfg));
+  view.querySelectorAll('[data-q]').forEach(btn => btn.onclick = () => {
+    save(); const p = presets.find(x => x.id === btn.dataset.q);
+    Object.assign(S, { freeMode: p.mode, freePer: p.per, freeWpm: p.wpm }); spSet(S);
+    launch({ title: p.title, mode: p.mode, per: p.per, from: p.wpm, to: p.wpm, mins: S.freeMins });
+  });
   view.querySelectorAll('[data-s]').forEach(btn => btn.onclick = () => {
     save(); const n = +btn.dataset.s;
     if (n === 0) return runBaseline(words, startIdx(), r => after({ title: 'Бастапқы өлшем', baseline: true, mode: 'static', per: 0 })(r));
