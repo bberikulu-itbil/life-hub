@@ -50,6 +50,9 @@ function epubChapters(book, parts) {
 
 const STOP = new Error('Тоқтатылды');
 const tick = () => new Promise(r => setTimeout(r));
+const EPUB_PAGE_CHARS = 1800; // баспа ісіндегі шартты бет: бос орындарымен бірге 1800 таңба
+const textChars = parts => parts.map(p => p.text.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n').length;
+const epubPageCount = chars => Math.max(1, Math.ceil(chars / EPUB_PAGE_CHARS));
 
 // PDF/EPUB-тен шыққан мәтінді тазалау: сөз тасымалы, бет нөмірлері, артық бос орын.
 const cleanText = t => t.replace(/\u00ad/g, '').replace(/^\s*\d{1,4}\s*$/gm, '')
@@ -88,7 +91,8 @@ async function extractParts(v, ctl) {
 
 async function indexVersion(b, v, ctl = { prog() {}, stopped: false }) {
   const { parts, chapters } = await extractParts(v, ctl);
-  if (parts.reduce((a, p) => a + p.text.length, 0) < 200) throw new Error('Мәтін табылмады. Бұл скан PDF болуы мүмкін: оған OCR (суреттен мәтін оқу) керек, ол әзірге жоқ.');
+  const chars = textChars(parts);
+  if (chars < 200) throw new Error('Мәтін табылмады. Бұл скан PDF болуы мүмкін: оған OCR (суреттен мәтін оқу) керек, ол әзірге жоқ.');
   // тарау ішіндегі тақырыпшалар (EPUB h2–h6): аудиода бөлімнің ішкі мазмұны ретінде көрсетіледі
   for (const c of chapters) c.subs = parts.slice(c.from, c.to + 1).flatMap(p => p.heads || []).filter(h => tkey(h) !== tkey(c.title));
   ctl.prog(.92, 'Бөлшектеу…'); await tick();
@@ -100,8 +104,34 @@ async function indexVersion(b, v, ctl = { prog() {}, stopped: false }) {
   const tx = db.transaction('chunks', 'readwrite');
   chunks.forEach(c => tx.objectStore('chunks').put(c));
   await done(tx);
-  Object.assign(v, { indexed: chunks.length, chapters, words, prepV: 3 }); await put('versions', v);
+  Object.assign(v, { indexed: chunks.length, chapters, words, chars, ...(v.type === 'epub' ? { pages: epubPageCount(chars), pageChars: EPUB_PAGE_CHARS } : {}), prepV: 3 }); await put('versions', v);
+  if (v.type === 'epub') { b.pages = v.pages; b.pageCalc = `epub-${EPUB_PAGE_CHARS}`; b.pageVersion = v.id; await put('books', b); }
   ctl.prog(1, 'Дайын');
+}
+
+// Бұрын қосылған EPUB кітаптарына да бірдей шартты бет санын бір рет есептейді.
+async function ensureEpubPages() {
+  const [books, versions, chunks] = await Promise.all([all('books'), all('versions'), all('chunks')]);
+  const byVersion = new Map();
+  chunks.forEach(c => { if (!byVersion.has(c.versionId)) byVersion.set(c.versionId, []); byVersion.get(c.versionId).push(c); });
+  let changed = false;
+  for (const v of versions.filter(x => x.type === 'epub')) {
+    if (v.pageChars === EPUB_PAGE_CHARS && v.pages) continue;
+    try {
+      const saved = (byVersion.get(v.id) || []).sort((a, c) => a.n - c.n);
+      const chars = saved.length ? saved.map(c => c.text.trim()).filter(Boolean).join('\n').length : textChars((await extractParts(v, { stopped: false, prog() {} })).parts);
+      if (chars < 200) continue;
+      Object.assign(v, { chars, pages: epubPageCount(chars), pageChars: EPUB_PAGE_CHARS }); await put('versions', v); changed = true;
+      await tick();
+    } catch (e) { console.warn('epub pages', v.name, e); }
+  }
+  for (const b of books) {
+    const ev = versions.filter(v => v.bookId === b.id && v.type === 'epub' && v.pages).sort((a, c) => verOrder(a) - verOrder(c) || c.added - a.added);
+    if (!ev.length) continue;
+    const v = ev[0];
+    if (b.pages !== v.pages || b.pageCalc !== `epub-${EPUB_PAGE_CHARS}` || b.pageVersion !== v.id) { b.pages = v.pages; b.pageCalc = `epub-${EPUB_PAGE_CHARS}`; b.pageVersion = v.id; await put('books', b); changed = true; }
+  }
+  return changed;
 }
 
 async function loadChunks(bookId) {

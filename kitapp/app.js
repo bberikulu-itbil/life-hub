@@ -74,7 +74,7 @@ async function showBook(id) {
       ${b.series ? `<button class="link" id="bSer">${ic('layers', 14)} ${esc(b.series)}${b.seriesNo !== '' && b.seriesNo != null ? ` · ${b.seriesNo}-кітап` : ''}</button>` : ''}
       <div class="bk-au">${authorsOf(b).map(a => `<button class="link" data-au="${esc(a)}">${esc(a)}</button>`).join(', ') || '<span>Автор көрсетілмеген</span>'}</div>
       <div class="bk-stats">
-        ${b.pages ? stat(b.pages, 'бет') : ''}${b.year ? stat(b.year, 'жыл') : ''}
+        ${b.pages ? stat(b.pages, b.pageCalc ? 'шартты бет' : 'бет') : ''}${b.year ? stat(b.year, 'жыл') : ''}
         ${chs.length ? stat(hh ? `${hh} сағ ${mm} мин` : `${mm} мин`, ic('headphones', 16)) : ''}
         ${stat(pct + '%', 'оқылды')}
       </div>
@@ -113,7 +113,7 @@ async function showBook(id) {
 
     <div class="glass sec"><h3>Нұсқалар</h3><div id="vers">${vs.length ? vs.map(v => `
       <div class="ver" data-id="${v.id}">
-        <div><b>${esc(v.name)}</b> <span class="badge">${v.type.toUpperCase()}</span>${v.kind ? ` <span class="badge">${KIND[v.kind]}</span>` : ''}<br><small class="muted">${mb(v.blob.size)} · ${v.pct || 0}% оқылды${isReady(v) ? ' · мәтін дайын' : ''}</small></div>
+        <div><b>${esc(v.name)}</b> <span class="badge">${v.type.toUpperCase()}</span>${v.kind ? ` <span class="badge">${KIND[v.kind]}</span>` : ''}<br><small class="muted">${mb(v.blob.size)}${v.pages ? ` · ${v.pages} шартты бет` : ''} · ${v.pct || 0}% оқылды${isReady(v) ? ' · мәтін дайын' : ''}</small></div>
         <div class="row"><button class="primary" data-a="open">${ic('book-open', 16)} Оқу</button><button class="icon-btn" data-a="vmenu" aria-label="Нұсқа мәзірі">${ic('more', 20)}</button></div>
       </div>`).join('') : `<div class="empty">Нұсқа жоқ. Жоғарғы ${ic('more', 16)} мәзірінен «Нұсқа қосу» таңда.</div>`}</div>
     </div>
@@ -246,7 +246,8 @@ async function openEpub(buf) {
     const pct = book.locations.length() ? Math.round(book.locations.percentageFromCfi(loc.start.cfi) * 100) : (R.ver.pct || 0);
     const file = loc.start.href.split('/').pop(), t = R.toc.filter(x => x.file === file);
     chapterInfo(t[0]?.title || R.toc.filter(x => x.spine <= loc.start.index).pop()?.title || '', (loc.start.displayed?.total || 0) - (loc.start.displayed?.page || 0));
-    progress({ cfi: loc.start.cfi }, pct, pct + '%');
+    const pn = R.ver.pages ? Math.max(1, Math.ceil(pct / 100 * R.ver.pages)) : 0;
+    progress({ cfi: loc.start.cfi }, pct, pn ? `${pn} / ${R.ver.pages}` : pct + '%');
     $('#rSlider').value = pct;
   });
   R.rend.on('displayError', err => { console.error(err); stage.innerHTML = `<div class="empty">EPUB бетін көрсету мүмкін болмады: ${esc(err?.message || 'белгісіз қате')}</div>`; });
@@ -261,7 +262,7 @@ async function openEpub(buf) {
   await R.rend.display(R.ver.pos?.cfi || useful?.href || undefined);
   book.locations.generate(1200).then(() => {
     const st = R.rend?.currentLocation()?.start;
-    if (st) { const pct = Math.round(book.locations.percentageFromCfi(st.cfi) * 100); progress({ cfi: st.cfi }, pct, pct + '%'); $('#rSlider').value = pct; }
+    if (st) { const pct = Math.round(book.locations.percentageFromCfi(st.cfi) * 100), pn = R.ver.pages ? Math.max(1, Math.ceil(pct / 100 * R.ver.pages)) : 0; progress({ cfi: st.cfi }, pct, pn ? `${pn} / ${R.ver.pages}` : pct + '%'); $('#rSlider').value = pct; }
   }).catch(() => {});
 }
 function applyEpubTheme() {
@@ -287,7 +288,7 @@ function chapterInfo(title, left) {
 let pT;
 function progress(pos, pct, label) {
   touchRead();
-  $('#rPosText').textContent = R.kind === 'pdf' ? label : pct + '%';
+  $('#rPosText').textContent = label;
   R.cur = { pos, pct, label };
   clearTimeout(pT);
   pT = setTimeout(async () => { R.ver.pos = pos; R.ver.pct = pct; await put('versions', R.ver); }, 400);
@@ -549,4 +550,7 @@ $('#nav').onclick = e => {
   scrollTo(0, 0);
 };
 
-addEventListener('DOMContentLoaded', () => openDB().then(showHome).then(autoSync));
+addEventListener('DOMContentLoaded', () => openDB().then(showHome).then(async () => {
+  try { if (await ensureEpubPages() && ['home', 'library', 'book'].includes(view.dataset.page)) rerender(); } catch (e) { console.warn('epub pages', e); }
+  autoSync();
+}));

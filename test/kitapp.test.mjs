@@ -74,8 +74,11 @@ import fs from "node:fs";
 
 test("cleanText joins hyphenated words and drops bare page numbers", () => {
   const ctx = vm.createContext({ supabase: { createClient: () => ({}) }, esc: (s) => s, localStorage: {} });
-  vm.runInContext(fs.readFileSync(new URL("../kitapp/chat.js", import.meta.url), "utf8") + ";this.cleanText=cleanText", ctx);
+  vm.runInContext(fs.readFileSync(new URL("../kitapp/chat.js", import.meta.url), "utf8") + ";this.cleanText=cleanText;this.textChars=textChars;this.epubPageCount=epubPageCount", ctx);
   assert.equal(ctx.cleanText("Кіта-\nпхана — бұл\n12\nорын.  Келесі\nжол"), "Кітапхана — бұл орын. Келесі жол");
+  assert.equal(ctx.textChars([{ text: "  Бір   екі  " }, { text: "үш" }]), 10);
+  assert.equal(ctx.epubPageCount(1800), 1);
+  assert.equal(ctx.epubPageCount(1801), 2);
 });
 
 const KC = createRequire(import.meta.url)("../kitapp/kconvert.js");
