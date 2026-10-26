@@ -1,8 +1,8 @@
 "use strict";
 /* FinSaulyq интерфейсі. Деректер тек осы құрылғыда (localStorage); есептеу — core.js (FS). */
 const KEY = "finsaulyq.v1";
-const DEF = { settings: { capital: 0, income: 0, fixed: 0, city: "Астана", pad: true, hide: false }, settingsId: null, tx: [], cycles: [], items: [], goals: [], stock: [], matches: [], contribs: [], accounts: [], transfers: [], pending: [], synced: false };
-const LISTS = ["tx", "cycles", "items", "goals", "stock", "matches", "contribs", "accounts", "transfers"];
+const DEF = { settings: { capital: 0, income: 0, fixed: 0, city: "Астана", pad: true, hide: false }, settingsId: null, tx: [], cycles: [], items: [], categories: [], incomes: [], goals: [], stock: [], matches: [], contribs: [], accounts: [], transfers: [], pending: [], synced: false };
+const LISTS = ["tx", "cycles", "items", "categories", "incomes", "goals", "stock", "matches", "contribs", "accounts", "transfers"];
 const CATS = ["Тамақ", "Көлік", "Тұрмыс", "Кітап", "Күтім", "Жалақы"];
 const MONTHS = ["Қаңтар", "Ақпан", "Наурыз", "Сәуір", "Мамыр", "Маусым", "Шілде", "Тамыз", "Қыркүйек", "Қазан", "Қараша", "Желтоқсан"];
 const COLORS = ["var(--acc)", "var(--star)", "var(--warn)", "var(--acc-2)", "var(--good)", "var(--mute)"];
@@ -126,16 +126,18 @@ const accOpts = (cur) => [...S.accounts.map((a) => [a.id, a.name]), ...(cur !== 
 const accField = (cur) => hasAcc() ? [{ name: "account", label: "Шот", options: accOpts(cur), value: cur ?? (S.accounts.some((a) => a.id === S.settings.lastAcc) ? S.settings.lastAcc : S.accounts[0].id) }] : [];
 const withAcc = (e, v) => { if (v.account) { e.account = v.account; S.settings.lastAcc = v.account; } return e; };
 const catList = () => [...new Set([...S.tx.map((t) => FS.normCat(t.category)), ...CATS])];
+const subsOf = (cat) => S.categories.find((c) => FS.normCat(c.name) === FS.normCat(cat))?.subs ?? [];
 const stores = () => [...new Set([...S.tx.map((t) => t.store), ...S.items.map((i) => i.store)].filter(Boolean))];
 const txForm = (t, pre) => { const d = t ?? pre ?? {}; ask(t ? "Транзакцияны өзгерту" : pre ? "Чектен оқылды: тексеріп сақта" : "Жаңа транзакция", [
   { name: "kind", label: "Түрі", options: [["expense", "Шығыс"], ["income", "Кіріс"]], value: d.kind },
   { name: "amount", label: "Сома, ₸", type: "number", min: 0.01, value: d.amount },
   { name: "category", label: "Санат", value: d.category ?? "Тамақ", suggest: catList() },
+  { name: "sub", label: "Ішкі санат", optional: true, value: d.sub },
   { name: "store", label: "Дүкен", optional: true, value: d.store, suggest: stores() },
   { name: "note", label: "Ескертпе", optional: true, value: d.note },
   { name: "date", label: "Күні", type: "date", value: d.date ?? today() },
   ...accField(t ? (t.account ?? "") : undefined),
-], (v) => { put("tx", withAcc({ id: t?.id ?? crypto.randomUUID(), kind: v.kind, amount: num(v.amount), category: FS.normCat(v.category), note: v.note.trim(), date: v.date, ...(v.store.trim() ? { store: v.store.trim() } : {}) }, v)); save(); }); };
+], (v) => { put("tx", withAcc({ id: t?.id ?? crypto.randomUUID(), kind: v.kind, amount: num(v.amount), category: FS.normCat(v.category), note: v.note.trim(), date: v.date, ...(v.store.trim() ? { store: v.store.trim() } : {}), ...(v.sub.trim() ? { sub: v.sub.trim() } : {}) }, v)); save(); }); };
 
 // Чекті түсіру: суретті кішірейтіп, `receipt` функциясына жібереміз; нәтиже форманы толтырады, сақтауды өзің растайсың
 async function shrink(file, max = 1800) {
@@ -186,6 +188,16 @@ const addCycle = (pre, then) => ask("Жаңа тауар (цикл)", [
   save(); then?.(c);
 });
 
+const catForm = (c) => ask(c ? "Санатты өзгерту" : "Жаңа санат", [
+  { name: "name", label: "Санат", value: c?.name },
+  { name: "subs", label: "Ішкі санаттар (үтірмен бөл)", optional: true, value: (c?.subs ?? []).join(", ") },
+], (v) => { put("categories", { id: c?.id ?? crypto.randomUUID(), name: FS.normCat(v.name), subs: [...new Map(v.subs.split(",").map((x) => x.trim()).filter(Boolean).map((x) => [x.toLowerCase(), x])).values()] }); save(); });
+const incForm = (i) => ask(i ? "Кіріс көзін өзгерту" : "Жаңа кіріс көзі", [
+  { name: "name", label: "Көзі (жалақы, репетиторлық…)", value: i?.name },
+  { name: "amount", label: "Айлық сома, ₸", type: "number", min: 0.01, value: i?.amount },
+], (v) => { put("incomes", { id: i?.id ?? crypto.randomUUID(), name: v.name.trim(), amount: num(v.amount) }); save(); });
+const gotIncome = (i) => ask(`Түсті: ${i.name}`, [{ name: "amount", label: "Сома, ₸", type: "number", min: 0.01, value: i.amount }, ...accField(), { name: "date", label: "Күні", type: "date", value: today() }],
+  (v) => { put("tx", withAcc({ id: crypto.randomUUID(), kind: "income", amount: num(v.amount), category: FS.normCat(i.name), note: "", date: v.date }, v)); save(); });
 const addGoal = () => ask("Жаңа мақсат", [
   { name: "name", label: "Мақсат" },
   { name: "target", label: "Керек сома, ₸", type: "number", min: 1 },
@@ -278,6 +290,12 @@ function plan() {
   return [
     head("Summary"),
     sec("Шығындар бөлінісі", null, donut(m)),
+    Object.keys(m.byCat).length ? sec("Санаттар", null, Object.entries(m.byCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => h("div", { class: "row", style: "align-items:flex-start" },
+      h("div", { class: "main" }, h("b", {}, k), ...Object.entries(m.bySub[k] ?? {}).sort((a, b) => b[1] - a[1]).map(([sk, sv]) => h("small", { class: "muted num" }, `${sk} · ${tg(sv)}`))),
+      h("span", { class: "num" }, tg(v))))) : null,
+    S.incomes.length ? sec("Кіріс көздері", null, S.incomes.map((i) => { const got = S.tx.filter((t) => t.kind === "income" && t.date.slice(0, 7) === T.slice(0, 7) && FS.normCat(t.category) === FS.normCat(i.name)).reduce((a, t) => a + t.amount, 0), pct = Math.min(100, Math.round(got / i.amount * 100));
+      return h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, i.name), h("small", { class: "num muted" }, `${mon(got)} / ${mon(i.amount)} · ${pct}%`), bar(pct))); })) : null,
+    S.goals.length ? sec("Жинақтар", null, FS.goalsView(S).map((g) => goalRow(g))) : null,
     sec("Шоттар", null, S.accounts.length || w.loose !== null ? [...w.accounts.map((a) => [a.name, a.balance]), ...(w.loose !== null ? [["Шотсыз", w.loose]] : [])].map(([n, b]) => h("div", { class: "row" }, h("b", {}, n), h("span", { class: "num " + (b < 0 ? "warn" : "") }, mon(b)))) : empty("Шот жоқ. «Профиль» бөлімінде қос.")),
     sec("Келесі сатып алулар", null, next.length ? next.map((c) => h("div", { class: "row" },
       h("div", { class: "main" }, h("b", {}, c.name), h("small", { class: "muted num" }, FS.nextBuy(c) < T ? "Мерзімі өтті" : FS.nextBuy(c))),
@@ -349,7 +367,7 @@ function walletPage() {
 const grp = (s) => { const [a, b] = String(s || "0").split("."); return a.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + (b !== undefined ? "." + b : ""); };
 const topCats = (kind) => {
   const m = {}; for (const t of S.tx) if (t.kind === kind) m[FS.normCat(t.category)] = (m[FS.normCat(t.category)] || 0) + 1;
-  return [...new Set([...Object.keys(m), ...(kind === "income" ? ["Жалақы"] : CATS.filter((c) => c !== "Жалақы"))])].sort((a, b) => (m[b] || 0) - (m[a] || 0));
+  return [...new Set([...Object.keys(m), ...(kind === "income" ? [...S.incomes.map((i) => FS.normCat(i.name)), "Жалақы"] : [...S.categories.map((c) => FS.normCat(c.name)), ...CATS.filter((c) => c !== "Жалақы")])])].sort((a, b) => (m[b] || 0) - (m[a] || 0));
 };
 const sel = (name, opts, val) => h("select", { name }, opts.map(([v, t]) => h("option", { value: v, selected: v === val }, t)));
 const fld = (label, input) => h("label", {}, label, input);
@@ -410,7 +428,7 @@ function openAdd(init = {}) {
     const c = S.cycles.find((x) => x.id === st.cycleId), cat = c ? FS.normCat(c.cat || "Тұрмыс") : st.cat, inc = st.kind === "income";
     const f = h("form", { onsubmit: (e) => {
       e.preventDefault(); const v = Object.fromEntries(new FormData(f)), note = v.note.trim(), store = v.store.trim();
-      const tx = withAcc({ id: crypto.randomUUID(), kind: st.kind, amount: num(st.amount), category: cat, note: c ? [c.name, note].filter(Boolean).join(" · ") : note, date: v.date, ...(store ? { store } : {}) }, v);
+      const tx = withAcc({ id: crypto.randomUUID(), kind: st.kind, amount: num(st.amount), category: cat, note: c ? [c.name, note].filter(Boolean).join(" · ") : note, date: v.date, ...(store ? { store } : {}), ...(v.sub ? { sub: v.sub } : {}) }, v);
       put("tx", tx);
       if (c) recordItem(c, { cost: tx.amount, qty: num(v.qty) || 1, store, discount: v.discount === "1", note, date: v.date, txId: tx.id });
       save(); dlg.close();
@@ -419,6 +437,7 @@ function openAdd(init = {}) {
       fld("Дүкен", h("input", { name: "store", list: "dl-store", autocomplete: "off" })), h("datalist", { id: "dl-store" }, stores().map((v) => h("option", { value: v }))),
       c && fld(`Саны, ${c.unit || "дана"}`, h("input", { name: "qty", type: "number", min: 0.01, step: "any", value: 1, inputmode: "decimal" })),
       c && fld("Жеңілдікпен алдың ба?", sel("discount", [["0", "Жоқ"], ["1", "Иә"]], "0")),
+      !c && subsOf(cat).length > 0 && fld("Ішкі санат", sel("sub", [["", "—"], ...subsOf(cat).map((x) => [x, x])], "")),
       fld(c ? "Баға/пікір" : "Ескертпе", h("input", { name: "note" })),
       fld("Күні", h("input", { type: "date", name: "date", value: today(), required: true })),
       h("div", { class: "end" }, h("button", { type: "button", class: "ghost", onclick: () => { st.step = 2; draw(); } }, "Артқа"), h("button", { class: "primary" }, "Сақтау")));
@@ -489,6 +508,8 @@ const valid = (x) => {
     a("stock", (i) => n(i.qty)) &&
     a("matches", (m) => Array.isArray(m.brands) && m.brands.length > 1 && m.brands.every((b) => n(b.price) && n(b.days) && b.days > 0)) &&
     a("contribs", (c) => n(c.amount) && s(c.goalId)) &&
+    a("categories", (c) => s(c.name) && Array.isArray(c.subs ?? [])) &&
+    a("incomes", (c) => s(c.name) && n(c.amount) && c.amount > 0) &&
     a("accounts", (c) => s(c.name) && n(c.opening)) &&
     a("transfers", (t) => n(t.amount) && t.amount > 0 && s(t.from) && s(t.to));
 };
@@ -518,6 +539,14 @@ function settings() {
   return [
     head("Профиль"),
     ...walletPage().slice(1),
+    sec("Санаттар", add(() => catForm()), S.categories.length ? S.categories.map((c) => h("div", { class: "row" },
+      h("div", { class: "main" }, h("b", {}, c.name), h("small", { class: "muted" }, (c.subs ?? []).join(", ") || "Ішкі санат жоқ")),
+      h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${c.name}`, onclick: () => catForm(c) }, ic("edit")), del("categories", c.id, c.name))) : empty("Санат жоқ. Мысалы: Тамақ → Азық-түлік, Мейрамхана.")),
+    sec("Кіріс көздері", add(() => incForm()), S.incomes.length ? S.incomes.map((i) => h("div", { class: "row" },
+      h("div", { class: "main" }, h("b", {}, i.name), h("small", { class: "muted num" }, `${tg(i.amount)} / ай`)),
+      h("button", { onclick: () => gotIncome(i) }, ic("check"), "Түсті"),
+      h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${i.name}`, onclick: () => incForm(i) }, ic("edit")), del("incomes", i.id, i.name))) : empty("Кіріс көзі жоқ.")),
+    sec("Жинақтар", add(addGoal), S.goals.length ? FS.goalsView(S).map((g) => goalRow(g, true)) : empty("Жинақ жоқ. Мысалы: ноутбук, демалыс.")),
     sec("Қаржылық параметрлер", h("button", { class: "ghost", onclick: () => ask("Қаржылық параметрлер", [
       { name: "capital", label: "Бастапқы капитал, ₸", type: "number", min: -1e12, value: st.capital },
       { name: "income", label: "Айлық тұрақты кіріс, ₸", type: "number", value: st.income },

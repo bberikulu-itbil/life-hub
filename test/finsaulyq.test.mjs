@@ -189,3 +189,14 @@ test("fromRow: item жарамды болса ғана; tx.store және settin
   assert.equal(r("fs_settings", { city: " Алматы " }).item.city, "Алматы");
   assert.equal(FS.toRow("settings", { capital: 1, income: 2, fixed: 3, city: "Алматы" }, "s").data.city, "Алматы");
 });
+
+test("санат/ішкі санат және кіріс көзі: fromRow, monthTotals.bySub", () => {
+  const r = (app, data) => FS.fromRow({ id: "z", app, data, created_at: "2026-10-01T00:00:00Z" });
+  assert.deepEqual(r("fs_category", { name: "Тамақ", subs: ["Азық", "Кафе"] }).subs, ["Азық", "Кафе"]);
+  assert.equal(r("fs_category", { name: " " }), null);
+  assert.equal(r("fs_income", { name: "Жалақы", amount: 400000 }).amount, 400000);
+  assert.equal(r("fs_income", { name: "Жалақы", amount: 0 }), null);
+  assert.equal(r("money", { amount: 5, kind: "expense", category: "тамақ", date: "2026-10-01", sub: "Кафе" }).sub, "Кафе");
+  const m = FS.monthTotals([{ kind: "expense", amount: 5, category: "Тамақ", sub: "Кафе", date: "2026-10-01" }, { kind: "expense", amount: 7, category: "тамақ", sub: "Кафе", date: "2026-10-02" }, { kind: "expense", amount: 1, category: "Тамақ", date: "2026-10-02" }], "2026-10-26");
+  assert.deepEqual([m.byCat["Тамақ"], m.bySub["Тамақ"]], [13, { Кафе: 12 }]);
+});

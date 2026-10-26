@@ -54,11 +54,11 @@ const normCat = (c) => { const t = String(c ?? "").trim(); return t ? t[0].toUpp
 
 // Осы айдың кірісі, шығыны және санат бойынша шығын
 function monthTotals(tx, today) {
-  const month = today.slice(0, 7), out = { income: 0, expense: 0, byCat: {} };
+  const month = today.slice(0, 7), out = { income: 0, expense: 0, byCat: {}, bySub: {} };
   for (const t of tx) {
     if (t.date.slice(0, 7) !== month) continue;
     out[t.kind] += t.amount;
-    if (t.kind === "expense") { const k = normCat(t.category); out.byCat[k] = (out.byCat[k] || 0) + t.amount; }
+    if (t.kind === "expense") { const k = normCat(t.category); out.byCat[k] = (out.byCat[k] || 0) + t.amount; if (t.sub) { out.bySub[k] ||= {}; out.bySub[k][t.sub] = (out.bySub[k][t.sub] || 0) + t.amount; } }
   }
   return out;
 }
@@ -81,7 +81,7 @@ function wallet(S) {
 
 // ---- Supabase `items` ↔ жергілікті күй ----
 // tx — ассистентпен ортақ `money` (data: kind, amount, category, note, date); қалғаны — fs_* қолданбасына тән
-const APP_OF = { tx: "money", cycles: "fs_cycle", items: "fs_item", goals: "fs_goal", stock: "fs_stock", matches: "fs_match", contribs: "fs_contrib", accounts: "fs_account", transfers: "fs_transfer", settings: "fs_settings" };
+const APP_OF = { categories: "fs_category", incomes: "fs_income", tx: "money", cycles: "fs_cycle", items: "fs_item", goals: "fs_goal", stock: "fs_stock", matches: "fs_match", contribs: "fs_contrib", accounts: "fs_account", transfers: "fs_transfer", settings: "fs_settings" };
 const KEY_OF = Object.fromEntries(Object.entries(APP_OF).map(([k, a]) => [a, k]));
 const localDate = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
@@ -90,10 +90,11 @@ function fromRow(r) {
   const k = KEY_OF[r.app], d = r.data || {}, n = (v) => Number.isFinite(Number(v)) && v !== "" && v != null;
   if (!k) return null;
   if (k === "tx") return n(d.amount) && (d.kind === "income" || d.kind === "expense")
-    ? { id: r.id, kind: d.kind, amount: Number(d.amount), category: normCat(d.category), note: String(d.note ?? ""), date: /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : localDate(r.created_at), ...(typeof d.account === "string" && d.account ? { account: d.account } : {}), ...(typeof d.store === "string" && d.store ? { store: d.store } : {}) } : null;
+    ? { id: r.id, kind: d.kind, amount: Number(d.amount), category: normCat(d.category), note: String(d.note ?? ""), date: /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : localDate(r.created_at), ...(typeof d.account === "string" && d.account ? { account: d.account } : {}), ...(typeof d.store === "string" && d.store ? { store: d.store } : {}), ...(typeof d.sub === "string" && d.sub ? { sub: d.sub } : {}) } : null;
   if (k === "settings") return { key: "settings", item: { capital: Number(d.capital) || 0, income: Number(d.income) || 0, fixed: Number(d.fixed) || 0, city: typeof d.city === "string" && d.city.trim() ? d.city.trim() : "Астана" }, id: r.id };
   const ok = { cycles: n(d.price) && n(d.every) && d.every > 0 && typeof d.last === "string", goals: n(d.target) && n(d.saved) && n(d.months) && typeof d.start === "string",
     stock: n(d.qty), matches: Array.isArray(d.brands) && d.brands.length > 1, contribs: n(d.amount) && typeof d.goalId === "string",
+    categories: typeof d.name === "string" && d.name.trim() && Array.isArray(d.subs ?? []), incomes: typeof d.name === "string" && d.name.trim() && n(d.amount) && d.amount > 0,
     items: typeof d.cycleId === "string" && n(d.cost) && /^\d{4}-\d{2}-\d{2}$/.test(d.time),
     accounts: typeof d.name === "string" && n(d.opening), transfers: n(d.amount) && d.amount > 0 && typeof d.from === "string" && typeof d.to === "string" && d.from !== d.to }[k];
   return ok ? { id: r.id, ...d } : null;
@@ -106,7 +107,7 @@ const toRow = (k, e, settingsId) => {
 
 // Серверден келген жолдар + әлі жіберілмеген өзгерістер → жаңа күй (сервер негіз, кезектегі өзгеріс үстінен жазылады)
 function mergePull(S, rows) {
-  const next = { tx: [], cycles: [], items: [], goals: [], stock: [], matches: [], contribs: [], accounts: [], transfers: [] }, pend = new Map((S.pending || []).map((p) => [p.k + ":" + p.id, p.op]));
+  const next = { tx: [], cycles: [], items: [], categories: [], incomes: [], goals: [], stock: [], matches: [], contribs: [], accounts: [], transfers: [] }, pend = new Map((S.pending || []).map((p) => [p.k + ":" + p.id, p.op]));
   let settings = null, settingsId = null;
   for (const r of rows) {
     const e = fromRow(r);
