@@ -458,10 +458,30 @@ function showReaderTools() {
       if (a === 'toc') showToc();
       if (a === 'search') showSearch();
       if (a === 'aa') showAa();
-      if (a === 'notes') { const p = $('#rPanel'); p.hidden = !p.hidden; }
+      if (a === 'notes') showReaderNotes();
       if (a === 'mark') readerMark();
       if (a === 'shelf') openShelfDlg(R.book.id);
       if (a === 'share') navigator.share({ title: R.book.title, text: `«${R.book.title}»: ${pct}% оқылды` }).catch(() => {});
+    };
+  });
+}
+async function showReaderNotes() {
+  const ms = (await byBook('marks', R.book.id)).filter(m => m.kind === 'read' && m.versionId === R.ver.id).sort((a, b) => (a.pct || 0) - (b.pct || 0));
+  const ns = (await byBook('notes', R.book.id)).sort((a, b) => b.created - a.created);
+  rSheet(`<div class="psl-hd"><b>Белгілер мен ескертпелер</b><button class="icon-btn" data-mark aria-label="Бетбелгі қою">${ic('bookmark', 20)}</button></div>
+    <h4>Бетбелгілер</h4><div id="rsMarks">${ms.length ? ms.map(markRow).join('') : '<small class="muted">Әзірге жоқ</small>'}</div>
+    <h4>Ескертпе</h4><textarea id="rsNoteText" placeholder="Осы жерге ескертпе жаз…"></textarea><button class="primary" data-save>Ескертпені сақтау</button>
+    <div class="rs-list">${ns.length ? ns.map(n => `<div class="note"><small>${esc(n.ref)}</small><div>${esc(n.text).replace(/\n/g, '<br>')}</div></div>`).join('') : '<small class="muted">Әзірге ескертпе жоқ</small>'}</div>`, D => {
+    bindMarks(D.querySelector('#rsMarks'), ms, showReaderNotes);
+    D.querySelector('[data-mark]').onclick = () => {
+      const pdf = R.kind === 'pdf', pct = R.cur?.pct || 0;
+      D.close();
+      openMarkDlg({ bookId: R.book.id, versionId: R.ver.id, kind: 'read', pos: pdf ? { page: R.page } : { cfi: R.cur?.pos?.cfi }, pct, label: pdf ? `бет ${R.page}` : `${pct}%` }, showReaderNotes);
+    };
+    D.querySelector('[data-save]').onclick = async () => {
+      const t = D.querySelector('#rsNoteText').value.trim(); if (!t) return;
+      await put('notes', { id: uid(), bookId: R.book.id, vname: R.ver.name, text: t, ref: R.kind === 'pdf' ? `бет ${R.page}` : (R.cur?.label || ''), created: Date.now() });
+      D.close(); showReaderNotes(); toast('Ескертпе сақталды');
     };
   });
 }

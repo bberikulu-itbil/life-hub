@@ -1,4 +1,4 @@
-const C = 'kitapp-v30'; // Kitapp 0.8.1 reader refresh
+const C = 'kitapp-v31'; // Kitapp 0.8.1 speed reader refresh
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'rag.js', 'chat.js', 'audio.js', 'ltts.js', 'jobs.js', 'tts-worker.js', 'vendor/piper/piper.js', 'vendor/piper/piper-o91UDS6e.js', 'icons.js', 'covers.js', 'home.js', 'player.js', 'prep.js', 'shelves.js', 'marks.js', 'brand.js', 'profile.js', 'kstats.js', 'kspeed.js', 'kconvert.js', 'convert.js', 'speed.js', 'stats.js', 'edit.js', 'cloud.js', 'manifest.webmanifest',
   'vendor/lib/pdf.min.js', 'vendor/lib/pdf.worker.min.js', 'vendor/lib/epub.min.js', 'vendor/lib/jszip.min.js']; // кітап ашуға міндетті: CDN-сіз, қосымшамен бірге
 // Сыртқы кітапханалар: интернетсіз оқу үшін алдын ала сақталады (нұсқасы бекітілген, өзгермейді).
