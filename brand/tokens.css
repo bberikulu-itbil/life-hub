@@ -1,0 +1,222 @@
+/* Life Hub — ортақ токендер. Бастауы: «Life Hub» дизайн жүйесі (tokens.json); өзгерту сонда, сосын осы файл.
+   Қосымша өз түсін <html data-app="kitapp"> арқылы алады: acc, acc-2, acc-ink, blob1–3. */
+:root{
+  --bg:#eef1f7;
+  --paper:#fbfbfd;
+  --ink:#111827;
+  --mute:#6b7487;
+  --line:rgba(17,24,39,.08);
+  --glass:rgba(255,255,255,.56);
+  --glass-2:rgba(255,255,255,.8);
+  --gb:rgba(255,255,255,.75);
+  --hi:rgba(255,255,255,.95);
+  --sh:rgba(31,41,72,.12);
+  --warn:#e5484d;
+  --star:#f5a524;
+  --star-ink:#b7791f;
+  --good:#22a06b;
+  --good-ink:#1a8a5a;
+  --toast:rgba(18,22,32,.86);
+  --backdrop:rgba(10,14,24,.35);
+  --lifehub-acc:#2b3142;
+  --lifehub-acc-2:#5a6276;
+  --lifehub-acc-ink:#ffffff;
+  --lifehub-blob1:#d8d0fb;
+  --lifehub-blob2:#ffd6c2;
+  --lifehub-blob3:#c6ecef;
+  --sozdik-acc:#0a7586;
+  --sozdik-acc-2:#2fa4b4;
+  --sozdik-acc-ink:#ffffff;
+  --sozdik-blob1:#b9e8ee;
+  --sozdik-blob2:#d6dcff;
+  --sozdik-blob3:#ffe1c4;
+  --kitapp-acc:#3b6ef5;
+  --kitapp-acc-2:#6d93f7;
+  --kitapp-acc-ink:#ffffff;
+  --kitapp-blob1:#b7cbfd;
+  --kitapp-blob2:#ffd3bf;
+  --kitapp-blob3:#c3eedc;
+  --finsaulyq-acc:#0d7a52;
+  --finsaulyq-acc-2:#36a97b;
+  --finsaulyq-acc-ink:#ffffff;
+  --finsaulyq-blob1:#bfe9d5;
+  --finsaulyq-blob2:#fbe7b5;
+  --finsaulyq-blob3:#c9dcfb;
+  --jospar-acc:#c2410c;
+  --jospar-acc-2:#ec7a35;
+  --jospar-acc-ink:#ffffff;
+  --jospar-blob1:#ffd2b3;
+  --jospar-blob2:#ffe7a8;
+  --jospar-blob3:#f6c9dc;
+  --mindmap-acc:#6646d6;
+  --mindmap-acc-2:#8f74ef;
+  --mindmap-acc-ink:#ffffff;
+  --mindmap-blob1:#d9ccfd;
+  --mindmap-blob2:#c5e3fb;
+  --mindmap-blob3:#f8cde6;
+  --densaulyq-acc:#be2f63;
+  --densaulyq-acc-2:#e2628e;
+  --densaulyq-acc-ink:#ffffff;
+  --densaulyq-blob1:#fbc7d8;
+  --densaulyq-blob2:#d6f0c4;
+  --densaulyq-blob3:#ffdcc0;
+  --shadow-glass:inset 0 1px 0 rgba(255,255,255,.95), 0 10px 30px rgba(31,41,72,.12);
+  --sheen:linear-gradient(135deg,rgba(255,255,255,.35),rgba(255,255,255,0) 42%);
+  color-scheme:light
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141925;
+  --paper:#161b26;
+  --ink:#eef2f8;
+  --mute:#98a2b6;
+  --line:rgba(255,255,255,.08);
+  --glass:rgba(38,45,63,.52);
+  --glass-2:rgba(27,33,47,.86);
+  --gb:rgba(255,255,255,.11);
+  --hi:rgba(255,255,255,.13);
+  --sh:rgba(0,0,0,.4);
+  --warn:#ff6b6b;
+  --star:#f7b733;
+  --lifehub-acc:#e4e8f1;
+  --lifehub-acc-2:#ffffff;
+  --lifehub-acc-ink:#141925;
+  --lifehub-blob1:#3a2f72;
+  --lifehub-blob2:#4f2a24;
+  --lifehub-blob3:#13474f;
+  --sozdik-acc:#4cc3d4;
+  --sozdik-acc-2:#7ad6e2;
+  --sozdik-acc-ink:#04262c;
+  --sozdik-blob1:#0f4a55;
+  --sozdik-blob2:#262f72;
+  --sozdik-blob3:#4a3216;
+  --kitapp-acc:#6d93f2;
+  --kitapp-acc-2:#8eacf6;
+  --kitapp-acc-ink:#0b1530;
+  --kitapp-blob1:#22397a;
+  --kitapp-blob2:#47286a;
+  --kitapp-blob3:#12544f;
+  --finsaulyq-acc:#4cc595;
+  --finsaulyq-acc-2:#7bd8b1;
+  --finsaulyq-acc-ink:#052a1b;
+  --finsaulyq-blob1:#0f4a35;
+  --finsaulyq-blob2:#4a3c10;
+  --finsaulyq-blob3:#1f3770;
+  --jospar-acc:#ff9152;
+  --jospar-acc-2:#ffb07f;
+  --jospar-acc-ink:#331203;
+  --jospar-blob1:#5a2a10;
+  --jospar-blob2:#4d3c0d;
+  --jospar-blob3:#4d1a33;
+  --mindmap-acc:#a58cff;
+  --mindmap-acc-2:#c0afff;
+  --mindmap-acc-ink:#1c0f45;
+  --mindmap-blob1:#3a2a7a;
+  --mindmap-blob2:#163f63;
+  --mindmap-blob3:#4d1a44;
+  --densaulyq-acc:#ff7aa6;
+  --densaulyq-acc-2:#ff9fbf;
+  --densaulyq-acc-ink:#3a0a1d;
+  --densaulyq-blob1:#5a1a33;
+  --densaulyq-blob2:#23441a;
+  --densaulyq-blob3:#4f2a14;
+  --shadow-glass:inset 0 1px 0 rgba(255,255,255,.13), 0 10px 30px rgba(0,0,0,.4);
+  --sheen:linear-gradient(135deg,rgba(255,255,255,.07),rgba(255,255,255,0) 42%);
+  color-scheme:dark
+}}
+:root[data-theme="dark"]{
+  --bg:#141925;
+  --paper:#161b26;
+  --ink:#eef2f8;
+  --mute:#98a2b6;
+  --line:rgba(255,255,255,.08);
+  --glass:rgba(38,45,63,.52);
+  --glass-2:rgba(27,33,47,.86);
+  --gb:rgba(255,255,255,.11);
+  --hi:rgba(255,255,255,.13);
+  --sh:rgba(0,0,0,.4);
+  --warn:#ff6b6b;
+  --star:#f7b733;
+  --lifehub-acc:#e4e8f1;
+  --lifehub-acc-2:#ffffff;
+  --lifehub-acc-ink:#141925;
+  --lifehub-blob1:#3a2f72;
+  --lifehub-blob2:#4f2a24;
+  --lifehub-blob3:#13474f;
+  --sozdik-acc:#4cc3d4;
+  --sozdik-acc-2:#7ad6e2;
+  --sozdik-acc-ink:#04262c;
+  --sozdik-blob1:#0f4a55;
+  --sozdik-blob2:#262f72;
+  --sozdik-blob3:#4a3216;
+  --kitapp-acc:#6d93f2;
+  --kitapp-acc-2:#8eacf6;
+  --kitapp-acc-ink:#0b1530;
+  --kitapp-blob1:#22397a;
+  --kitapp-blob2:#47286a;
+  --kitapp-blob3:#12544f;
+  --finsaulyq-acc:#4cc595;
+  --finsaulyq-acc-2:#7bd8b1;
+  --finsaulyq-acc-ink:#052a1b;
+  --finsaulyq-blob1:#0f4a35;
+  --finsaulyq-blob2:#4a3c10;
+  --finsaulyq-blob3:#1f3770;
+  --jospar-acc:#ff9152;
+  --jospar-acc-2:#ffb07f;
+  --jospar-acc-ink:#331203;
+  --jospar-blob1:#5a2a10;
+  --jospar-blob2:#4d3c0d;
+  --jospar-blob3:#4d1a33;
+  --mindmap-acc:#a58cff;
+  --mindmap-acc-2:#c0afff;
+  --mindmap-acc-ink:#1c0f45;
+  --mindmap-blob1:#3a2a7a;
+  --mindmap-blob2:#163f63;
+  --mindmap-blob3:#4d1a44;
+  --densaulyq-acc:#ff7aa6;
+  --densaulyq-acc-2:#ff9fbf;
+  --densaulyq-acc-ink:#3a0a1d;
+  --densaulyq-blob1:#5a1a33;
+  --densaulyq-blob2:#23441a;
+  --densaulyq-blob3:#4f2a14;
+  --shadow-glass:inset 0 1px 0 rgba(255,255,255,.13), 0 10px 30px rgba(0,0,0,.4);
+  --sheen:linear-gradient(135deg,rgba(255,255,255,.07),rgba(255,255,255,0) 42%);
+  color-scheme:dark
+}
+:root{
+  --gutter:16px;
+  --gap-xs:.45rem;
+  --gap-sm:.6rem;
+  --gap-md:.9rem;
+  --gap-lg:1.3rem;
+  --sec-gap:1rem;
+  --sec-pad:1.1rem;
+  --tap:42px;
+  --nav-h:66px;
+  --mini-h:64px;
+  --sidebar:220px;
+  --r-xs:6px;
+  --r-cover:10px;
+  --r-input:12px;
+  --r-btn:14px;
+  --r-card:18px;
+  --r-mini:20px;
+  --r-list:22px;
+  --r-sec:24px;
+  --r-sheet:26px;
+  --r-nav:33px;
+  --r-pill:99px;
+  --blur:blur(24px) saturate(180%);
+  --blur-backdrop:blur(6px);
+  --shadow-cover:0 12px 26px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.12);
+  --shadow-primary:inset 0 1px 0 rgba(255,255,255,.35),0 6px 18px color-mix(in srgb,var(--acc) 35%,transparent);
+  --font-sans:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --font-serif:Georgia, "Times New Roman", serif;
+  --font-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace
+}
+[data-app="lifehub"]{--acc:var(--lifehub-acc);--acc-2:var(--lifehub-acc-2);--acc-ink:var(--lifehub-acc-ink);--blob1:var(--lifehub-blob1);--blob2:var(--lifehub-blob2);--blob3:var(--lifehub-blob3)}
+[data-app="sozdik"]{--acc:var(--sozdik-acc);--acc-2:var(--sozdik-acc-2);--acc-ink:var(--sozdik-acc-ink);--blob1:var(--sozdik-blob1);--blob2:var(--sozdik-blob2);--blob3:var(--sozdik-blob3)}
+[data-app="kitapp"]{--acc:var(--kitapp-acc);--acc-2:var(--kitapp-acc-2);--acc-ink:var(--kitapp-acc-ink);--blob1:var(--kitapp-blob1);--blob2:var(--kitapp-blob2);--blob3:var(--kitapp-blob3)}
+[data-app="finsaulyq"]{--acc:var(--finsaulyq-acc);--acc-2:var(--finsaulyq-acc-2);--acc-ink:var(--finsaulyq-acc-ink);--blob1:var(--finsaulyq-blob1);--blob2:var(--finsaulyq-blob2);--blob3:var(--finsaulyq-blob3)}
+[data-app="jospar"]{--acc:var(--jospar-acc);--acc-2:var(--jospar-acc-2);--acc-ink:var(--jospar-acc-ink);--blob1:var(--jospar-blob1);--blob2:var(--jospar-blob2);--blob3:var(--jospar-blob3)}
+[data-app="mindmap"]{--acc:var(--mindmap-acc);--acc-2:var(--mindmap-acc-2);--acc-ink:var(--mindmap-acc-ink);--blob1:var(--mindmap-blob1);--blob2:var(--mindmap-blob2);--blob3:var(--mindmap-blob3)}
+[data-app="densaulyq"]{--acc:var(--densaulyq-acc);--acc-2:var(--densaulyq-acc-2);--acc-ink:var(--densaulyq-acc-ink);--blob1:var(--densaulyq-blob1);--blob2:var(--densaulyq-blob2);--blob3:var(--densaulyq-blob3)}

@@ -40,6 +40,12 @@ Hub GitHub Pages арқылы жарияланған: https://bberikulu-itbil.gi
 
 Supabase → Authentication → URL Configuration → Site URL өрісіне осы сілтемені жаз — тіркелудегі растау хаттары сонда апарады.
 
+## Дизайн
+
+Барлық қосымша бір стильде (Liquid Glass) — «Life Hub» дизайн жүйесі. Кодтағы ортақ бөлігі `brand/` ішінде:
+- `brand/tokens.css` — түстер, бұрыштар, кеңістік және жеті қосымшаның түсі. Қосымша өз түсін `<html data-app="kitapp">` арқылы алады.
+- `brand/logos/` — жеті логотип (`lifehub`, `sozdik`, `kitapp`, `finsaulyq`, `jospar`, `mindmap`, `densaulyq`) және iPhone басты экранына арналған `lifehub-180.png`.
+
 ## Сынып хабарлары
 
 https://bberikulu-itbil.github.io/life-hub/broadcast/ — бірнеше сыныпқа WhatsApp хабарлары.
