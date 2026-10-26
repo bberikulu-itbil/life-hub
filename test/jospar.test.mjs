@@ -4,8 +4,8 @@ import { createRequire } from "node:module";
 const JO = createRequire(import.meta.url)("../jospar/core.js");
 
 const T = "2026-10-26";
-const good = { id: "g", name: "Таңғы жаттығу", kind: "good", steps: ["Шпагат 10 минут", "Отырып тұру 15 рет"], time: "", dur: 0, created: "2026-10-20" };
-const bad = { id: "b", name: "Тырнақ тістеу", kind: "bad", steps: [], time: "", dur: 0, created: "2026-10-20" };
+const good = { id: "g", name: "Таңғы жаттығу", kind: "good", steps: ["Шпагат 10 минут", "Отырып тұру 15 рет"], time: "", dur: 0, w: 1, created: "2026-10-20" };
+const bad = { id: "b", name: "Тырнақ тістеу", kind: "bad", steps: [], time: "", dur: 0, w: 1, created: "2026-10-20" };
 const log = (habit, date, o = {}) => ({ id: habit + date, habit, date, done: [], slip: false, resist: 0, count: 0, ...o });
 
 test("жақсы әдет: тек барлық пункт белгіленгенде орындалды", () => {
@@ -64,7 +64,7 @@ test("fromRow: жарамсыз жолдар — null, жарамдылары т
   assert.equal(JO.fromRow(row("jo_habit", { name: "А", kind: "evil", created: T })), null);
   assert.equal(JO.fromRow(row("jo_log", { habit: "g", date: "ертең" })), null);
   assert.equal(JO.fromRow(row("money", { amount: 1 })), null);
-  assert.deepEqual(JO.fromRow(row("jo_habit", { name: "А", kind: "good", created: T, steps: ["a", 5], time: "9:00", dur: -1 })), { id: "x", name: "А", kind: "good", steps: ["a"], time: "", dur: 0, created: T });
+  assert.deepEqual(JO.fromRow(row("jo_habit", { name: "А", kind: "good", created: T, steps: ["a", 5], time: "9:00", dur: -1 })), { id: "x", name: "А", kind: "good", steps: ["a"], time: "", dur: 0, w: 1, created: T });
   assert.deepEqual(JO.fromRow(row("jo_log", { habit: "g", date: T, done: [0, "1", -2], resist: "x" })).done, [0]);
 });
 
@@ -83,7 +83,7 @@ test("mergePull: сервер негіз, кезектегі өзгеріс же
   assert.deepEqual(m.logs[0].done, [0, 1]);
 });
 
-const task = (o = {}) => ({ id: "t", title: "ClassFlow коды", goal: "", due: "", time: "", dur: 0, done: false, doneAt: "", ...o });
+const task = (o = {}) => ({ id: "t", title: "ClassFlow коды", goal: "", due: "", time: "", dur: 0, w: 1, done: false, doneAt: "", ...o });
 
 test("rate: жақсы әдет — бүгін тек орындалса есептеледі; жаман — бүгін есептелмейді; бейтарап — null", () => {
   const S = { logs: ["2026-10-24", "2026-10-25"].map((d) => log("g", d, { done: [0, 1] })) };
@@ -126,7 +126,7 @@ test("fromRow: тапсырма мен мақсат", () => {
   const row = (app, data, done = false) => ({ id: "x", app, data, done });
   assert.equal(JO.fromRow(row("jo_task", { title: "  " })), null);
   assert.equal(JO.fromRow(row("jo_goal", { title: "А", deadline: "жақында" })), null);
-  assert.deepEqual(JO.fromRow(row("jo_task", { title: "А", due: "2026-10-30", time: "9", doneAt: "2026-10-26" }, true)), { id: "x", title: "А", goal: "", due: "2026-10-30", time: "", dur: 0, done: true, doneAt: "2026-10-26" });
+  assert.deepEqual(JO.fromRow(row("jo_task", { title: "А", due: "2026-10-30", time: "9", doneAt: "2026-10-26" }, true)), { id: "x", title: "А", goal: "", due: "2026-10-30", time: "", dur: 0, w: 1, done: true, doneAt: "2026-10-26" });
   assert.equal(JO.fromRow(row("jo_task", { title: "А", done: false, doneAt: "2026-10-26" })).doneAt, ""); // орындалмаған — doneAt жоқ
   const g = { id: "x", title: "Олимпиада банкі", why: "Оқушыларға", deadline: "2026-12-20" };
   assert.deepEqual(JO.fromRow(JO.toRow("goals", g)), g);
@@ -150,4 +150,31 @@ test("тапсырманың «орындалды» белгісі — items.don
   assert.equal(JO.fromRow(fromHub).done, true);
   assert.equal(JO.fromRow({ ...fromHub, done: false, data: { title: "А", done: true } }).done, false);
   assert.equal(JO.fromRow({ id: "x", app: "jo_task", data: { title: "А" } }).done, false); // ассистент жазған жаңа тапсырма
+});
+
+test("салмақ: 0–5, жоқ не жарамсыз болса 1; 0 сақталады", () => {
+  const r = (w) => JO.fromRow({ id: "x", app: "jo_task", data: { title: "А", w } }).w;
+  assert.deepEqual([r(0), r(5), r(3), r(undefined), r(6), r(-1), r("5"), r(2.5)], [0, 5, 3, 1, 1, 1, 1, 1]);
+  assert.equal(JO.fromRow(JO.toRow("habits", { ...good, w: 4 })).w, 4);
+});
+
+test("dayPoints: тапсырма, жақсы және жаман әдет салмағымен; 0 салмақ пен бейтарап ұпай бермейді", () => {
+  const S = { habits: [{ ...good, steps: [], w: 5 }, bad, { id: "n", name: "Су", kind: "neutral", steps: [], time: "", dur: 0, w: 3, created: "2026-10-20" }],
+    logs: [log("g", "2026-10-25", { done: [0] }), log("b", "2026-10-24", { slip: true })],
+    tasks: [task({ id: "a", done: true, doneAt: "2026-10-25", w: 3 }), task({ id: "z", done: true, doneAt: "2026-10-25", w: 0 }), task({ id: "u", w: 5 })], goals: [], pending: [] };
+  assert.equal(JO.dayPoints(S, "2026-10-25", T), 5 + 1 + 3); // жақсы 5 + жаман 1 (сүрінбеген) + тапсырма 3
+  assert.equal(JO.dayPoints(S, "2026-10-24", T), 0); // сүрінген күн, ештеңе орындалмаған
+  assert.equal(JO.dayPoints(S, T, T), 0); // бүгін: жаман әдет күн жабылғанша есептелмейді
+  assert.equal(JO.dayPoints(S, "2026-10-19", T), 0); // әдет құрылғанға дейін
+});
+
+test("profileStats: апта/ай ұпайы, қатар, жылу картасы дүйсенбіден басталады", () => {
+  const S = { habits: [], logs: [], goals: [], pending: [], tasks: ["2026-10-23", "2026-10-24", "2026-10-26"].map((d, i) => task({ id: "t" + i, done: true, doneAt: d, w: 2 })) };
+  const st = JO.profileStats(S, T); // 2026-10-26 — дүйсенбі
+  assert.equal(st.days.length, 13 * 7 - 6); // соңғы апта тек дүйсенбі
+  assert.equal(new Date(st.days[0].date + "T00:00:00Z").getUTCDay(), 1);
+  assert.equal(st.days.at(-1).date, T);
+  assert.deepEqual([st.week, st.month, st.cur, st.best, st.max], [2, 6, 1, 2, 2]);
+  assert.equal(JO.profileStats(S, "2026-10-27").cur, 1); // бүгін бос — кешегі қатар үзілмейді
+  assert.equal(JO.profileStats({ ...S, tasks: [] }, T).max, 0);
 });

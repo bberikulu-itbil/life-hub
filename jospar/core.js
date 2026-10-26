@@ -65,6 +65,28 @@ function monthStats(S, today) {
     fights: S.habits.reduce((t, h) => t + (h.kind === "bad" ? fightDays(S, h, month) : 0), 0), slips: S.logs.filter((l) => l.slip && l.date.startsWith(month)).length };
 }
 
+// Күн ұпайы: орындалған тапсырмалар (doneAt) + орындалған жақсы әдеттер + сүрінбеген жаман әдеттер (күн жабылғанда) — әрқайсысы өз салмағымен
+function dayPoints(S, date, today) {
+  let p = S.tasks.reduce((t, x) => t + (x.done && x.doneAt === date ? x.w : 0), 0);
+  for (const h of S.habits) {
+    if (h.kind === "neutral" || date < h.created || date > today) continue;
+    if (dayStatus(h, logOf(S, h.id, date)) === "done" && (h.kind === "good" || date < today)) p += h.w;
+  }
+  return p;
+}
+const weekday = (s) => (new Date(dnum(s) * MS).getUTCDay() + 6) % 7; // дүйсенбі = 0
+
+// Профиль: апта/ай ұпайы, белсенді күндер қатары және соңғы `weeks` аптаның жылу картасы (дүйсенбіден басталады)
+function profileStats(S, today, weeks = 13) {
+  const start = addDays(today, -weekday(today) - 7 * (weeks - 1)), days = [];
+  for (let d = start; d <= today; d = addDays(d, 1)) days.push({ date: d, p: dayPoints(S, d, today) });
+  const sum = (from) => days.filter((x) => x.date >= from).reduce((t, x) => t + x.p, 0);
+  let cur = 0, best = 0, run = 0;
+  for (const x of days) { run = x.p > 0 ? run + 1 : 0; best = Math.max(best, run); }
+  for (let i = days.length - 1 - (days.at(-1).p > 0 ? 0 : 1); i >= 0 && days[i].p > 0; i--) cur++; // бүгін әлі бос болса, серия үзілмейді
+  return { days, week: sum(addDays(today, -weekday(today))), month: sum(today.slice(0, 8) + "01"), cur, best, max: Math.max(0, ...days.map((x) => x.p)) };
+}
+
 // Күрес күндері: «Шыдадым» кемінде бір рет басылған күндер (month: «YYYY-MM» болса, сол ай ғана)
 const fightDays = (S, h, month = "") => S.logs.filter((l) => l.habit === h.id && l.resist > 0 && l.date.startsWith(month)).length;
 
@@ -85,6 +107,7 @@ function pickMsg(list, vars, last = -1, rand = Math.random) {
 const APP_OF = { habits: "jo_habit", logs: "jo_log", tasks: "jo_task", goals: "jo_goal" };
 const KEY_OF = Object.fromEntries(Object.entries(APP_OF).map(([k, a]) => [a, k]));
 const DATE = /^\d{4}-\d{2}-\d{2}$/, TIME = /^\d{2}:\d{2}$/;
+const wt = (v) => (Number.isInteger(v) && v >= 0 && v <= 5 ? v : 1); // салмақ 0–5; 0 — міндетті емес, ұпай бермейді; жоқ болса 1
 const text = (v) => typeof v === "string" && v.trim() !== "";
 const nn = (v) => Number.isInteger(v) && v >= 0;
 
@@ -92,9 +115,9 @@ const nn = (v) => Number.isInteger(v) && v >= 0;
 function fromRow(r) {
   const k = KEY_OF[r.app], d = r.data || {};
   if (k === "habits") return typeof d.name === "string" && d.name.trim() && KINDS.includes(d.kind) && DATE.test(d.created)
-    ? { id: r.id, name: d.name, kind: d.kind, steps: Array.isArray(d.steps) ? d.steps.filter((s) => typeof s === "string") : [], time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, created: d.created } : null;
+    ? { id: r.id, name: d.name, kind: d.kind, steps: Array.isArray(d.steps) ? d.steps.filter((s) => typeof s === "string") : [], time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, w: wt(d.w), created: d.created } : null;
   if (k === "tasks") return text(d.title)
-    ? { id: r.id, title: d.title, goal: typeof d.goal === "string" ? d.goal : "", due: DATE.test(d.due) ? d.due : "", time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, done: r.done === true, doneAt: r.done === true && DATE.test(d.doneAt) ? d.doneAt : "" } : null;
+    ? { id: r.id, title: d.title, goal: typeof d.goal === "string" ? d.goal : "", due: DATE.test(d.due) ? d.due : "", time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, w: wt(d.w), done: r.done === true, doneAt: r.done === true && DATE.test(d.doneAt) ? d.doneAt : "" } : null;
   if (k === "goals") return text(d.title) && DATE.test(d.deadline) ? { id: r.id, title: d.title, why: typeof d.why === "string" ? d.why : "", deadline: d.deadline } : null;
   if (k === "logs") return typeof d.habit === "string" && DATE.test(d.date)
     ? { id: r.id, habit: d.habit, date: d.date, done: Array.isArray(d.done) ? d.done.filter(nn) : [], slip: d.slip === true, resist: nn(d.resist) ? d.resist : 0, count: nn(d.count) ? d.count : 0 } : null;
@@ -124,5 +147,5 @@ function mergePull(S, rows) {
   return next;
 }
 
-const JO = { addDays, daysBetween, stepCount, logOf, dayStatus, runs, rate, goalProgress, todayTask, monthStats, fightDays, RESIST, SLIP, pickMsg, APP_OF, fromRow, toRow, mergePull };
+const JO = { addDays, daysBetween, stepCount, logOf, dayStatus, runs, rate, goalProgress, todayTask, monthStats, dayPoints, profileStats, fightDays, RESIST, SLIP, pickMsg, APP_OF, fromRow, toRow, mergePull };
 if (typeof module !== "undefined") module.exports = JO;

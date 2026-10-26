@@ -153,6 +153,7 @@ function home() {
   ];
 }
 
+const WEIGHTS = [["1", "1 · жеңіл"], ["2", "2"], ["3", "3 · орташа"], ["4", "4"], ["5", "5 · маңызды"], ["0", "0 · міндетті емес, ұпай бермейді"]];
 /* ---------- Әдеттер ---------- */
 function habitForm(hb) {
   ask(hb ? "Әдетті өзгерту" : "Жаңа әдет", [
@@ -161,9 +162,10 @@ function habitForm(hb) {
     { name: "steps", label: "Ішкі пункттер: әр жолға біреу (тек жақсы әдетке)", type: "textarea", value: hb?.steps.join("\n") },
     { name: "time", label: "Басталу уақыты", type: "time", optional: true, value: hb?.time },
     { name: "dur", label: "Ұзақтығы, минут", type: "number", optional: true, min: 0, step: 1, value: hb?.dur || "" },
+    { name: "w", label: "Салмағы · профильдегі ұпайға әсері", options: WEIGHTS, value: String(hb?.w ?? 1) },
   ], (v) => {
     put("habits", { id: hb?.id ?? crypto.randomUUID(), name: v.name.trim(), kind: v.kind, steps: v.kind === "good" ? v.steps.split("\n").map((s) => s.trim()).filter(Boolean) : [],
-      time: v.time || "", dur: Math.round(Number(v.dur)) || 0, created: hb?.created ?? today() });
+      time: v.time || "", dur: Math.round(Number(v.dur)) || 0, w: Number(v.w), created: hb?.created ?? today() });
     save();
   }, hb && (() => {
     if (!confirm(`«${hb.name}» және оның тарихы өшіріледі. Жалғастыру ма?`)) return;
@@ -189,8 +191,9 @@ function taskForm(t) {
     { name: "due", label: "Мерзімі", type: "date", optional: true, value: t ? t.due : today() },
     { name: "time", label: "Басталу уақыты", type: "time", optional: true, value: t?.time },
     { name: "dur", label: "Ұзақтығы, минут", type: "number", optional: true, min: 0, step: 1, value: t?.dur || "" },
+    { name: "w", label: "Салмағы · профильдегі ұпайға әсері", options: WEIGHTS, value: String(t?.w ?? 1) },
   ], (v) => {
-    put("tasks", { id: t?.id ?? crypto.randomUUID(), title: v.title.trim(), goal: v.goal || "", due: v.due || "", time: v.time || "", dur: Math.round(Number(v.dur)) || 0, done: t?.done ?? false, doneAt: t?.doneAt ?? "" });
+    put("tasks", { id: t?.id ?? crypto.randomUUID(), title: v.title.trim(), goal: v.goal || "", due: v.due || "", time: v.time || "", dur: Math.round(Number(v.dur)) || 0, w: Number(v.w), done: t?.done ?? false, doneAt: t?.doneAt ?? "" });
     save();
   }, t && (() => { if (!confirm(`«${t.title}» өшіру ме?`)) return; rm("tasks", t.id); save(); }));
 }
@@ -251,11 +254,13 @@ const CLOUD = { local: "Бұлт өшік: Hub-қа кіріп, осы бетт�
 function profilePage() {
   // «ok» ескіруі мүмкін: кейін жазба қосылса не желі жоқ болса, кезекте күтіп тұр. Кіргенбіз, бірақ желі жоқ — «local» емес
   const state = (Sync.state === "local" && S.synced) || (Sync.state === "ok" && S.pending.length) ? "wait" : Sync.state;
-  const row = (k, v) => h("div", { class: "row" }, h("span", {}, k), h("b", { class: "num" }, v));
+  const row = (k, v) => h("div", { class: "row" }, h("span", {}, k), h("b", { class: "num" }, v)), st = JO.profileStats(S, today());
   return [
     h("h1", {}, "Профиль"), h("p", { class: "muted sub" }, "Деректер мен бұлт"),
     sec("Бұлт", h("p", { class: "muted" }, CLOUD[state] + (state === "wait" ? `: ${S.pending.length}` : "") + (state === "err" ? `: ${Sync.error}` : "")),
       h("div", { class: "end", style: "margin-top:0;justify-content:flex-start" }, state === "local" ? h("a", { class: "btn", href: "../" }, "Hub-қа кіру") : h("button", { onclick: () => Sync.now() }, "Қазір синхрондау"))),
+    sec("Белсенділік · соңғы 13 апта", h("div", { class: "heat", role: "img", "aria-label": "Күн сайынғы ұпай картасы" }, st.days.map((x) => h("i", { "data-l": st.max ? Math.ceil(x.p / st.max * 4) : 0, title: `${dshort(x.date)}: ${x.p}` }))),
+      row("Осы апта · ұпай", st.week), row("Осы ай · ұпай", st.month), row("Белсенді күндер қатары", st.cur), row("Ең ұзақ қатар", st.best)),
     sec("Жазбалар", row("Әдеттер", S.habits.length), row("Тапсырмалар", S.tasks.length), row("Мақсаттар", S.goals.length)),
   ];
 }
