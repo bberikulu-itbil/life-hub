@@ -435,28 +435,37 @@ const KINDS = [["expense", "Шығыс"], ["income", "Кіріс"], ["transfer",
 
 function openAdd(init = {}) {
   const st = { mode: init.cycleId ? "item" : "tx", kind: "expense", amount: "", step: 1, cat: "", cycleId: "", ...init };
+  st.expr ??= st.amount; if (!st.amount) st.expr = "";
   const dlg = h("dialog", { class: "sheet" });
-  const draw = () => dlg.replaceChildren(...[view1, view2, view3][st.step - 1]().flat().filter(Boolean));
+  const draw = () => { dlg.className = "sheet" + (st.step === 1 ? " pk" : ""); dlg.replaceChildren(...[view1, view2, view3][st.step - 1]().flat().filter(Boolean)); };
+  const OPS = "+−×÷", lastNum = () => st.expr.split(/[+−×÷]/).pop();
+  const calc = (e) => { const t = e.replace(/[+−×÷]$/, "").split(/([+−×÷])/); if (!t[0]) return NaN; const v = [Number(t[0])], o = [];
+    for (let i = 1; i < t.length; i += 2) { const x = Number(t[i + 1]); if (t[i] === "×") v[v.length - 1] *= x; else if (t[i] === "÷") v[v.length - 1] /= x; else { o.push(t[i]); v.push(x); } }
+    return v.reduce((a, x, i) => (o[i - 1] === "−" ? a - x : a + x)); };
   const key = (k) => {
-    const a = st.amount;
-    if (k === "back") st.amount = a.slice(0, -1);
-    else if (k === ".") { if (!a.includes(".")) st.amount = (a || "0") + "."; }
-    else if (/^\d$/.test(k) && (a.includes(".") ? a.split(".")[1].length < 2 : a.length < 9) && !(a === "0")) st.amount = a + k;
-    else if (k === "0" && a === "") st.amount = "0";
-    else if (/^\d$/.test(k) && a === "0") st.amount = k;
+    const a = st.expr, n = lastNum();
+    if (k === "back") st.expr = a.slice(0, -1);
+    else if (OPS.includes(k)) { if (a) st.expr = OPS.includes(a.at(-1)) ? a.slice(0, -1) + k : a + k; }
+    else if (k === ".") { if (!n.includes(".")) st.expr = a + (n ? "." : "0."); }
+    else if (/^\d$/.test(k) && (n.includes(".") ? n.split(".")[1].length < 2 : n.length < 9)) st.expr = n === "0" ? a.slice(0, -1) + k : a + k;
+    const r = calc(st.expr); st.amount = r > 0 && isFinite(r) ? String(Math.round(r * 100) / 100) : "";
     draw();
   };
   const ok = () => num(st.amount) > 0;
-  const next = () => { if (ok()) { st.step = 2; draw(); } };
-  const tabs = () => [h("div", { class: "seg" },
-    ...[["tx", "Транзакция"], ["item", "Тауар (цикл)"]].map(([m, t]) => h("button", { type: "button", "aria-pressed": String(st.mode === m), onclick: () => { st.mode = m; st.kind = "expense"; st.cycleId = ""; draw(); } }, t)),
-    h("button", { type: "button", class: "ghost sm", "aria-label": "Чек сканерлеу", onclick: () => { dlg.close(); receiptFlow(); } }, ic("camera"))),
-    st.mode === "tx" && h("div", { class: "seg" }, ...KINDS.map(([k, t]) => h("button", { type: "button", "aria-pressed": String(st.kind === k), onclick: () => { st.kind = k; draw(); } }, t)))];
-  const view1 = () => [...tabs(),
-    h("div", { class: "amt num", "aria-live": "polite" }, grp(st.amount) + " ₸"),
-    h("div", { class: "pad" }, ...["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "back"].map((k) =>
-      h("button", { type: "button", "aria-label": k === "back" ? "Өшіру" : k === "." ? "Нүкте" : k, onclick: () => key(k) }, k === "back" ? ic("back") : k))),
-    h("div", { class: "end" }, h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"), h("button", { class: "primary", disabled: !ok(), onclick: next }, "Келесі"))];
+  const next = () => { if (!ok()) return; if (/[+−×÷]/.test(st.expr)) { st.expr = st.amount; draw(); } else { st.step = 2; draw(); } };
+  const shown = () => st.expr.replace(/\d+(\.\d*)?/g, (m) => grp(m));
+  const MODES = [["tx", "Транзакция", "wallet"], ["item", "Тауар (цикл)", "box"]], KICON = { expense: "minus", income: "plus", transfer: "swap" };
+  const view1 = () => [
+    h("div", { class: "phead" }, h("div", { class: "seg modes" }, ...MODES.map(([m, t, i]) => h("button", { type: "button", "aria-label": t, title: t, "aria-pressed": String(st.mode === m), onclick: () => { st.mode = m; st.kind = "expense"; st.cycleId = ""; draw(); } }, ic(i)))),
+      h("div", { class: "ptitle" }, h("b", {}, st.mode === "item" ? "Тауар" : { expense: "Төледім", income: "Түсті", transfer: "Аударым" }[st.kind]), h("span", { class: "amtchip num" }, `₸${grp(st.amount)}`)),
+      h("button", { type: "button", class: "ghost round", "aria-label": "Чек сканерлеу", onclick: () => { dlg.close(); receiptFlow(); } }, ic("camera"))),
+    h("div", { class: "ppanel" },
+      h("div", { class: "amt num", "aria-live": "polite" }, (shown() || "0") + " ₸"),
+      h("div", { class: "krow" }, st.mode === "tx" ? h("div", { class: "kseg" }, ...KINDS.map(([k, t]) => h("button", { type: "button", "aria-label": t, title: t, "aria-pressed": String(st.kind === k), onclick: () => { st.kind = k; draw(); } }, ic(KICON[k])))) : h("div"),
+        h("button", { type: "button", class: "op", "aria-label": "Бөлу", onclick: () => key("÷") }, "÷")),
+      h("div", { class: "pad" }, ...[["7"], ["8"], ["9"], ["×", "Көбейту"], ["4"], ["5"], ["6"], ["−", "Алу"], ["1"], ["2"], ["3"], ["+", "Қосу"], [".", "Нүкте"], ["0"], ["back", "Өшіру"], ["ok", "Келесі"]].map(([k, l]) =>
+        k === "ok" ? h("button", { type: "button", class: "okb", "aria-label": l, disabled: !ok(), onclick: next }, ic("check"))
+          : h("button", { type: "button", class: OPS.includes(k) ? "op" : "", "aria-label": l || k, onclick: () => key(k) }, k === "back" ? ic("back") : k === "." ? "," : k))))];
   const pick = (patch) => { Object.assign(st, patch, { step: 3 }); draw(); };
   const view2 = () => {
     const back = h("button", { type: "button", class: "ghost", onclick: () => { st.step = 1; draw(); } }, "Артқа");
@@ -507,9 +516,10 @@ function openAdd(init = {}) {
   };
   dlg.addEventListener("keydown", (e) => {
     if (st.step !== 1 || e.target.closest?.("input,select,textarea") || e.ctrlKey || e.metaKey) return;
-    if (/^[0-9.]$/.test(e.key)) key(e.key); else if (e.key === "Backspace") key("back"); else if (e.key === "Enter" && ok()) { e.preventDefault(); next(); }
+    if (/^[0-9.]$/.test(e.key)) key(e.key); else if ("+-*/".includes(e.key) && e.key.length === 1) key("+−×÷"["+-*/".indexOf(e.key)]); else if (e.key === "Backspace") key("back"); else if (e.key === "Enter" && ok()) { e.preventDefault(); next(); }
   });
   dlg.addEventListener("close", () => dlg.remove());
+  dlg.addEventListener("click", (e) => { if (e.target === dlg && st.step === 1) dlg.close(); }); // қара аймаққа басса жабылады
   document.querySelectorAll("dialog.sheet").forEach((d) => d.remove());
   document.body.append(dlg); draw(); dlg.showModal();
 }

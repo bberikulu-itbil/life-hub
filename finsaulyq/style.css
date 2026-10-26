@@ -76,7 +76,7 @@ dialog button.menu{width:100%;justify-content:flex-start;margin-top:8px;min-heig
 
 .cic{color:var(--acc);flex:none}
 .gone{opacity:.6}
-dialog.sheet{max-height:calc(100dvh - 24px);overflow:auto}
+dialog.sheet{max-height:calc(100dvh - 12px);overflow:auto;margin:auto auto 0;width:100%;max-width:520px;border-radius:28px 28px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom))}
 .seg{display:flex;gap:6px;align-items:center;margin-bottom:6px}
 .seg button[aria-pressed]{flex:1;min-width:0;padding:.4rem .1rem;font-size:.9rem}
 .seg .ghost{flex:none;min-width:40px;padding:0}
@@ -146,3 +146,15 @@ button:disabled{opacity:.45;cursor:default}
 .mrow .ml{display:flex;flex-direction:column;gap:2px;min-width:0}
 .mrow>.num{margin-left:auto}
 .end.sticky{background:var(--card,#fff);margin:0 -4px;padding:10px 4px;border-radius:14px}
+/* Санперне: төменге тиіп тұрған парақ */
+dialog.sheet.pk{padding:0;overflow:hidden}
+.phead{display:grid;grid-template-columns:1fr auto;gap:8px 10px;align-items:center;padding:14px 16px;background:var(--card,#fff)}
+.phead .modes{grid-column:1/-1;justify-self:center;margin:0}.modes button{min-width:64px;display:inline-flex;justify-content:center}
+.ptitle{display:flex;align-items:center;gap:10px;font-size:1.8rem}.ptitle b{font-weight:800}.amtchip{font-size:1.6rem;font-weight:800;color:var(--mute)}
+.ppanel{background:var(--glass-2);padding:6px 14px calc(14px + env(safe-area-inset-bottom))}
+.ppanel .amt{font-size:2rem;color:var(--acc);min-height:56px;padding:8px 14px}
+.krow{display:grid;grid-template-columns:3fr 1fr;gap:10px;margin-bottom:10px}
+.kseg{display:flex;gap:4px;background:rgba(0,0,0,.07);border-radius:22px;padding:4px}.kseg button{flex:1;border:0;background:transparent;border-radius:18px;min-height:46px;color:var(--mute)}.kseg button[aria-pressed=true]{background:rgba(0,0,0,.14);color:var(--ink)}
+.pad{grid-template-columns:repeat(4,1fr);gap:10px}.pad button,.krow .op{border-radius:999px;min-height:58px;border:0;background:#fff;font-size:1.6rem}
+.pad .op,.krow .op{background:rgba(0,0,0,.18);color:var(--ink)}.pad .okb{background:#3b82f6;color:#fff;box-shadow:0 6px 16px rgba(59,130,246,.4)}.pad .okb:disabled{opacity:.45}
+.phead .modes{gap:8px}.modes button{flex:none;width:64px;height:40px;border-radius:14px;padding:0;display:inline-flex;align-items:center;justify-content:center}.modes svg{width:22px;height:22px}
