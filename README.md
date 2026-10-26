@@ -45,6 +45,7 @@ Supabase → Authentication → URL Configuration → Site URL өрісіне о
 Барлық қосымша бір стильде (Liquid Glass) — «Life Hub» дизайн жүйесі. Кодтағы ортақ бөлігі `brand/` ішінде:
 - `brand/tokens.css` — түстер, бұрыштар, кеңістік және жеті қосымшаның түсі. Қосымша өз түсін `<html data-app="kitapp">` арқылы алады.
 - `brand/logos/` — жеті логотип (`lifehub`, `sozdik`, `kitapp`, `finsaulyq`, `jospar`, `mindmap`, `densaulyq`) және iPhone басты экранына арналған `lifehub-180.png`.
+- `brand/addword.js` — сөзді белгілеп «Сөздікке қосу» (Тіл сөздігі, `items`, app=`lang`). Қосу: `<script src="../brand/addword.js">` + `AddWord.init({ sb: () => sb, toast, source: "kitapp" })`. Kitapp-та PDF (мәтін қабаты) және EPUB жұмыс істейді. ЖИ аудармасы тек ұсыныс.
 
 ## Broadcast
 

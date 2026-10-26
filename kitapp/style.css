@@ -271,7 +271,12 @@ body.has-mini .composer{bottom:calc(158px + env(safe-area-inset-bottom))}
 .r-title{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
 .r-body{position:relative;flex:1;display:flex;min-height:0}
 #rStage{flex:1;overflow:auto;position:relative;background:var(--paper)}
+#rStage .pdfp{position:relative;display:block;width:fit-content;max-width:100%;margin:0 auto}
 #rStage canvas{display:block;margin:0 auto;max-width:100%}
+.textLayer{position:absolute;inset:0;overflow:hidden;line-height:1;text-size-adjust:none;forced-color-adjust:none;transform-origin:0 0}
+.textLayer span,.textLayer br{color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0 0}
+.textLayer .markedContent{display:contents}
+.textLayer ::selection{background:color-mix(in srgb,var(--acc) 35%,transparent)}
 #rStage .epub{position:absolute;inset:0}
 #rPanel{width:300px;max-width:85vw;border-width:0 0 0 1px;border-radius:0;padding:.8rem;overflow:auto}
 #rPanel textarea{min-height:90px;margin-bottom:.5rem}

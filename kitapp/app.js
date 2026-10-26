@@ -224,9 +224,12 @@ async function renderPdf(n) {
   const vp0 = p.getViewport({ scale: 1 }), sc = w / vp0.width, dpr = window.devicePixelRatio || 1;
   const vp = p.getViewport({ scale: sc * dpr });
   let c = stage.querySelector('canvas');
-  if (!c) { stage.innerHTML = '<canvas></canvas>'; c = stage.querySelector('canvas'); }
+  if (!c) { stage.innerHTML = '<div class="pdfp"><canvas></canvas><div class="textLayer"></div></div>'; c = stage.querySelector('canvas'); }
   c.width = vp.width; c.height = vp.height; c.style.width = vp.width / dpr + 'px';
   await p.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+  // Көрінбейтін мәтін қабаты: сөзді белгілеп сөздікке қосуға болады. Масштаб — canvas-тың нақты көрінген ені.
+  const tl = stage.querySelector('.textLayer'); tl.replaceChildren();
+  pdfjsLib.renderTextLayer({ textContentSource: p.streamTextContent(), container: tl, viewport: p.getViewport({ scale: c.offsetWidth / vp0.width }) }).promise.catch(() => {}); // мәтіні жоқ (скан) бетте қабат бос қалады
   stage.scrollTop = 0;
   const ci = R.toc.filter(t => t.page <= R.page).length - 1, next = R.toc[ci + 1]?.page ?? R.total + 1;
   if (R.toc.length) chapterInfo(R.toc[ci]?.title || '', next - R.page - 1);
@@ -319,7 +322,7 @@ function bindGestures(rend) {
   };
   if (rend) {
     // EPUB беті iframe ішінде: үлкейтуді сол құжатта да тоқтатамыз
-    rend.hooks.content.register(c => { c.document.documentElement.style.touchAction = 'manipulation'; c.document.addEventListener('gesturestart', e => e.preventDefault()); });
+    rend.hooks.content.register(c => { c.document.documentElement.style.touchAction = 'manipulation'; c.document.addEventListener('gesturestart', e => e.preventDefault()); AddWord.watch(c.document); });
     rend.on('touchstart', down);
     rend.on('touchend', e => up(e, t => zoneTap(t.screenX - stage.getBoundingClientRect().left - (window.screenX || 0), stage.clientWidth)));
     rend.on('click', e => { if (!('ontouchstart' in window) && !e.target.closest?.('a')) zoneTap(e.clientX - (rend.manager?.container?.scrollLeft || 0), stage.clientWidth); });
