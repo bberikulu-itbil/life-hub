@@ -97,14 +97,45 @@ const accOpts = (cur) => [...S.accounts.map((a) => [a.id, a.name]), ...(cur !== 
 const accField = (cur) => hasAcc() ? [{ name: "account", label: "Шот", options: accOpts(cur), value: cur ?? (S.accounts.some((a) => a.id === S.settings.lastAcc) ? S.settings.lastAcc : S.accounts[0].id) }] : [];
 const withAcc = (e, v) => { if (v.account) { e.account = v.account; S.settings.lastAcc = v.account; } return e; };
 const catList = () => [...new Set([...S.tx.map((t) => FS.normCat(t.category)), ...CATS])];
-const txForm = (t) => ask(t ? "Транзакцияны өзгерту" : "Жаңа транзакция", [
-  { name: "kind", label: "Түрі", options: [["expense", "Шығыс"], ["income", "Кіріс"]], value: t?.kind },
-  { name: "amount", label: "Сома, ₸", type: "number", min: 0.01, value: t?.amount },
-  { name: "category", label: "Санат", value: t?.category ?? "Тамақ", suggest: catList() },
-  { name: "note", label: "Ескертпе", optional: true, value: t?.note },
-  { name: "date", label: "Күні", type: "date", value: t?.date ?? today() },
+const txForm = (t, pre) => { const d = t ?? pre ?? {}; ask(t ? "Транзакцияны өзгерту" : pre ? "Чектен оқылды: тексеріп сақта" : "Жаңа транзакция", [
+  { name: "kind", label: "Түрі", options: [["expense", "Шығыс"], ["income", "Кіріс"]], value: d.kind },
+  { name: "amount", label: "Сома, ₸", type: "number", min: 0.01, value: d.amount },
+  { name: "category", label: "Санат", value: d.category ?? "Тамақ", suggest: catList() },
+  { name: "note", label: "Ескертпе", optional: true, value: d.note },
+  { name: "date", label: "Күні", type: "date", value: d.date ?? today() },
   ...accField(t ? (t.account ?? "") : undefined),
-], (v) => { put("tx", withAcc({ id: t?.id ?? crypto.randomUUID(), kind: v.kind, amount: num(v.amount), category: FS.normCat(v.category), note: v.note.trim(), date: v.date }, v)); save(); });
+], (v) => { put("tx", withAcc({ id: t?.id ?? crypto.randomUUID(), kind: v.kind, amount: num(v.amount), category: FS.normCat(v.category), note: v.note.trim(), date: v.date }, v)); save(); }); };
+
+// Чекті түсіру: суретті кішірейтіп, `receipt` функциясына жібереміз; нәтиже форманы толтырады, сақтауды өзің растайсың
+async function shrink(file, max = 1800) {
+  const bmp = await createImageBitmap(file), k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.8);
+}
+function receiptFlow() {
+  if (!navigator.onLine) return alert("Чекті оқуға интернет керек. Транзакцияны қолмен енгізе аласың.");
+  // click() қолданушы басқан сәтте, await-сіз шақырылуы керек (iOS Safari әйтпесе файл таңдауын ашпайды)
+  const input = h("input", { type: "file", accept: "image/*", hidden: true });
+  document.body.append(input);
+  input.addEventListener("change", async () => {
+    const file = input.files[0]; input.remove();
+    if (!file) return;
+    if (!Sync.sb || !(await Sync.sb.auth.getSession()).data.session) return alert("Чекті оқу үшін алдымен Hub-қа кір, содан кейін осы бетті қайта аш.");
+    const wait = h("dialog", {}, h("h3", {}, "Чекті оқып жатыр…"), h("p", { class: "muted" }, "Бұл біраз уақыт алуы мүмкін."));
+    document.body.append(wait); wait.showModal();
+    try {
+      const { data, error } = await Sync.sb.functions.invoke("receipt", { body: { image: await shrink(file), today: today() } });
+      if (error) throw new Error((await error.context?.json?.().catch(() => null))?.error || error.message);
+      if (!data?.receipt) throw new Error(data?.error || "Чек оқылмады.");
+      wait.remove();
+      const r = data.receipt;
+      txForm(null, { kind: "expense", amount: r.total, category: r.category, note: r.store, date: r.date });
+    } catch (e) { wait.remove(); alert(`${e.message}\nТранзакцияны қолмен енгізе аласың.`); }
+  });
+  input.addEventListener("cancel", () => input.remove());
+  input.click();
+}
 
 const addCycle = () => ask("Жаңа цикл", [
   { name: "name", label: "Тауар не қызмет" },
@@ -335,13 +366,12 @@ const NAV = [["home", "Басты бет", "home"], ["plan", "Жоспар", "ta
 // Ортадағы «+»: транзакцияны қолмен енгізу не чекті түсіру
 function plusMenu() {
   const dlg = h("dialog", {}, h("h3", {}, "Не қосамыз?"),
-    ...[["Транзакция қосу", "plus", () => txForm()], ...(RECEIPT ? [["Чекті түсіру", "camera", () => RECEIPT()]] : [])].map(([t, i, f]) =>
+    ...[["Транзакция қосу", "plus", () => txForm()], ["Чекті түсіру", "camera", receiptFlow]].map(([t, i, f]) =>
       h("button", { class: "menu", onclick: () => { dlg.close(); f(); } }, ic(i), t)),
     h("div", { class: "end" }, h("button", { class: "ghost", onclick: () => dlg.close() }, "Бас тарту")));
   dlg.addEventListener("close", () => dlg.remove());
   document.body.append(dlg); dlg.showModal();
 }
-let RECEIPT = null;
 
 function render() {
   document.getElementById("view").replaceChildren(...PAGES[tab]());

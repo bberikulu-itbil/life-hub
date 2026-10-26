@@ -1,4 +1,4 @@
-const C = 'finsaulyq-v4';
+const C = 'finsaulyq-v5';
 const SHELL = ['./', 'index.html', 'style.css', 'core.js', 'sync.js', 'app.js', 'manifest.webmanifest', '../brand/tokens.css', '../brand/logos/finsaulyq.svg'];
 const LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js'; // нұсқасы бекітілген: интернетсіз де іске қосылсын
 self.addEventListener('install', (e) => e.waitUntil(caches.open(C).then(async (c) => { await c.addAll(SHELL); await c.add(LIB).catch(() => {}); }).then(() => self.skipWaiting())));
