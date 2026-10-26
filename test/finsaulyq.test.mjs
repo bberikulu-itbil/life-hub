@@ -110,3 +110,44 @@ test("mergePull: сервер негіз, кезектегі put үстінен 
   const m2 = FS.mergePull({ ...S0, pending: [{ k: "settings", id: "s", op: "put" }] }, rows);
   assert.equal(m2.settings.capital, 1); // жіберілмеген баптау сервердікін ауыстырады
 });
+
+test("wallet: шоттар, аударым, шотсыз қалта; жиынтық balance-пен тең", () => {
+  const s = S({
+    settings: { capital: 1000, income: 0, fixed: 0 },
+    accounts: [{ id: "cash", name: "Қолма-қол", opening: 500 }, { id: "card", name: "Карта", opening: 2000 }],
+    tx: [
+      { id: "1", kind: "expense", amount: 300, category: "Тамақ", date: "2026-10-01", account: "cash" },
+      { id: "2", kind: "income", amount: 5000, category: "Жалақы", date: "2026-10-02", account: "card" },
+      { id: "3", kind: "expense", amount: 100, category: "Көлік", date: "2026-10-03" }, // шоты жоқ (ассистент)
+      { id: "4", kind: "expense", amount: 7, category: "Көлік", date: "2026-10-03", account: "deleted" }, // шоты өшкен
+    ],
+    contribs: [{ goalId: "g", amount: 400, account: "card" }],
+    transfers: [{ id: "t", from: "card", to: "cash", amount: 1000 }, { id: "u", from: "", to: "cash", amount: 200 }],
+  });
+  const w = FS.wallet(s), by = Object.fromEntries(w.accounts.map((a) => [a.id, a.balance]));
+  assert.equal(by.cash, 500 - 300 + 1000 + 200);
+  assert.equal(by.card, 2000 + 5000 - 400 - 1000);
+  assert.equal(w.loose, 1000 - 100 - 7 - 200);
+  assert.equal(by.cash + by.card + w.loose, FS.balance(s)); // аударым жиынтықты өзгертпейді
+});
+
+test("wallet: шот жоқ, жазба жоқ — шотсыз қалта көрінбейді; ескі күйде balance өзгермейді", () => {
+  assert.equal(FS.wallet(S()).loose, null);
+  const old = S({ settings: { capital: 10, income: 0, fixed: 0 }, tx: [{ id: "1", kind: "income", amount: 5, category: "x", date: "2026-10-01" }] });
+  assert.equal(FS.wallet(old).loose, 15); assert.equal(FS.balance(old), 15);
+});
+
+test("fromRow: шот және аударым; жарамсыз аударым өткізіледі", () => {
+  const r = (app, data) => FS.fromRow({ id: "z", app, data, created_at: "2026-10-01T00:00:00Z" });
+  assert.equal(r("money", { amount: 5, kind: "expense", category: "x", date: "2026-10-01", account: "a1" }).account, "a1");
+  assert.equal("account" in r("money", { amount: 5, kind: "expense", category: "x", date: "2026-10-01" }), false);
+  assert.equal(r("fs_account", { name: "Карта", opening: 0 }).name, "Карта");
+  assert.equal(r("fs_transfer", { from: "a", to: "a", amount: 5 }), null);
+  assert.equal(r("fs_transfer", { from: "a", to: "b", amount: 0 }), null);
+  assert.equal(r("fs_transfer", { from: "", to: "b", amount: 5 }).from, "");
+});
+
+test("mergePull: шоттар ашылған ретімен", () => {
+  const a = (id) => ({ id, app: "fs_account", created_at: "2026-10-01T00:00:00Z", data: { name: id, opening: 0 } });
+  assert.deepEqual(FS.mergePull(S({ pending: [] }), [a("жаңа"), a("ескі")]).accounts.map((x) => x.id), ["ескі", "жаңа"]);
+});

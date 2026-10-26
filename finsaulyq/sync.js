@@ -26,7 +26,7 @@ Sync.now = async () => {
     if (!session) { Sync.state = "local"; return; }
     if (!S.synced) { // алғашқы рет: жергілікті деректер серверге қосылады (бар жазбалар өшпейді)
       const rows = await pullRows(), have = new Set(rows.map((r) => r.id));
-      for (const k of ["tx", "cycles", "goals", "stock", "matches", "contribs"]) for (const e of S[k]) if (!have.has(e.id)) queue(k, e.id, "put");
+      for (const k of LISTS) for (const e of S[k]) if (!have.has(e.id)) queue(k, e.id, "put");
       if (!rows.some((r) => r.app === "fs_settings")) put("settings"); // серверде баптау болса, соны аламыз
       S.synced = true; persist();
     }

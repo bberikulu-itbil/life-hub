@@ -65,3 +65,11 @@ dialog h3{margin:0 0 .4rem}
 .end{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 .chip{display:inline-block;padding:.1rem .6rem;border-radius:var(--r-pill);background:var(--line);font-size:.8rem}
 @media (prefers-reduced-transparency:reduce){.sec,.card,dialog,#nav{background:var(--glass-2);-webkit-backdrop-filter:none;backdrop-filter:none}}
+
+.head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.2rem}
+#nav{align-items:flex-end}
+#nav button.plus{flex:none;width:56px;height:56px;min-height:56px;border-radius:50%;padding:0;margin:0 4px 6px;transform:translateY(-14px)}
+#nav button.plus:active{transform:translateY(-14px) scale(.95)}
+#nav button.plus .ic svg{width:28px;height:28px}
+dialog button.menu{width:100%;justify-content:flex-start;margin-top:8px;min-height:52px}
+#nav button.plus{background:linear-gradient(160deg,var(--acc-2),var(--acc));color:var(--acc-ink);border:0;box-shadow:var(--shadow-primary)}

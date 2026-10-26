@@ -1,8 +1,8 @@
 "use strict";
 /* FinSaulyq интерфейсі. Деректер тек осы құрылғыда (localStorage); есептеу — core.js (FS). */
 const KEY = "finsaulyq.v1";
-const DEF = { settings: { capital: 0, income: 0, fixed: 0, hide: false }, settingsId: null, tx: [], cycles: [], goals: [], stock: [], matches: [], contribs: [], pending: [], synced: false };
-const LISTS = ["tx", "cycles", "goals", "stock", "matches", "contribs"];
+const DEF = { settings: { capital: 0, income: 0, fixed: 0, hide: false }, settingsId: null, tx: [], cycles: [], goals: [], stock: [], matches: [], contribs: [], accounts: [], transfers: [], pending: [], synced: false };
+const LISTS = ["tx", "cycles", "goals", "stock", "matches", "contribs", "accounts", "transfers"];
 const CATS = ["Тамақ", "Көлік", "Тұрмыс", "Кітап", "Күтім", "Жалақы"];
 const MONTHS = ["Қаңтар", "Ақпан", "Наурыз", "Сәуір", "Мамыр", "Маусым", "Шілде", "Тамыз", "Қыркүйек", "Қазан", "Қараша", "Желтоқсан"];
 const COLORS = ["var(--acc)", "var(--star)", "var(--warn)", "var(--acc-2)", "var(--good)", "var(--mute)"];
@@ -10,6 +10,9 @@ const ICONS = {
   home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   box: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+  wallet: '<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>',
+  camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  swap: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
   sliders: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   minus: '<line x1="5" y1="12" x2="19" y2="12"/>',
@@ -54,6 +57,8 @@ function h(tag, a = {}, ...kids) {
   return e;
 }
 const ic = (n) => { const s = h("span", { class: "ic", "aria-hidden": "true" }); s.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[n]}</svg>`; return s; };
+const head = (t) => h("div", { class: "head" }, h("h1", {}, t), tab !== "set" && h("button", { class: "ghost sm", "aria-label": "Баптаулар", onclick: () => go("set") }, ic("sliders")));
+const go = (t) => { tab = t; render(); scrollTo(0, 0); };
 const sec = (title, action, ...body) => h("section", { class: "sec" }, h("header", {}, h("h2", {}, title), action), ...body);
 const add = (fn) => h("button", { class: "ghost", onclick: fn }, ic("plus"), "Қосу");
 const empty = (t) => h("p", { class: "empty" }, t);
@@ -86,6 +91,11 @@ function ask(title, fields, ok) {
 const num = (v) => Number(v);
 
 /* ---------- енгізу формалары ---------- */
+// Шот таңдауы: шоттар болса ғана көрсетіледі. Ескі (шотсыз) жазбаны өңдегенде «Шотсыз» таңдауы қалады
+const hasAcc = () => S.accounts.length > 0;
+const accOpts = (cur) => [...S.accounts.map((a) => [a.id, a.name]), ...(cur !== undefined && !S.accounts.some((a) => a.id === cur) ? [["", "Шотсыз"]] : [])];
+const accField = (cur) => hasAcc() ? [{ name: "account", label: "Шот", options: accOpts(cur), value: cur ?? (S.accounts.some((a) => a.id === S.settings.lastAcc) ? S.settings.lastAcc : S.accounts[0].id) }] : [];
+const withAcc = (e, v) => { if (v.account) { e.account = v.account; S.settings.lastAcc = v.account; } return e; };
 const catList = () => [...new Set([...S.tx.map((t) => FS.normCat(t.category)), ...CATS])];
 const txForm = (t) => ask(t ? "Транзакцияны өзгерту" : "Жаңа транзакция", [
   { name: "kind", label: "Түрі", options: [["expense", "Шығыс"], ["income", "Кіріс"]], value: t?.kind },
@@ -93,7 +103,8 @@ const txForm = (t) => ask(t ? "Транзакцияны өзгерту" : "Жа�
   { name: "category", label: "Санат", value: t?.category ?? "Тамақ", suggest: catList() },
   { name: "note", label: "Ескертпе", optional: true, value: t?.note },
   { name: "date", label: "Күні", type: "date", value: t?.date ?? today() },
-], (v) => { put("tx", { id: t?.id ?? crypto.randomUUID(), kind: v.kind, amount: num(v.amount), category: FS.normCat(v.category), note: v.note.trim(), date: v.date }); save(); });
+  ...accField(t ? (t.account ?? "") : undefined),
+], (v) => { put("tx", withAcc({ id: t?.id ?? crypto.randomUUID(), kind: v.kind, amount: num(v.amount), category: FS.normCat(v.category), note: v.note.trim(), date: v.date }, v)); save(); });
 
 const addCycle = () => ask("Жаңа цикл", [
   { name: "name", label: "Тауар не қызмет" },
@@ -128,7 +139,7 @@ function markBought(c) {
   const d = today();
   c.last = d;
   put("cycles", c);
-  put("tx", { id: crypto.randomUUID(), kind: "expense", amount: c.price, category: FS.normCat(c.cat || "Тұрмыс"), note: c.name, date: d });
+  put("tx", { id: crypto.randomUUID(), kind: "expense", amount: c.price, category: FS.normCat(c.cat || "Тұрмыс"), note: c.name, date: d, ...(S.accounts.some((a) => a.id === S.settings.lastAcc) ? { account: S.settings.lastAcc } : {}) });
   save();
 }
 
@@ -149,7 +160,7 @@ function goalRow(g, full) {
       h("small", { class: "num muted" }, `${tg(g.saved)} / ${tg(g.target)} · ${pct}%`),
       h("small", { class: done ? "" : "muted" }, done ? "Мақсатқа жеттің. Құттықтаймыз" : `Осы айға жарна: ${tg(FS.goalMonthly(g, today()))}`),
       bar(pct)),
-    !done && h("button", { onclick: () => ask("Мақсатқа аудару", [{ name: "amount", label: "Сома, ₸", type: "number", min: 0.01 }], (v) => { put("contribs", { id: crypto.randomUUID(), goalId: g.id, amount: num(v.amount), date: today() }); save(); }) }, ic("plus"), "Жарна"),
+    !done && h("button", { onclick: () => ask("Мақсатқа аудару", [{ name: "amount", label: "Сома, ₸", type: "number", min: 0.01 }, ...accField()], (v) => { put("contribs", withAcc({ id: crypto.randomUUID(), goalId: g.id, amount: num(v.amount), date: today() }, v)); save(); }) }, ic("plus"), "Жарна"),
     full && del("goals", g.id, g.name));
 }
 
@@ -177,14 +188,14 @@ function home() {
   const gv = FS.goalsView(S), goals = gv.slice(0, 2), inGoals = gv.reduce((t, g) => t + g.saved, 0);
   const all = S.tx.slice().sort((a, b) => b.date.localeCompare(a.date)), recent = allTx ? all : all.slice(0, 5);
   return [
-    h("h1", {}, "FinSaulyq"),
+    head("FinSaulyq"),
     h("section", { class: "sec" },
       h("header", {}, h("span", { class: "muted" }, "Қолжетімді қалдық"),
         h("button", { class: "ghost sm", "aria-label": hide ? "Балансты көрсету" : "Балансты жасыру", onclick: () => { S.settings.hide = !hide; save(); } }, ic(hide ? "eye-off" : "eye"))),
       h("div", { class: "big num" }, mon(FS.balance(S))),
       h("div", { class: "split num" }, h("span", { class: "good" }, `Кіріс ${mon(m.income)}`), h("span", { class: "warn" }, `Шығын ${mon(m.expense)}`)),
       h("div", { class: "muted num" }, `Мақсаттарда: ${mon(inGoals)} · Барлығы: ${mon(FS.balance(S) + inGoals)}`),
-      h("div", { class: "end" }, h("button", { class: "primary", onclick: () => txForm() }, ic("plus"), "Транзакция қосу"))),
+    ),
     sec("Циклдер", null, cycles.length ? cycles.map((c) => cycleRow(c)) : empty("Цикл жоқ. «Қор» бөлімінде қос.")),
     sec("Мақсаттар", null, goals.length ? goals.map((g) => goalRow(g)) : empty("Мақсат жоқ. «Жоспар» бөлімінде қос.")),
     sec("Шығындар бөлінісі", null, donut(m)),
@@ -199,7 +210,7 @@ function home() {
 function plan() {
   const T = today(), next = [...S.cycles].sort((a, b) => FS.nextBuy(a).localeCompare(FS.nextBuy(b))), f = FS.forecast(S, T, 3);
   return [
-    h("h1", {}, "Жоспар"),
+    head("Жоспар"),
     sec("Мақсаттар", add(addGoal), S.goals.length ? FS.goalsView(S).map((g) => goalRow(g, true)) : empty("Мақсат жоқ.")),
     sec("Келесі сатып алулар", null, next.length ? next.map((c) => h("div", { class: "row" },
       h("div", { class: "main" }, h("b", {}, c.name), h("small", { class: "muted num" }, FS.nextBuy(c) < T ? "Мерзімі өтті" : FS.nextBuy(c))),
@@ -220,7 +231,7 @@ function stock() {
       h("small", { class: "good" }, `Үздігін таңдасаң, жылына ${tg(r.yearSaving)} үнем`)), del("matches", m.id, m.name));
   };
   return [
-    h("h1", {}, "Қор"),
+    head("Қор"),
     sec("Циклдер", add(addCycle), S.cycles.length ? S.cycles.map((c) => cycleRow(c, true)) : empty("Цикл жоқ. Мысалы: тіс пастасы, 45 күн.")),
     sec("Өнімдер қоры", add(addStock), S.stock.length ? S.stock.map((s) => h("div", { class: "row" },
       h("div", { class: "main" }, h("b", {}, s.name), h("small", { class: "muted num" }, `${fmt(s.qty)} ${s.unit} · ${tg(s.price)}`)),
@@ -231,6 +242,40 @@ function stock() {
   ];
 }
 
+function walletPage() {
+  const w = FS.wallet(S), hide = S.settings.hide, mon = (n) => hide ? "*** ₸" : tg(n);
+  const total = FS.balance(S);
+  const pocket = (name, balance, extra) => h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, name), h("small", { class: "muted" }, balance < 0 ? "Қалдық теріс" : " ")), h("span", { class: "num " + (balance < 0 ? "warn" : "") }, mon(balance)), extra);
+  const pockets = [{ id: "", name: "Шотсыз" }, ...S.accounts];
+  const trForm = () => {
+    const opts = [...S.accounts.map((a) => [a.id, a.name]), ...(w.loose !== null ? [["", "Шотсыз"]] : [])];
+    if (opts.length < 2) return alert("Аударым үшін кемінде екі шот керек.");
+    ask("Шоттар арасындағы аударым", [
+      { name: "from", label: "Қайдан", options: opts, value: opts[0][0] }, { name: "to", label: "Қайда", options: opts, value: opts[1][0] },
+      { name: "amount", label: "Сома, ₸", type: "number", min: 0.01 }, { name: "date", label: "Күні", type: "date", value: today() },
+    ], (v) => { if (v.from === v.to) return alert("Қайдан және қайда бірдей болмауы керек."); put("transfers", { id: crypto.randomUUID(), from: v.from, to: v.to, amount: num(v.amount), date: v.date }); save(); });
+  };
+  const delAcc = (a) => { if (!confirm(`«${a.name}» шотын өшіру ме? Жазбалар «Шотсыз» қалтаға өтеді, осы шоттың аударымдары өшеді.`)) return;
+    for (const k of ["tx", "contribs"]) S[k].filter((x) => x.account === a.id).forEach((x) => { delete x.account; put(k, x); });
+    S.transfers.filter((t) => t.from === a.id || t.to === a.id).forEach((t) => rm("transfers", t.id));
+    rm("accounts", a.id); save(); };
+  return [
+    head("Әмиян"),
+    h("section", { class: "sec" }, h("header", {}, h("span", { class: "muted" }, "Барлық қаражат"), h("button", { class: "ghost sm", "aria-label": hide ? "Балансты көрсету" : "Балансты жасыру", onclick: () => { S.settings.hide = !hide; save(); } }, ic(hide ? "eye-off" : "eye"))),
+      h("div", { class: "big num" }, mon(total)), h("small", { class: "muted" }, "Мақсаттарға аударылған сома кірмейді")),
+    sec("Шоттар", add(() => ask("Жаңа шот", [{ name: "name", label: "Атауы (қолма-қол, карта…)" }, { name: "opening", label: "Қазіргі қалдық, ₸", type: "number", min: -1e12, value: 0 }],
+      (v) => { put("accounts", { id: crypto.randomUUID(), name: v.name.trim(), opening: num(v.opening) }); save(); })),
+      S.accounts.length ? w.accounts.map((a) => pocket(a.name, a.balance, del2(a))) : empty("Шот жоқ. Қолма-қол, карта сияқты шоттарды қос: әр транзакция шотқа байланады."),
+      w.loose !== null && S.accounts.length ? pocket("Шотсыз", w.loose) : null),
+    S.accounts.length ? h("div", { class: "end", style: "margin-top:0" }, h("button", { onclick: trForm }, ic("swap"), "Аударым")) : null,
+    S.transfers.length ? sec("Аударымдар", null, [...S.transfers].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10).map((t) => {
+      const nm = (id) => S.accounts.find((a) => a.id === id)?.name ?? "Шотсыз";
+      return h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, `${nm(t.from)} → ${nm(t.to)}`), h("small", { class: "muted" }, t.date)), h("span", { class: "num" }, tg(t.amount)), del("transfers", t.id, `${nm(t.from)} → ${nm(t.to)}`));
+    })) : null,
+  ];
+  function del2(a) { return h("button", { class: "ghost sm", "aria-label": `Өшіру: ${a.name}`, onclick: () => delAcc(a) }, ic("trash")); }
+}
+
 const valid = (x) => {
   const n = Number.isFinite, s = (v) => typeof v === "string", a = (k, f) => Array.isArray(x[k] ?? []) && (x[k] ?? []).every((i) => i && s(i.id) && f(i));
   return x && typeof x === "object" && (!x.settings || [x.settings.capital, x.settings.income, x.settings.fixed].every((v) => v == null || n(v))) &&
@@ -239,7 +284,9 @@ const valid = (x) => {
     a("goals", (g) => s(g.start) && n(g.target) && n(g.saved) && n(g.months)) &&
     a("stock", (i) => n(i.qty)) &&
     a("matches", (m) => Array.isArray(m.brands) && m.brands.length > 1 && m.brands.every((b) => n(b.price) && n(b.days) && b.days > 0)) &&
-    a("contribs", (c) => n(c.amount) && s(c.goalId));
+    a("contribs", (c) => n(c.amount) && s(c.goalId)) &&
+    a("accounts", (c) => s(c.name) && n(c.opening)) &&
+    a("transfers", (t) => n(t.amount) && t.amount > 0 && s(t.from) && s(t.to));
 };
 
 const CLOUD = { local: "Бұлт өшік: Hub-қа кіріп, осы бетті қайта аш", ok: "Бұлтпен синхрондалды", wait: "Бұлтқа жіберуге күтіп тұр", err: "Бұлт қатесі" };
@@ -265,7 +312,7 @@ function settings() {
   const state = (Sync.state === "local" && S.synced) || (Sync.state === "ok" && S.pending.length) ? "wait" : Sync.state;
   const cloud = CLOUD[state] + (state === "wait" ? `: ${S.pending.length}` : "") + (state === "err" ? `: ${Sync.error}` : "");
   return [
-    h("h1", {}, "Баптаулар"),
+    head("Баптаулар"),
     sec("Қаржылық параметрлер", h("button", { class: "ghost", onclick: () => ask("Қаржылық параметрлер", [
       { name: "capital", label: "Бастапқы капитал, ₸", type: "number", min: -1e12, value: st.capital },
       { name: "income", label: "Айлық тұрақты кіріс, ₸", type: "number", value: st.income },
@@ -282,11 +329,25 @@ function settings() {
   ];
 }
 
-const TABS = [["home", "Басты бет", "home", home], ["plan", "Жоспар", "target", plan], ["stock", "Қор", "box", stock], ["set", "Баптаулар", "sliders", settings]];
+const PAGES = { home, plan, stock, wallet: walletPage, set: settings };
+const NAV = [["home", "Басты бет", "home"], ["plan", "Жоспар", "target"], ["+"], ["stock", "Қор", "box"], ["wallet", "Әмиян", "wallet"]];
+
+// Ортадағы «+»: транзакцияны қолмен енгізу не чекті түсіру
+function plusMenu() {
+  const dlg = h("dialog", {}, h("h3", {}, "Не қосамыз?"),
+    ...[["Транзакция қосу", "plus", () => txForm()], ...(RECEIPT ? [["Чекті түсіру", "camera", () => RECEIPT()]] : [])].map(([t, i, f]) =>
+      h("button", { class: "menu", onclick: () => { dlg.close(); f(); } }, ic(i), t)),
+    h("div", { class: "end" }, h("button", { class: "ghost", onclick: () => dlg.close() }, "Бас тарту")));
+  dlg.addEventListener("close", () => dlg.remove());
+  document.body.append(dlg); dlg.showModal();
+}
+let RECEIPT = null;
+
 function render() {
-  document.getElementById("view").replaceChildren(...TABS.find((t) => t[0] === tab)[3]());
-  document.getElementById("nav").replaceChildren(...TABS.map(([id, label, icon]) =>
-    h("button", { "aria-current": id === tab ? "page" : null, onclick: () => { tab = id; render(); scrollTo(0, 0); } }, ic(icon), label)));
+  document.getElementById("view").replaceChildren(...PAGES[tab]());
+  document.getElementById("nav").replaceChildren(...NAV.map(([id, label, icon]) => id === "+"
+    ? h("button", { class: "plus primary", "aria-label": "Қосу", onclick: plusMenu }, ic("plus"))
+    : h("button", { "aria-current": id === tab ? "page" : null, onclick: () => go(id) }, ic(icon), label)));
 }
 addEventListener("online", render);
 addEventListener("offline", render);

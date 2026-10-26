@@ -64,11 +64,24 @@ function monthTotals(tx, today) {
 }
 
 // Қолжетімді қалдық: жарна мақсатқа аударылған ақша, сондықтан одан шығады
-const balance = (S) => S.settings.capital + S.tx.reduce((t, x) => t + (x.kind === "income" ? x.amount : -x.amount), 0) - (S.contribs || []).reduce((t, c) => t + c.amount, 0);
+const signed = (x) => (x.kind === "income" ? x.amount : -x.amount);
+const balance = (S) => S.settings.capital + (S.accounts || []).reduce((t, a) => t + a.opening, 0) + S.tx.reduce((t, x) => t + signed(x), 0) - (S.contribs || []).reduce((t, c) => t + c.amount, 0);
+
+// Әмиян: шоттар бойынша қалдық. Шоты жоқ (ескі, ассистент жазған) жазбалар «шотсыз» қалтаға түседі ("" — сол қалта).
+function wallet(S) {
+  const ids = new Set((S.accounts || []).map((a) => a.id)), own = (id) => (ids.has(id) ? id : "");
+  const sum = { "": S.settings.capital }; // шотсыз қалта капиталдан басталады
+  for (const a of S.accounts || []) sum[a.id] = a.opening;
+  for (const x of S.tx) sum[own(x.account)] += signed(x);
+  for (const c of S.contribs || []) sum[own(c.account)] -= c.amount;
+  for (const t of S.transfers || []) { sum[own(t.from)] -= t.amount; sum[own(t.to)] += t.amount; }
+  const loose = S.tx.some((x) => !ids.has(x.account)) || (S.contribs || []).some((c) => !ids.has(c.account));
+  return { accounts: (S.accounts || []).map((a) => ({ ...a, balance: sum[a.id] })), loose: loose || sum[""] !== 0 ? sum[""] : null };
+}
 
 // ---- Supabase `items` ↔ жергілікті күй ----
 // tx — ассистентпен ортақ `money` (data: kind, amount, category, note, date); қалғаны — fs_* қолданбасына тән
-const APP_OF = { tx: "money", cycles: "fs_cycle", goals: "fs_goal", stock: "fs_stock", matches: "fs_match", contribs: "fs_contrib", settings: "fs_settings" };
+const APP_OF = { tx: "money", cycles: "fs_cycle", goals: "fs_goal", stock: "fs_stock", matches: "fs_match", contribs: "fs_contrib", accounts: "fs_account", transfers: "fs_transfer", settings: "fs_settings" };
 const KEY_OF = Object.fromEntries(Object.entries(APP_OF).map(([k, a]) => [a, k]));
 const localDate = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
@@ -77,10 +90,11 @@ function fromRow(r) {
   const k = KEY_OF[r.app], d = r.data || {}, n = (v) => Number.isFinite(Number(v)) && v !== "" && v != null;
   if (!k) return null;
   if (k === "tx") return n(d.amount) && (d.kind === "income" || d.kind === "expense")
-    ? { id: r.id, kind: d.kind, amount: Number(d.amount), category: normCat(d.category), note: String(d.note ?? ""), date: /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : localDate(r.created_at) } : null;
+    ? { id: r.id, kind: d.kind, amount: Number(d.amount), category: normCat(d.category), note: String(d.note ?? ""), date: /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : localDate(r.created_at), ...(typeof d.account === "string" && d.account ? { account: d.account } : {}) } : null;
   if (k === "settings") return { key: "settings", item: { capital: Number(d.capital) || 0, income: Number(d.income) || 0, fixed: Number(d.fixed) || 0 }, id: r.id };
   const ok = { cycles: n(d.price) && n(d.every) && d.every > 0 && typeof d.last === "string", goals: n(d.target) && n(d.saved) && n(d.months) && typeof d.start === "string",
-    stock: n(d.qty), matches: Array.isArray(d.brands) && d.brands.length > 1, contribs: n(d.amount) && typeof d.goalId === "string" }[k];
+    stock: n(d.qty), matches: Array.isArray(d.brands) && d.brands.length > 1, contribs: n(d.amount) && typeof d.goalId === "string",
+    accounts: typeof d.name === "string" && n(d.opening), transfers: n(d.amount) && d.amount > 0 && typeof d.from === "string" && typeof d.to === "string" && d.from !== d.to }[k];
   return ok ? { id: r.id, ...d } : null;
 }
 const toRow = (k, e, settingsId) => {
@@ -91,7 +105,7 @@ const toRow = (k, e, settingsId) => {
 
 // Серверден келген жолдар + әлі жіберілмеген өзгерістер → жаңа күй (сервер негіз, кезектегі өзгеріс үстінен жазылады)
 function mergePull(S, rows) {
-  const next = { tx: [], cycles: [], goals: [], stock: [], matches: [], contribs: [] }, pend = new Map((S.pending || []).map((p) => [p.k + ":" + p.id, p.op]));
+  const next = { tx: [], cycles: [], goals: [], stock: [], matches: [], contribs: [], accounts: [], transfers: [] }, pend = new Map((S.pending || []).map((p) => [p.k + ":" + p.id, p.op]));
   let settings = null, settingsId = null;
   for (const r of rows) {
     const e = fromRow(r);
@@ -107,9 +121,10 @@ function mergePull(S, rows) {
     const i = next[p.k].findIndex((x) => x.id === p.id);
     if (i >= 0) next[p.k][i] = local; else next[p.k].push(local);
   }
+  next.accounts.reverse(); // жолдар жаңадан ескіге келеді, ал шоттар ашылған ретімен тұрады
   const pendingSettings = (S.pending || []).some((p) => p.k === "settings");
   return { ...next, settings: settings && !pendingSettings ? { ...S.settings, ...settings } : S.settings, settingsId: settingsId || S.settingsId };
 }
 
-const FS = { addDays, daysBetween, cycleDaysLeft, stockPct, nextBuy, brandMatch, goalSaved, goalsView, goalMonthly, forecast, normCat, monthTotals, balance, APP_OF, fromRow, toRow, mergePull };
+const FS = { addDays, daysBetween, cycleDaysLeft, stockPct, nextBuy, brandMatch, goalSaved, goalsView, goalMonthly, forecast, normCat, monthTotals, balance, wallet, APP_OF, fromRow, toRow, mergePull };
 if (typeof module !== "undefined") module.exports = FS;
