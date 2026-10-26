@@ -105,7 +105,7 @@ test("mergePull: сервер негіз, кезектегі put үстінен 
   const rows = [row("local-edit", 10), row("del-me", 4), row("remote", 5), { id: "s", app: "fs_settings", created_at: "2026-10-01T00:00:00Z", data: { capital: 50, income: 60, fixed: 70 } }];
   const m = FS.mergePull(S0, rows);
   assert.deepEqual(m.tx.map((x) => [x.id, x.amount]).sort(), [["local-edit", 999], ["new-local", 7], ["remote", 5]]);
-  assert.deepEqual(m.settings, { capital: 50, income: 60, fixed: 70, hide: true }); // hide — тек құрылғыда
+  assert.deepEqual(m.settings, { capital: 50, income: 60, fixed: 70, city: "Астана", hide: true }); // hide — тек құрылғыда
   assert.equal(m.settingsId, "s");
   const m2 = FS.mergePull({ ...S0, pending: [{ k: "settings", id: "s", op: "put" }] }, rows);
   assert.equal(m2.settings.capital, 1); // жіберілмеген баптау сервердікін ауыстырады
@@ -150,4 +150,42 @@ test("fromRow: шот және аударым; жарамсыз аударым �
 test("mergePull: шоттар ашылған ретімен", () => {
   const a = (id) => ({ id, app: "fs_account", created_at: "2026-10-01T00:00:00Z", data: { name: id, opening: 0 } });
   assert.deepEqual(FS.mergePull(S({ pending: [] }), [a("жаңа"), a("ескі")]).accounts.map((x) => x.id), ["ескі", "жаңа"]);
+});
+
+test("recalcCycle: цикл-күн — сатып алулар арасындағы күндердің орташасы; бір item болса болжам сақталады", () => {
+  const c = { id: "c", every: 45, last: "2026-01-01", price: 1000 };
+  const it = (time, cost) => ({ cycleId: "c", time, cost });
+  FS.recalcCycle(c, [it("2026-01-01", 1000)]);
+  assert.equal(c.every, 45);
+  FS.recalcCycle(c, [it("2026-02-20", 1200), it("2026-01-01", 1000), it("2026-03-12", 1100), { cycleId: "x", time: "2030-01-01", cost: 1 }]);
+  assert.deepEqual([c.every, c.last, c.price], [Math.round((50 + 20) / 2), "2026-03-12", 1100]);
+  assert.equal(FS.perDay({ price: 1100, every: 35 }).toFixed(1), "31.4");
+});
+
+test("migrate: ескі цикл бір item алады, қайта жүргізсе қайталанбайды, id тұрақты", () => {
+  const s = { settings: { city: "Астана" }, items: [], cycles: [{ id: "abc", name: "Паста", price: 900, every: 40, last: "2026-10-01" }] };
+  assert.equal(FS.migrate(s), 1); assert.equal(FS.migrate(s), 0);
+  assert.equal(s.items.length, 1);
+  assert.deepEqual([s.items[0].id, s.items[0].cycleId, s.items[0].cost, s.items[0].time, s.cycles[0].every, s.cycles[0].status], ["fbc", "abc", 900, "2026-10-01", 40, "active"]);
+  assert.equal(FS.itemIdOf("fbc"), "ebc");
+});
+
+test("matchCycle және groupReceipt: чек позициясы циклге, қалғаны санатқа; архивтелген цикл сәйкес келмейді", () => {
+  const cycles = [{ id: "c1", name: "Тіс пастасы", cat: "күтім" }, { id: "c2", name: "Сүт", cat: "Тамақ", status: "archived" }];
+  assert.equal(FS.matchCycle("Паста тіс пастасы 75мл", cycles)?.id, "c1");
+  assert.equal(FS.matchCycle("Сүт 1л", cycles), null);
+  assert.equal(FS.matchCycle("ab", cycles), null);
+  const g = FS.groupReceipt([{ name: "тіс пастасы", price: 900, category: "Тұрмыс" }, { name: "Нан", price: 100, category: "тамақ" }, { name: "Сүт", price: 400, category: "Тамақ" }], cycles);
+  assert.deepEqual(g.byCat, { Күтім: 900, Тамақ: 500 });
+  assert.deepEqual(g.rows.map((r) => r.cycleId), ["c1", "", ""]);
+});
+
+test("fromRow: item жарамды болса ғана; tx.store және settings.city сақталады", () => {
+  const r = (app, data) => FS.fromRow({ id: "z", app, data, created_at: "2026-10-01T00:00:00Z" });
+  assert.equal(r("fs_item", { cycleId: "c", cost: 5, time: "2026-10-01" }).cost, 5);
+  assert.equal(r("fs_item", { cycleId: "c", cost: "x", time: "2026-10-01" }), null);
+  assert.equal(r("fs_item", { cycleId: "c", cost: 5, time: "ертең" }), null);
+  assert.equal(r("money", { amount: 5, kind: "expense", category: "x", date: "2026-10-01", store: "Magnum" }).store, "Magnum");
+  assert.equal(r("fs_settings", { city: " Алматы " }).item.city, "Алматы");
+  assert.equal(FS.toRow("settings", { capital: 1, income: 2, fixed: 3, city: "Алматы" }, "s").data.city, "Алматы");
 });

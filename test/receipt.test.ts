@@ -5,7 +5,7 @@ import { okImage, parseReceipt, pickVision } from "../supabase/functions/receipt
 
 const T = "2026-10-26";
 test("parseReceipt: таза JSON, ``` ішіндегі және мәтінмен аралас жауап", () => {
-  const want = { store: "Magnum", total: 12345.5, date: "2026-10-20", category: "Тамақ" };
+  const want = { store: "Magnum", total: 12345.5, date: "2026-10-20", category: "Тамақ", items: [] };
   const j = JSON.stringify({ ...want });
   assert.deepEqual(parseReceipt(j, T), want);
   assert.deepEqual(parseReceipt("```json\n" + j + "\n```", T), want);
@@ -18,6 +18,10 @@ test("parseReceipt: сома жоқ/жарамсыз — қате; күн жоқ
   for (const bad of ['{"total":null}', '{"total":0}', '{"total":-5}', '{"total":"abc"}', '{"total":1e12}', "жоқ", "{сынық"]) assert.ok("error" in parseReceipt(bad, T), bad);
   for (const d of ["null", '"2027-01-01"', '"1999-01-01"', '"20.10.2026"']) assert.equal((parseReceipt(`{"total":5,"date":${d}}`, T) as any).date, T, d);
   assert.equal((parseReceipt('{"total":5}', T) as any).category, "Басқа");
+});
+test("parseReceipt: позициялар — жарамсыздары (атауы/бағасы жоқ, теріс) түседі", () => {
+  const r = parseReceipt(JSON.stringify({ total: 900, items: [{ name: "Сүт  1л", price: "450", category: "Тамақ" }, { name: "", price: 5 }, { name: "Қате", price: -1 }, { name: "Нан", price: "1 000,5" }, null] }), T) as any;
+  assert.deepEqual(r.items, [{ name: "Сүт 1л", price: 450, category: "Тамақ" }, { name: "Нан", price: 1000.5, category: "Басқа" }]);
 });
 test("okImage: тек JPEG/PNG/WebP data URL, көлемі шектелген", () => {
   assert.ok(okImage("data:image/jpeg;base64,AAAA"));

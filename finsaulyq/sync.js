@@ -39,6 +39,7 @@ Sync.now = async () => {
       persist();
     }
     Object.assign(S, FS.mergePull(S, await pullRows()));
+    migrate();
     Sync.state = S.pending.length ? "wait" : "ok"; Sync.error = "";
     persist();
   } catch (e) {

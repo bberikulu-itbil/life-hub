@@ -73,3 +73,19 @@ dialog h3{margin:0 0 .4rem}
 #nav button.plus .ic svg{width:28px;height:28px}
 dialog button.menu{width:100%;justify-content:flex-start;margin-top:8px;min-height:52px}
 #nav button.plus{background:linear-gradient(160deg,var(--acc-2),var(--acc));color:var(--acc-ink);border:0;box-shadow:var(--shadow-primary)}
+
+.cic{color:var(--acc);flex:none}
+.gone{opacity:.6}
+dialog.sheet{max-height:calc(100dvh - 24px);overflow:auto}
+.seg{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.seg button[aria-pressed]{flex:1;min-width:0;padding:.4rem .1rem;font-size:.9rem}
+.seg .ghost{flex:none;min-width:40px;padding:0}
+.seg button[aria-pressed=true]{background:linear-gradient(160deg,var(--acc-2),var(--acc));color:var(--acc-ink);border-color:transparent}
+.amt{font-size:2.4rem;font-weight:700;text-align:right;padding:12px 4px;min-height:72px;overflow-wrap:anywhere}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.pad button{min-height:58px;font-size:1.5rem}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:.4rem 0}
+.chipb{border-radius:var(--r-pill);padding:.4rem .9rem}
+.own{display:flex;gap:8px;margin-top:8px}
+.own button{flex:none}
+button:disabled{opacity:.45;cursor:default}
