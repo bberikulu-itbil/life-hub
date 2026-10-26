@@ -80,6 +80,27 @@ export const TOOLS = [
   }),
 ];
 
+// Free models often invent Kazakh words; these rules and examples keep translations to real dictionary Kazakh.
+const KK_RULE = "Kazakh translations must be real, common literary Kazakh words as in an English–Kazakh dictionary (never Russian, never invented or misspelled words). Give 1–3 main senses, comma-separated, lowercase; verbs in the -у/-ю infinitive (abandon → тастап кету, бас тарту; confuse → шатастыру, абдырату; bring about → тудыру, туғызу; expense → шығын, шығыс). If unsure of a sense, leave it out.";
+
+export function translateMessages(word: string) {
+  return [
+    { role: "system", content: `You are an English–Kazakh lexicographer for a vocabulary app. ${KK_RULE}\nReturn only JSON: {"translation": "...", "example": "short natural English sentence using the word"}.` },
+    { role: "user", content: "dispatch" },
+    { role: "assistant", content: '{"translation": "жіберу, аттандыру", "example": "The company will dispatch the parcel tomorrow."}' },
+    { role: "user", content: word.slice(0, 80) },
+  ];
+}
+// The model's JSON, or null when it is not a usable Kazakh translation.
+export function parseTranslation(text: string): { translation: string; example: string } | null {
+  try {
+    const o = JSON.parse(String(text).replace(/^```(json)?|```$/g, "").trim());
+    const t = String(o.translation ?? "").trim();
+    if (!t || t.length > 120 || !/[а-яәғқңөұүһі]/i.test(t)) return null;
+    return { translation: t.toLowerCase(), example: String(o.example ?? "").trim().slice(0, 200) };
+  } catch { return null; }
+}
+
 export function systemPrompt(now: string): string {
   return [
     "You are Hub, the personal assistant at the center of the user's ecosystem of apps.",
@@ -91,6 +112,7 @@ export function systemPrompt(now: string): string {
     "- One message may need several tools (for example an expense and a task): call all of them.",
     "- To answer questions about saved data, call list_items first and never invent records. For money questions use the totals it returns.",
     "- Ask back only when a required field truly cannot be inferred.",
+    `- ${KK_RULE}`,
     "- After acting, confirm in one short sentence what was saved and in which app.",
   ].join("\n");
 }
@@ -131,6 +153,10 @@ export async function runTool(db: any, name: string, args: any, today = ""): Pro
   if (appId) {
     const data = cleanRecord(APPS[appId], args);
     if (typeof data === "string") return { error: data };
+    if (appId === "lang") { // one entry per word, whatever the case
+      const { data: same } = await db.from("items").select("id").eq("app", "lang").ilike("data->>word", String(data.word)).limit(1);
+      if (same?.length) return { saved: false, exists: true, app: appId, id: same[0].id, note: "the word is already in the vocabulary" };
+    }
     const { data: row, error } = await db.from("items").insert({ app: appId, data }).select("id").single();
     return error ? { error: error.message } : { saved: true, app: appId, id: row.id };
   }

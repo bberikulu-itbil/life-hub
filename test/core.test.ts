@@ -1,7 +1,7 @@
 // Run: node --test test/core.test.ts   (Node 22.18+ strips the TypeScript types itself)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { APPS, TOOLS, buildChain, callOpenRouter, cleanHistory, cleanRecord, runLoop, runTool, totals, templateMessages } from "../supabase/functions/assistant/core.ts";
+import { APPS, TOOLS, buildChain, callOpenRouter, cleanHistory, cleanRecord, runLoop, runTool, totals, templateMessages, parseTranslation, translateMessages } from "../supabase/functions/assistant/core.ts";
 
 test("cleanRecord coerces numbers, checks enums and required fields", () => {
   assert.deepEqual(cleanRecord(APPS.money, { amount: "1 500,5", kind: "expense", category: "тамақ", junk: 1 }),
@@ -114,4 +114,19 @@ test("TOOLS: моделге регулярлы өрнек жіберілмейд
   assert.deepEqual(Object.keys(t.function.parameters.properties), ["title", "due", "time", "dur"]);
   assert.ok(!JSON.stringify(TOOLS).includes('"re"'));
   assert.match(t.function.parameters.properties.due.description, /YYYY-MM-DD/);
+});
+
+test("translations: only real Kazakh JSON is accepted, a known word is not saved twice", async () => {
+  assert.deepEqual(parseTranslation('```json\n{"translation": "Шатастыру, абдырату", "example": "Don\'t confuse them."}\n```'), { translation: "шатастыру, абдырату", example: "Don't confuse them." });
+  assert.equal(parseTranslation('{"translation": "to confuse"}'), null);
+  assert.equal(parseTranslation("шатастыру"), null);
+  assert.match(translateMessages("abandon")[0].content, /тастап кету/);
+  let inserted = false;
+  const db = { from: () => ({
+    select: () => ({ eq: () => ({ ilike: (_c: string, w: string) => ({ limit: async () => ({ data: w === "Confuse" ? [{ id: "w1" }] : [] }) }) }) }),
+    insert: () => { inserted = true; return { select: () => ({ single: async () => ({ data: { id: "w2" }, error: null }) }) }; },
+  }) };
+  assert.equal((await runTool(db, "add_word", { word: "Confuse", translation: "шатастыру" })).exists, true);
+  assert.equal(inserted, false);
+  assert.equal((await runTool(db, "add_word", { word: "abandon", translation: "тастап кету" })).saved, true);
 });

@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.117.2";
-import { buildChain, callOpenRouter, cleanHistory, freeToolModels, runLoop, runTool, systemPrompt, templateMessages } from "./core.ts";
+import { buildChain, callOpenRouter, cleanHistory, freeToolModels, parseTranslation, runLoop, runTool, systemPrompt, templateMessages, translateMessages } from "./core.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -44,6 +44,23 @@ Deno.serve(async (req) => {
       const { message, model } = await callOpenRouter(key, chain, templateMessages(info, String(body.signature ?? "").slice(0, 120), Array.isArray(body.tags) ? body.tags : []), fetch, []);
       const text = String(message.content ?? "").trim();
       return text ? json({ template: text, model }) : json({ error: "Модель бос жауап берді, қайта көр." }, 502);
+    } catch (e) {
+      return json({ error: `Модельдер жауап бермеді: ${(e as Error).message}` }, 502);
+    }
+  }
+
+  if (body.action === "translate") {
+    const word = String(body.word ?? "").trim();
+    if (!word || word.length > 80) return json({ error: "Сөз бос не тым ұзын." }, 400);
+    const chain = buildChain(body.models, await freeToolModels().catch(() => []));
+    try {
+      // a model that answers with nonsense is skipped for the next one
+      for (let i = 0; i < chain.length; i += 3) {
+        const { message, model } = await callOpenRouter(key, chain.slice(i), translateMessages(word), fetch, []);
+        const out = parseTranslation(String(message.content ?? ""));
+        if (out) return json({ ...out, model });
+      }
+      return json({ error: "Модель дұрыс аударма бермеді. Аударманы өзің жаз." }, 502);
     } catch (e) {
       return json({ error: `Модельдер жауап бермеді: ${(e as Error).message}` }, 502);
     }
