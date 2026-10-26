@@ -285,7 +285,7 @@ const APPS = {
   lang:   { brand: "sozdik", name: "Sozdik", sub: "Тіл үйрену", tool: "add_word", url: "../til/", hint: "ubiquitous сөзін сөздікке қос", title: (d) => d.word, detail: (d) => join(d.translation, d.example) },
   books:  { brand: "kitapp", name: "Kitapp", sub: "Кітаптар", tool: "add_book", url: "kitapp/", hint: "«Абай жолы» кітабын оқып жатырмын", title: (d) => d.title, detail: (d) => join(d.author, STATUS[d.status]) },
   money:  { brand: "finsaulyq", name: "FinSaulyq", sub: "Қаржы", tool: "add_transaction", url: "finsaulyq/", hint: "Түскі асқа 2500 теңге жұмсадым", title: (d) => `${d.kind === "income" ? "+" : "−"}${money(d.amount)} ${cur(d.currency)}`, detail: (d) => join(d.category, d.note) },
-  plan:   { brand: "jospar", name: "Jospar", sub: "Жоспар мен әдет", tool: "add_task", hint: "Жұмада 7B сыныбымен сынып сағаты", title: (d) => d.title, detail: (d) => join(d.due, d.note), check: true },
+  plan:   { brand: "jospar", name: "Jospar", sub: "Жоспар мен әдет", tool: "add_task", url: "jospar/", hint: "Жұмада 7B сыныбымен сынып сағаты", title: (d) => d.title, detail: (d) => join(d.due, d.note), check: true },
   health: { brand: "densaulyq", name: "Densaulyq", sub: "Денсаулық", tool: "add_health_log", hint: "Бүгін 30 минут жүгірдім", title: (d) => join(HEALTH[d.type] || d.type, d.value), detail: (d) => d.note },
   ideas:  { brand: "mindmap", name: "MindMap", sub: "Ойлар мен зерттеулер", tool: "add_note", hint: "Идея: олимпиада есептерінің банкі", title: (d) => d.text, detail: (d) => (d.tags || []).map((t) => "#" + t).join(" ") },
 };
