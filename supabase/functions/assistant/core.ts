@@ -1,12 +1,14 @@
 // The hub's brain: the app registry, the tools the model may call, and the tool-calling loop.
 // Adding an app = one entry in APPS here + one display entry in index.html.
 
-type Field = { type: "string" | "number" | "array"; description: string; enum?: string[] };
+type Field = { type: "string" | "number" | "array"; description: string; enum?: string[]; re?: RegExp };
 type App = { name: string; tool: string; about: string; fields: Record<string, Field>; required: string[] };
 
 const s = (description: string, values?: string[]): Field =>
   values ? { type: "string", description, enum: values } : { type: "string", description };
 const n = (description: string): Field => ({ type: "number", description });
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const pat = (description: string, re: RegExp): Field => ({ type: "string", description, re }); // format is checked on the server, so Jospar never gets a value it cannot read
 
 export const APPS: Record<string, App> = {
   lang: {
@@ -27,10 +29,11 @@ export const APPS: Record<string, App> = {
     fields: { amount: n("Amount, a positive number"), kind: s("expense or income", ["expense", "income"]), category: s("Category in Kazakh, e.g. тамақ, көлік, кітап"), currency: s("Currency code, default KZT"), note: s("Optional note"), date: s("Date YYYY-MM-DD, default today") },
     required: ["amount", "kind", "category"],
   },
-  plan: {
-    name: "Жоспар", tool: "add_task",
-    about: "Add a task or plan item to the planner.",
-    fields: { title: s("What to do"), due: s("When: YYYY-MM-DD or YYYY-MM-DD HH:MM"), note: s("Optional note") },
+  // The id is the `app` value Jospar reads (task: title, due, time, dur, done, doneAt, goal). Done lives in items.done.
+  jo_task: {
+    name: "Jospar", tool: "add_task",
+    about: "Add a task to the Jospar app: a one-off to-do, optionally with a date and a start time.",
+    fields: { title: s("What to do"), due: pat("Due date YYYY-MM-DD", DATE), time: pat("Start time HH:MM, 24-hour, only if the user named a time", /^([01]\d|2[0-3]):[0-5]\d$/), dur: n("Duration in minutes, only if the user said how long") },
     required: ["title"],
   },
   health: {
@@ -53,7 +56,7 @@ export const TOOLS = [
   ...Object.values(APPS).map((a) => fn(a.tool, a.about, {
     type: "object",
     properties: Object.fromEntries(Object.entries(a.fields).map(([k, f]) =>
-      [k, f.type === "array" ? { type: "array", items: { type: "string" }, description: f.description } : f])),
+      [k, f.type === "array" ? { type: "array", items: { type: "string" }, description: f.description } : { type: f.type, description: f.description, ...(f.enum && { enum: f.enum }) }])),
     required: a.required,
   })),
   fn("list_items", "Read saved records of one app, newest first. Call it before answering any question about the user's saved data.", {
@@ -106,6 +109,7 @@ export function cleanRecord(app: App, args: Record<string, unknown>): Record<str
     } else {
       v = String(v).trim().slice(0, 4000);
       if (f.enum && !f.enum.includes(v as string)) return `${k} must be one of: ${f.enum.join(", ")}`;
+      if (f.re && !f.re.test(v as string)) return `${k} has a wrong format: ${f.description}`;
     }
     out[k] = v;
   }
@@ -121,7 +125,8 @@ export const totals = (rows: { data: any }[]) =>
   }, { expense: 0, income: 0 });
 
 // Runs one tool call against the database (a supabase-js client scoped to the user, so RLS applies).
-export async function runTool(db: any, name: string, args: any): Promise<any> {
+// `today` is the user's local date (YYYY-MM-DD) from the client; the server clock is UTC and can be a day off.
+export async function runTool(db: any, name: string, args: any, today = ""): Promise<any> {
   const appId = Object.keys(APPS).find((k) => APPS[k].tool === name);
   if (appId) {
     const data = cleanRecord(APPS[appId], args);
@@ -147,12 +152,17 @@ export async function runTool(db: any, name: string, args: any): Promise<any> {
     const { data: row, error } = await db.from("items").select("app, data").eq("id", args.id).maybeSingle();
     if (error || !row) return { error: error?.message ?? "record not found" };
     const patch: Record<string, unknown> = {};
-    if (typeof args.done === "boolean") patch.done = args.done;
+    let next: Record<string, unknown> | null = null; // the new data, when it changes
+    if (typeof args.done === "boolean") {
+      patch.done = args.done;
+      if (row.app === "jo_task") next = { ...row.data, doneAt: args.done && DATE.test(today) ? today : "" }; // Jospar counts tasks by the day they were finished
+    }
     if (args.changes && typeof args.changes === "object" && APPS[row.app]) {
       const data = cleanRecord(APPS[row.app], { ...row.data, ...args.changes });
       if (typeof data === "string") return { error: data };
-      patch.data = { ...row.data, ...data }; // keep fields other apps add, e.g. the Til app's review state (srs)
+      next = { ...(next ?? row.data), ...data }; // keep fields other apps add, e.g. the Til app's review state (srs)
     }
+    if (next) patch.data = next;
     if (!Object.keys(patch).length) return { error: "nothing to change" };
     const { error: e2 } = await db.from("items").update(patch).eq("id", args.id);
     return e2 ? { error: e2.message } : { updated: true };

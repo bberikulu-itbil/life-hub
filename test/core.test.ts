@@ -1,7 +1,7 @@
 // Run: node --test test/core.test.ts   (Node 22.18+ strips the TypeScript types itself)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { APPS, buildChain, callOpenRouter, cleanHistory, cleanRecord, runLoop, runTool, totals, templateMessages } from "../supabase/functions/assistant/core.ts";
+import { APPS, TOOLS, buildChain, callOpenRouter, cleanHistory, cleanRecord, runLoop, runTool, totals, templateMessages } from "../supabase/functions/assistant/core.ts";
 
 test("cleanRecord coerces numbers, checks enums and required fields", () => {
   assert.deepEqual(cleanRecord(APPS.money, { amount: "1 500,5", kind: "expense", category: "тамақ", junk: 1 }),
@@ -46,9 +46,13 @@ test("callOpenRouter moves to the next three models when a request fails", async
 test("runTool saves into the right app and refuses bad input", async () => {
   let inserted: any = null;
   const db = { from: () => ({ insert: (row: any) => { inserted = row; return { select: () => ({ single: async () => ({ data: { id: "r1" }, error: null }) }) }; } }) };
-  assert.deepEqual(await runTool(db, "add_task", { title: "Ата-аналар жиналысы", due: "2026-10-21 18:00" }), { saved: true, app: "plan", id: "r1" });
-  assert.equal(inserted.app, "plan");
+  assert.deepEqual(await runTool(db, "add_task", { title: "Ата-аналар жиналысы", due: "2026-10-21", time: "18:00", dur: "45", junk: 1 }), { saved: true, app: "jo_task", id: "r1" });
+  assert.equal(inserted.app, "jo_task");
+  assert.deepEqual(inserted.data, { title: "Ата-аналар жиналысы", due: "2026-10-21", time: "18:00", dur: 45 }); // Jospar оқитын өрістер
   assert.deepEqual(await runTool(db, "add_task", {}), { error: "missing: title" });
+  assert.match((await runTool(db, "add_task", { title: "а", due: "2026-10-21 18:00" })).error, /^due has a wrong format/); // Jospar оқи алмайтын күнді өткізбейміз
+  assert.match((await runTool(db, "add_task", { title: "а", time: "9:00" })).error, /^time has a wrong format/);
+  assert.match((await runTool(db, "add_task", { title: "а", time: "25:00" })).error, /^time has a wrong format/);
   assert.deepEqual(await runTool(db, "drop_table", {}), { error: "unknown tool drop_table" });
 });
 
@@ -86,4 +90,28 @@ test("template calls send no tools and keep the placeholders in the instructions
   assert.match(body.messages[0].content, /\{Алушы\}/);
   assert.match(body.messages[0].content, /\{Математика\}/);
   assert.match(body.messages[0].content, /Бағдәулет/);
+});
+
+test("update_item: Jospar тапсырмасын орындау — done бағаны + data.doneAt; өзгерістер doneAt-ты жоймайды", async () => {
+  let row: any = { app: "jo_task", data: { title: "А", due: "2026-10-27", goal: "g1" } }, patch: any = null;
+  const db = { from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: row, error: null }) }) }), update: (p: any) => { patch = p; return { eq: async () => ({ error: null }) }; } }) };
+  assert.deepEqual(await runTool(db, "update_item", { id: "1", done: true }, "2026-10-26"), { updated: true });
+  assert.deepEqual(patch, { done: true, data: { title: "А", due: "2026-10-27", goal: "g1", doneAt: "2026-10-26" } });
+  await runTool(db, "update_item", { id: "1", done: true }, "кеше");
+  assert.equal(patch.data.doneAt, ""); // жарамсыз күн — doneAt бос
+  row = { app: "jo_task", data: { title: "А", doneAt: "2026-10-26" } };
+  await runTool(db, "update_item", { id: "1", done: false }, "2026-10-26");
+  assert.deepEqual(patch, { done: false, data: { title: "А", doneAt: "" } });
+  await runTool(db, "update_item", { id: "1", done: true, changes: { title: "Б", time: "07:30" } }, "2026-10-26");
+  assert.deepEqual(patch, { done: true, data: { title: "Б", time: "07:30", doneAt: "2026-10-26" } });
+  row = { app: "books", data: { title: "К" } };
+  await runTool(db, "update_item", { id: "1", done: true }, "2026-10-26");
+  assert.deepEqual(patch, { done: true }); // басқа қосымшаларға тимейді
+});
+
+test("TOOLS: моделге регулярлы өрнек жіберілмейді, add_task пішімі сипатталған", () => {
+  const t: any = TOOLS.find((x: any) => x.function.name === "add_task");
+  assert.deepEqual(Object.keys(t.function.parameters.properties), ["title", "due", "time", "dur"]);
+  assert.ok(!JSON.stringify(TOOLS).includes('"re"'));
+  assert.match(t.function.parameters.properties.due.description, /YYYY-MM-DD/);
 });

@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     const out = await runLoop(
       [{ role: "system", content: systemPrompt(String(body.now ?? "").slice(0, 80)) }, ...history],
       (messages) => callOpenRouter(key, chain, messages),
-      (name, args) => runTool(db, name, args),
+      (name, args) => runTool(db, name, args, String(body.now ?? "").slice(0, 10)),
     );
     return json(out);
   } catch (e) {

@@ -285,7 +285,7 @@ const APPS = {
   lang:   { brand: "sozdik", name: "Sozdik", sub: "Тіл үйрену", tool: "add_word", url: "../til/", hint: "ubiquitous сөзін сөздікке қос", title: (d) => d.word, detail: (d) => join(d.translation, d.example) },
   books:  { brand: "kitapp", name: "Kitapp", sub: "Кітаптар", tool: "add_book", url: "kitapp/", hint: "«Абай жолы» кітабын оқып жатырмын", title: (d) => d.title, detail: (d) => join(d.author, STATUS[d.status]) },
   money:  { brand: "finsaulyq", name: "FinSaulyq", sub: "Қаржы", tool: "add_transaction", url: "finsaulyq/", hint: "Түскі асқа 2500 теңге жұмсадым", title: (d) => `${d.kind === "income" ? "+" : "−"}${money(d.amount)} ${cur(d.currency)}`, detail: (d) => join(d.category, d.note) },
-  plan:   { brand: "jospar", name: "Jospar", sub: "Жоспар мен әдет", tool: "add_task", url: "jospar/", hint: "Жұмада 7B сыныбымен сынып сағаты", title: (d) => d.title, detail: (d) => join(d.due, d.note), check: true },
+  jo_task: { brand: "jospar", name: "Jospar", sub: "Тапсырмалар", tool: "add_task", url: "jospar/", hint: "Жұмада 18:00-де 7B сыныбымен сынып сағаты", title: (d) => d.title, detail: (d) => join(d.due, d.time), check: true },
   health: { brand: "densaulyq", name: "Densaulyq", sub: "Денсаулық", tool: "add_health_log", hint: "Бүгін 30 минут жүгірдім", title: (d) => join(HEALTH[d.type] || d.type, d.value), detail: (d) => d.note },
   ideas:  { brand: "mindmap", name: "MindMap", sub: "Ойлар мен зерттеулер", tool: "add_note", hint: "Идея: олимпиада есептерінің банкі", title: (d) => d.text, detail: (d) => (d.tags || []).map((t) => "#" + t).join(" ") },
 };
@@ -528,8 +528,10 @@ function row(id, r) {
     box.setAttribute("aria-label", "Орындалды");
     box.onchange = async () => {
       li.classList.toggle("done", box.checked);
-      const { error } = await sb.from("items").update({ done: box.checked }).eq("id", r.id);
-      if (error) { box.checked = !box.checked; li.classList.toggle("done", box.checked); }
+      // Jospar орындалған күнін data.doneAt-тан алады (аналитика үшін); бағана — «орындалды» белгісінің негізі
+      const upd = { done: box.checked, ...(id === "jo_task" && { data: { ...r.data, doneAt: box.checked ? localNow().slice(0, 10) : "" } }) };
+      const { error } = await sb.from("items").update(upd).eq("id", r.id);
+      if (error) { box.checked = !box.checked; li.classList.toggle("done", box.checked); } else if (upd.data) r.data = upd.data;
     };
     li.append(box);
   }

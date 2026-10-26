@@ -123,10 +123,10 @@ test("monthStats: тапсырма, жақсы әдет %, күрес күнде
 });
 
 test("fromRow: тапсырма мен мақсат", () => {
-  const row = (app, data) => ({ id: "x", app, data });
+  const row = (app, data, done = false) => ({ id: "x", app, data, done });
   assert.equal(JO.fromRow(row("jo_task", { title: "  " })), null);
   assert.equal(JO.fromRow(row("jo_goal", { title: "А", deadline: "жақында" })), null);
-  assert.deepEqual(JO.fromRow(row("jo_task", { title: "А", due: "2026-10-30", time: "9", done: true, doneAt: "2026-10-26" })), { id: "x", title: "А", goal: "", due: "2026-10-30", time: "", dur: 0, done: true, doneAt: "2026-10-26" });
+  assert.deepEqual(JO.fromRow(row("jo_task", { title: "А", due: "2026-10-30", time: "9", doneAt: "2026-10-26" }, true)), { id: "x", title: "А", goal: "", due: "2026-10-30", time: "", dur: 0, done: true, doneAt: "2026-10-26" });
   assert.equal(JO.fromRow(row("jo_task", { title: "А", done: false, doneAt: "2026-10-26" })).doneAt, ""); // орындалмаған — doneAt жоқ
   const g = { id: "x", title: "Олимпиада банкі", why: "Оқушыларға", deadline: "2026-12-20" };
   assert.deepEqual(JO.fromRow(JO.toRow("goals", g)), g);
@@ -139,4 +139,15 @@ test("mergePull: тапсырма мен мақсат та біріктіріл�
   const m = JO.mergePull(S, [JO.toRow("tasks", task({ id: "t1", title: "Серверде" })), JO.toRow("goals", { id: "g1", title: "М", why: "", deadline: "2026-12-01" })]);
   assert.equal(m.tasks[0].title, "Жергілікті");
   assert.equal(m.goals.length, 1);
+});
+
+test("тапсырманың «орындалды» белгісі — items.done бағанында (Hub пен ассистент те сол бағанды өзгертеді)", () => {
+  const r = JO.toRow("tasks", task({ id: "x", done: true, doneAt: T }));
+  assert.equal(r.done, true);
+  assert.ok(!("done" in r.data) && r.data.doneAt === T);
+  assert.equal(JO.toRow("goals", { id: "g", title: "М", why: "", deadline: T }).done, undefined); // басқа жазбаларға бағана жазылмайды
+  const fromHub = { id: "x", app: "jo_task", data: { title: "А", done: false }, done: true }; // Hub белгілесе, дерек ішіндегі done есептелмейді
+  assert.equal(JO.fromRow(fromHub).done, true);
+  assert.equal(JO.fromRow({ ...fromHub, done: false, data: { title: "А", done: true } }).done, false);
+  assert.equal(JO.fromRow({ id: "x", app: "jo_task", data: { title: "А" } }).done, false); // ассистент жазған жаңа тапсырма
 });

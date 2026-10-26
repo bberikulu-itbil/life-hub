@@ -11,7 +11,7 @@ Sync.schedule = () => { clearTimeout(Sync.timer); Sync.timer = setTimeout(Sync.n
 async function pullRows() {
   const rows = [], apps = Object.values(JO.APP_OF);
   for (let a = 0; ; a += 1000) { // PostgREST бір жауапта 1000 жолдан аспайды
-    const { data, error } = await Sync.sb.from("items").select("id, app, data, created_at").in("app", apps).order("created_at", { ascending: false }).order("id").range(a, a + 999);
+    const { data, error } = await Sync.sb.from("items").select("id, app, data, done, created_at").in("app", apps).order("created_at", { ascending: false }).order("id").range(a, a + 999);
     if (error) throw error;
     rows.push(...data);
     if (data.length < 1000) return rows;

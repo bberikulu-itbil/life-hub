@@ -2,7 +2,7 @@
 /* Jospar есептеу ядросы: DOM-сыз, тестке ыңғайлы. Күндер — «YYYY-MM-DD» жолдары.
    Әдет: { id, name, kind: good|bad|neutral, steps: [ішкі пункттер], time: "HH:MM"|"", dur: минут, created }
    Күн жазбасы (әдет + күн үшін біреу): { id, habit, date, done: [орындалған пункт нөмірлері], slip, resist, count }
-   Тапсырма: { id, title, goal: мақсат id|"", due: күн|"", time, dur, done, doneAt: күн|"" }
+   Тапсырма: { id, title, goal: мақсат id|"", due: күн|"", time, dur, done (items.done бағаны), doneAt: күн|"" }
    Мақсат (SMART): { id, title, why, deadline } — өлшемі: оған байланған тапсырмалардың орындалуы */
 const MS = 864e5;
 const dnum = (s) => { const [y, m, d] = s.split("-").map(Number); return Date.UTC(y, m - 1, d) / MS; };
@@ -94,13 +94,18 @@ function fromRow(r) {
   if (k === "habits") return typeof d.name === "string" && d.name.trim() && KINDS.includes(d.kind) && DATE.test(d.created)
     ? { id: r.id, name: d.name, kind: d.kind, steps: Array.isArray(d.steps) ? d.steps.filter((s) => typeof s === "string") : [], time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, created: d.created } : null;
   if (k === "tasks") return text(d.title)
-    ? { id: r.id, title: d.title, goal: typeof d.goal === "string" ? d.goal : "", due: DATE.test(d.due) ? d.due : "", time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, done: d.done === true, doneAt: d.done === true && DATE.test(d.doneAt) ? d.doneAt : "" } : null;
+    ? { id: r.id, title: d.title, goal: typeof d.goal === "string" ? d.goal : "", due: DATE.test(d.due) ? d.due : "", time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, done: r.done === true, doneAt: r.done === true && DATE.test(d.doneAt) ? d.doneAt : "" } : null;
   if (k === "goals") return text(d.title) && DATE.test(d.deadline) ? { id: r.id, title: d.title, why: typeof d.why === "string" ? d.why : "", deadline: d.deadline } : null;
   if (k === "logs") return typeof d.habit === "string" && DATE.test(d.date)
     ? { id: r.id, habit: d.habit, date: d.date, done: Array.isArray(d.done) ? d.done.filter(nn) : [], slip: d.slip === true, resist: nn(d.resist) ? d.resist : 0, count: nn(d.count) ? d.count : 0 } : null;
   return null;
 }
-const toRow = (k, e) => { const { id, ...data } = e; return { id, app: APP_OF[k], data }; };
+const toRow = (k, e) => {
+  const { id, ...data } = e;
+  if (k !== "tasks") return { id, app: APP_OF[k], data };
+  const { done, ...rest } = data; // «орындалды» — items.done бағанында: Hub пен ассистент те сол бағанды өзгертеді
+  return { id, app: APP_OF[k], data: rest, done };
+};
 
 // Сервер негіз; әлі жіберілмеген жергілікті өзгерістер оның үстінен жазылады
 function mergePull(S, rows) {
