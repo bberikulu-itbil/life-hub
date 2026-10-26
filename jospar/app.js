@@ -5,6 +5,7 @@ const DEF = { habits: [], logs: [], tasks: [], goals: [], pending: [], synced: f
 const LISTS = ["habits", "logs", "tasks", "goals"];
 const WD = ["жексенбі", "дүйсенбі", "сейсенбі", "сәрсенбі", "бейсенбі", "жұма", "сенбі"];
 const MO = ["қаңтар", "ақпан", "наурыз", "сәуір", "мамыр", "маусым", "шілде", "тамыз", "қыркүйек", "қазан", "қараша", "желтоқсан"];
+let seg = "tasks", openId = null; // Тапсырмалар бетінің бөлімі және ашық әдет
 const KIND = { good: "Жақсы әдеттер", bad: "Жаман әдеттер", neutral: "Бейтарап әдеттер" };
 const ICONS = {
   home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
@@ -17,6 +18,8 @@ const ICONS = {
   check: '<polyline points="20 6 9 17 4 12"/>',
   x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   edit: '<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>',
+  chevron: '<path d="M9 18l6-6-6-6"/>',
+  back: '<path d="M15 18l-6-6 6-6"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
   heart: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
 };
@@ -179,8 +182,7 @@ function habitRow(hb) {
   const sub = hb.kind === "good" ? `Серия: ${r.cur} · ең ұзақ: ${r.best}` + (hb.steps.length ? ` · ${hb.steps.length} пункт` : "")
     : hb.kind === "bad" ? `Серия: ${r.cur} · ең ұзақ: ${r.best} · күрес күндері: ${JO.fightDays(S, hb)}`
     : `Осы айда: ${S.logs.filter((l) => l.habit === hb.id && l.date.startsWith(month)).reduce((t, l) => t + l.count, 0)}`;
-  return h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, hb.name), h("small", { class: "muted" }, [timeLabel(hb), sub].filter(Boolean).join(" · "))),
-    h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${hb.name}`, onclick: () => habitForm(hb) }, ic("edit")));
+  return h("div", { class: "row" }, h("button", { class: "line", onclick: () => { openId = hb.id; render(); scrollTo(0, 0); } }, main(hb.name, [timeLabel(hb), sub].filter(Boolean).join(" · ")), ic("chevron")));
 }
 
 /* ---------- Тапсырмалар ---------- */
@@ -204,15 +206,50 @@ function taskLine(t) {
     h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${t.title}`, onclick: () => taskForm(t) }, ic("edit")));
 }
 
+/* ---------- Әдет беті: тапсырмалар · жоспар · белсенділік ---------- */
+function planForm(hb) {
+  ask("Жоспар · " + hb.name, [
+    { name: "time", label: "Басталу уақыты: бос қалдырсаң, күн тізімінде уақытсыз бекітіледі", type: "time", optional: true, value: hb.time },
+    { name: "dur", label: "Ұзақтығы, минут", type: "number", optional: true, min: 0, step: 1, value: hb.dur || "" },
+  ], (v) => { put("habits", { ...hb, time: v.time || "", dur: v.time ? Math.round(Number(v.dur)) || 0 : 0 }); save(); });
+}
+
+function habitPage(hb) {
+  const t = today(), r = JO.runs(S, hb, t), rt = JO.rate(S, hb, t), row = (k, v) => h("div", { class: "row" }, h("span", {}, k), h("b", { class: "num" }, v));
+  const start = JO.addDays(t, -JO.weekday(t) - 49), cells = [];
+  for (let d = start; d <= t; d = JO.addDays(d, 1)) {
+    const l = JO.logOf(S, hb.id, d), on = d >= hb.created && (hb.kind === "neutral" ? l?.count > 0 : JO.dayStatus(hb, l) === "done" && (hb.kind === "good" || d < t));
+    cells.push(h("i", { "data-l": on ? 4 : 0, title: dshort(d) }));
+  }
+  const month = t.slice(0, 7), stat = hb.kind === "neutral" ? row("Осы айда", S.logs.filter((l) => l.habit === hb.id && l.date.startsWith(month)).reduce((s, l) => s + l.count, 0))
+    : [row("Серия", r.cur), row("Ең ұзақ серия", r.best), rt?.total && row("Соңғы 30 күн", `${Math.round(rt.done / rt.total * 100)}%`), hb.kind === "bad" && row("Күрес күндері", JO.fightDays(S, hb))];
+  return [
+    h("div", { class: "end", style: "justify-content:space-between;margin:0" }, h("button", { class: "ghost", onclick: () => { openId = null; render(); } }, ic("back"), "Әдеттер"),
+      h("button", { class: "ghost", onclick: () => habitForm(hb) }, ic("edit"), "Өзгерту")),
+    h("h1", {}, hb.name), h("p", { class: "muted sub" }, KIND[hb.kind].replace("әдеттер", "әдет") + ` · салмағы: ${hb.w}`),
+    sec("Тапсырмалар", hb.kind === "good" ? (hb.steps.length ? hb.steps.map((s) => h("div", { class: "row" }, h("span", {}, s))) : empty("Ішкі пункт жоқ: әдет бір қадам болып саналады. «Өзгерту» арқылы қос."))
+      : empty("Ішкі пункттер тек жақсы әдетте болады.")),
+    sec("Жоспар", h("div", { class: "row" }, h("span", {}, hb.time ? `Уақытпен: ${timeLabel(hb)}` : "Тізімде бекітілген, уақытсыз"), h("button", { class: "ghost sm", "aria-label": "Жоспарды өзгерту", onclick: () => planForm(hb) }, ic("edit")))),
+    sec("Белсенділік · соңғы 8 апта", h("div", { class: "heat", role: "img", "aria-label": "Әдеттің күнделікті орындалуы" }, cells), ...[stat].flat().filter(Boolean)),
+  ];
+}
+
 function tasksPage() {
   const open = S.tasks.filter((t) => !t.done).sort((a, b) => (a.due || "9").localeCompare(b.due || "9") || a.title.localeCompare(b.title));
   const done = S.tasks.filter((t) => t.done).sort((a, b) => b.doneAt.localeCompare(a.doneAt)).slice(0, 10); // shortcut: тек соңғы 10 орындалған көрінеді, тарих керек болса — бөлек бет
+  const hb = openId && S.habits.find((x) => x.id === openId);
+  if (hb) return habitPage(hb);
   return [
-    h("h1", {}, "Тапсырмалар"), h("p", { class: "muted sub" }, "Бір реттік істер мен әдеттер"),
-    open.length > 0 && sec("Орындалмаған", ...open.map(taskLine)),
-    done.length > 0 && sec("Соңғы орындалғандар", ...done.map(taskLine)),
-    ...["good", "bad", "neutral"].map((k) => S.habits.some((x) => x.kind === k) && sec(KIND[k], ...S.habits.filter((x) => x.kind === k).map(habitRow))),
-    !S.tasks.length && !S.habits.length && empty("Әлі ештеңе жоқ. Төмендегі «+» батырмасымен қос."),
+    h("h1", {}, "Тапсырмалар"),
+    h("div", { class: "seg", role: "tablist" }, [["tasks", "Тапсырмалар"], ["habits", "Әдеттер"]].map(([k, t]) => h("button", { role: "tab", "aria-selected": seg === k, onclick: () => { seg = k; render(); } }, t))),
+    ...(seg === "tasks" ? [
+      open.length > 0 && sec("Орындалмаған", ...open.map(taskLine)),
+      done.length > 0 && sec("Соңғы орындалғандар", ...done.map(taskLine)),
+      !S.tasks.length && empty("Тапсырма жоқ. Төмендегі «+» батырмасымен қос."),
+    ] : [
+      ...["good", "bad", "neutral"].map((k) => S.habits.some((x) => x.kind === k) && sec(KIND[k], ...S.habits.filter((x) => x.kind === k).map(habitRow))),
+      !S.habits.length && empty("Әдет жоқ. Төмендегі «+» батырмасымен қос."),
+    ]),
   ];
 }
 
@@ -276,7 +313,7 @@ function plusMenu() {
 
 const PAGES = { home, tasks: tasksPage, goals: goalsPage, profile: profilePage };
 const NAV = [["home", "Басты бет", "home"], ["tasks", "Тапсырмалар", "tasks"], ["+"], ["goals", "Мақсат", "target"], ["profile", "Профиль", "user"]];
-const go = (t) => { tab = t; render(); scrollTo(0, 0); };
+const go = (t) => { tab = t; openId = null; render(); scrollTo(0, 0); };
 
 function render() {
   document.getElementById("view").replaceChildren(...PAGES[tab]().filter(Boolean));
