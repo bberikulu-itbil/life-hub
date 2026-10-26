@@ -287,7 +287,7 @@ function chapterInfo(title, left) {
 let pT;
 function progress(pos, pct, label) {
   touchRead();
-  $('#rPosText').textContent = `Бүкіл кітаптан ${pct}%${R.kind === 'pdf' ? ` · ${label}` : ''}`;
+  $('#rPosText').textContent = R.kind === 'pdf' ? label : pct + '%';
   R.cur = { pos, pct, label };
   clearTimeout(pT);
   pT = setTimeout(async () => { R.ver.pos = pos; R.ver.pct = pct; await put('versions', R.ver); }, 400);
@@ -439,10 +439,34 @@ function showMore() {
     };
   });
 }
-$('#rToc').onclick = showToc;
+function showReaderTools() {
+  const pct = R.cur?.pct || 0;
+  rSheet(`<div class="reader-tool-head"><button data-a="toc"><span>${esc($('#rCh').textContent || 'Мазмұны')} · ${pct}%</span>${ic('list', 24)}</button></div>
+    <div class="reader-tool-list">
+      <button data-a="notes"><span>Белгілер мен ескертпелер</span>${ic('note', 24)}</button>
+      <button data-a="search"><span>Кітаптан іздеу</span>${ic('search', 24)}</button>
+      <button data-a="aa"><span>Мәтін баптаулары</span><b>Aa</b></button>
+    </div>
+    <div class="reader-tool-icons">
+      ${navigator.share ? `<button data-a="share" aria-label="Бөлісу">${ic('share', 24)}</button>` : ''}
+      <button data-a="shelf" aria-label="Сөреге қосу">${ic('shelves', 24)}</button>
+      <button data-a="mark" aria-label="Бетбелгі қою">${ic('bookmark', 24)}</button>
+    </div>`, D => {
+    D.querySelector('.rs-body').onclick = e => {
+      const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
+      D.close();
+      if (a === 'toc') showToc();
+      if (a === 'search') showSearch();
+      if (a === 'aa') showAa();
+      if (a === 'notes') { const p = $('#rPanel'); p.hidden = !p.hidden; }
+      if (a === 'mark') readerMark();
+      if (a === 'shelf') openShelfDlg(R.book.id);
+      if (a === 'share') navigator.share({ title: R.book.title, text: `«${R.book.title}»: ${pct}% оқылды` }).catch(() => {});
+    };
+  });
+}
 $('#rMore').onclick = showMore;
-$('#rAdd').onclick = () => openShelfDlg(R.book.id);
-$('#rAa').onclick = showAa;
+$('#rTools').onclick = showReaderTools;
 const readerListen = () => {
   const b = R.book, v = R.ver;
   const pi = R.kind === 'pdf' ? R.page - 1 : (R.rend?.currentLocation()?.start?.index ?? 0);
@@ -450,11 +474,6 @@ const readerListen = () => {
   if (!isReady(v)) return closeReader(() => Player.open(b, null, { vid: v.id, pi }));
   Player.open(b, null, { vid: v.id, pi });
 };
-$('#rListen').onclick = readerListen;
-$('#rAi').onclick = () => closeReader(() => showChat(R.book.id));
-$('#rSpeed').onclick = () => readerSpeed();
-$('#rMark').onclick = () => readerMark();
-$('#rNotes').onclick = () => { const p = $('#rPanel'); p.hidden = !p.hidden; };
 
 async function refreshNotes() {
   const ms = (await byBook('marks', R.book.id)).filter(m => m.kind === 'read' && m.versionId === R.ver.id).sort((a, b) => (a.pct || 0) - (b.pct || 0));

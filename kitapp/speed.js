@@ -4,9 +4,8 @@
 const SP_DEF = { chapPause: 2, baseline: 200, family: 'serif', font: 56, orp: true, punct: 1, long: true, ramp: true, countdown: true, unlocked: 1, freeMode: 'rsvp', freePer: 1, freeWpm: 260, freeMins: 3 };
 const FF = { serif: 'Georgia,"Times New Roman",serif', sans: 'system-ui,sans-serif', mono: 'ui-monospace,Menlo,monospace' };
 const speedPresets = B => [
-  { id: 'focus', icon: 'book-open', title: 'Жайлы', desc: 'Мәтін көз алдында', mode: 'pacer', per: 3, wpm: Math.max(140, Math.round(B * 1.05 / 10) * 10) },
-  { id: 'flow', icon: 'zap', title: 'Қалыпты', desc: '2 сөзден, бірқалыпты', mode: 'rsvp', per: 2, wpm: Math.max(180, Math.round(B * 1.35 / 10) * 10) },
-  { id: 'sprint', icon: 'flame', title: 'Спринт', desc: 'Зейін мен жылдамдық', mode: 'rsvp', per: 2, wpm: Math.max(240, Math.round(B * 1.8 / 10) * 10) },
+  { id: 'follow', icon: 'book-open', title: 'Мәтін бойымен', desc: 'Кәдімгі бетте оқылатын сөздер белгіленіп жылжиды', mode: 'pacer', per: 3, wpm: Math.max(140, Math.round(B * 1.1 / 10) * 10) },
+  { id: 'center', icon: 'zap', title: 'Ортадағы сөз', desc: 'Сөздер экранның ортасында бір-бірден ауысады', mode: 'rsvp', per: 1, wpm: Math.max(180, Math.round(B * 1.35 / 10) * 10) },
 ];
 const spGet = () => ({ ...SP_DEF, ...JSON.parse(localStorage.kSpeed || '{}') });
 const spSet = o => { localStorage.kSpeed = JSON.stringify(o); };
@@ -187,13 +186,12 @@ async function readerSpeed() {
     toast(`${Math.round(res.wpm)} сөз/мин · ${res.words} сөз`);
   });
   const presets = speedPresets(S.baseline);
-  rSheet(`<h3>${ic('zap', 20)} Жылдам оқу</h3><p class="muted">Режимді таңдаңыз. Жаттығу осы ашық тұрған жерден басталады.</p><div class="sp-preset-grid">
-    ${presets.map((p, i) => `<button class="sp-preset ${i === 1 ? 'on' : ''}" data-p="${p.id}">${ic(p.icon, 22)}<b>${p.title}</b><small>${p.desc}<br>${p.wpm} сөз/мин · ${p.per} сөз</small></button>`).join('')}
-    <button class="sp-preset" data-p="custom">${ic('sliders', 22)}<b>Өз баптауым</b><small>${S.freeWpm} сөз/мин · ${S.freePer} сөз · ${S.freeMode === 'pacer' ? 'мәтінмен' : 'ортада'}</small></button></div>`, D => {
+  rSheet(`<h3>${ic('zap', 20)} Жылдам оқу</h3><p class="muted">Екі режимнің бірін таңдаңыз. Қарқынды оқу кезінде өзгерте аласыз.</p><div class="sp-preset-grid two">
+    ${presets.map(p => `<button class="sp-preset" data-p="${p.id}">${ic(p.icon, 22)}<b>${p.title}</b><small>${p.desc}<br>${p.wpm} сөз/мин</small></button>`).join('')}</div>`, D => {
     D.querySelector('.sp-preset-grid').onclick = e => {
       const id = e.target.closest('[data-p]')?.dataset.p; if (!id) return;
       D.close();
-      begin(id === 'custom' ? { mode: S.freeMode, per: S.freePer, wpm: S.freeWpm } : presets.find(p => p.id === id));
+      begin(presets.find(p => p.id === id));
     };
   });
 }
@@ -234,7 +232,7 @@ async function showSpeed() {
     <div class="stats"><div class="stat"><b>${S.baseline}</b><small>Бастапқы қарқын (сөз/мин)</small></div><div class="stat"><b>${best || '—'}</b><small>Ең жақсы (түсінумен)</small></div>
       <div class="stat"><b>${Math.min(S.unlocked, 6)}/6</b><small>Ашылған кезең</small></div><div class="stat"><b>${drills.length}</b><small>Жаттығу саны</small></div></div>
     <div class="glass sec sp-quick"><div class="sp-qhead"><div><h3>${ic('play', 18)} Бірден бастау</h3><small class="muted">Мақсатқа қарай бір режимді таңдаңыз</small></div><span class="badge">${posPct}%</span></div>
-      <div class="sp-preset-grid">${presets.map((p, i) => `<button class="sp-preset ${i === 1 ? 'on' : ''}" data-q="${p.id}">${ic(p.icon, 22)}<b>${p.title}</b><small>${p.desc}<br>${p.wpm} сөз/мин · ${p.per} сөз</small></button>`).join('')}</div></div>
+      <div class="sp-preset-grid two">${presets.map((p, i) => `<button class="sp-preset ${i === 1 ? 'on' : ''}" data-q="${p.id}">${ic(p.icon, 22)}<b>${p.title}</b><small>${p.desc}<br>${p.wpm} сөз/мин${p.mode === 'pacer' ? ` · ${p.per} сөз белгіленеді` : ''}</small></button>`).join('')}</div></div>
     <div class="glass sec"><h3>${ic('book-open', 18)} Жаттығу мәтіні</h3>
       <label>Кітап ${sel('sSrc', vsSorted.map(x => [x.id, `${title(x.bookId)} · ${x.name}${isReady(x) ? '' : ' (дайындалмаған)'}`]), v.id)}</label>
       <label>Қайдан бастау
