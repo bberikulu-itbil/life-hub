@@ -210,3 +210,20 @@ test("цикл-күн белгісіз (every=0): ескерту/болжам ж
   FS.recalcCycle(c, [{ cycleId: "c", time: "2026-10-01", cost: 1000 }, { cycleId: "c", time: "2026-10-31", cost: 1100 }]);
   assert.equal(c.every, 30);
 });
+
+test("бөліп-төлем: ай сомасы, соңғы төлем қалдықты жабады, келесі күн", () => {
+  const i = { total: 1000, months: 3, start: "2026-10-31", paid: 0 };
+  assert.equal(FS.instMonthly(i), 333); assert.equal(FS.instPay(i), 333); assert.equal(FS.instDue(i), "2026-10-28");
+  assert.equal(FS.instPay({ ...i, paid: 2 }), 334); assert.equal(FS.instLeft({ ...i, paid: 1 }), 667);
+  assert.equal(FS.instDue({ ...i, paid: 3 }), "2027-01-28"); assert.ok(FS.instDone({ ...i, paid: 3 })); assert.equal(FS.instLeft({ ...i, paid: 3 }), 0);
+});
+test("бөліп-төлем: болжам төлемдердің аяғына дейін ғана", () => {
+  const s = S({ installments: [{ total: 1000, months: 3, start: "2026-11-05", paid: 0 }] }), f = FS.forecast(s, "2026-10-26", 5).map((r) => r.installments);
+  assert.deepEqual(f, [0, 333, 333, 334, 0]);
+  assert.equal(FS.forecast(s, "2026-10-26", 2)[1].total, 333);
+});
+test("бөліп-төлем пен тілек: fromRow жарамсыз жолды өткізбейді", () => {
+  assert.ok(FS.fromRow({ id: "a", app: "fs_install", data: { name: "Mac", total: 900000, months: 12, paid: 0, start: "2026-11-05" } }));
+  assert.equal(FS.fromRow({ id: "a", app: "fs_install", data: { name: "Mac", total: 900000, months: 0, paid: 0, start: "2026-11-05" } }), null);
+  assert.ok(FS.fromRow({ id: "b", app: "fs_wish", data: { name: "Дрон", price: 500000 } })); assert.equal(FS.fromRow({ id: "b", app: "fs_wish", data: { name: "", price: 5 } }), null);
+});

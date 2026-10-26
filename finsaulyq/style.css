@@ -158,3 +158,7 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .pad{grid-template-columns:repeat(4,1fr);gap:10px}.pad button,.krow .op{border-radius:999px;min-height:58px;border:0;background:#fff;font-size:1.6rem}
 .pad .op,.krow .op{background:rgba(0,0,0,.18);color:var(--ink)}.pad .okb{background:#3b82f6;color:#fff;box-shadow:0 6px 16px rgba(59,130,246,.4)}.pad .okb:disabled{opacity:.45}
 .phead .modes{gap:8px}.modes button{flex:none;width:64px;height:40px;border-radius:14px;padding:0;display:inline-flex;align-items:center;justify-content:center}.modes svg{width:22px;height:22px}
+/* Есеп: екі бөлім */
+.seg.tabs{margin:.4rem 0 .8rem}.seg.tabs button{padding:.6rem .2rem;font-weight:600}
+.row.wish{flex-wrap:wrap}.row.wish button:not(.ghost){font-size:.85rem}
+.catgrid.fav{grid-template-columns:repeat(2,1fr)}.catgrid.fav .catb{flex-direction:row;justify-content:flex-start;gap:8px;text-align:left;min-height:56px}

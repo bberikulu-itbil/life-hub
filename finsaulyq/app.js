@@ -1,8 +1,8 @@
 "use strict";
 /* FinSaulyq интерфейсі. Деректер тек осы құрылғыда (localStorage); есептеу — core.js (FS). */
 const KEY = "finsaulyq.v1";
-const DEF = { settings: { capital: 0, income: 0, fixed: 0, city: "Астана", pad: true, hide: false }, settingsId: null, tx: [], cycles: [], items: [], categories: [], incomes: [], goals: [], stock: [], matches: [], contribs: [], accounts: [], transfers: [], pending: [], synced: false };
-const LISTS = ["tx", "cycles", "items", "categories", "incomes", "goals", "stock", "matches", "contribs", "accounts", "transfers"];
+const DEF = { settings: { capital: 0, income: 0, fixed: 0, city: "Астана", pad: true, hide: false }, settingsId: null, tx: [], cycles: [], items: [], categories: [], incomes: [], goals: [], installments: [], wishes: [], stock: [], matches: [], contribs: [], accounts: [], transfers: [], pending: [], synced: false };
+const LISTS = ["tx", "cycles", "items", "categories", "incomes", "goals", "installments", "wishes", "stock", "matches", "contribs", "accounts", "transfers"];
 const CATS = ["Тамақ", "Көлік", "Тұрмыс", "Кітап", "Күтім", "Жалақы"];
 const MONTHS = ["Қаңтар", "Ақпан", "Наурыз", "Сәуір", "Мамыр", "Маусым", "Шілде", "Тамыз", "Қыркүйек", "Қазан", "Қараша", "Желтоқсан"];
 const COLORS = ["var(--acc)", "var(--star)", "var(--warn)", "var(--acc-2)", "var(--good)", "var(--mute)"];
@@ -343,12 +343,37 @@ function plan() {
       h("div", { class: "main" }, h("b", {}, c.name), h("small", { class: "muted num" }, FS.nextBuy(c) < T ? "Мерзімі өтті" : FS.nextBuy(c))),
       h("span", { class: "num" }, tg(c.price)))) : empty("Цикл жоқ.")),
     sec("Алдағы 3 айдың болжамы", null,
-      h("table", { class: "num" }, h("thead", {}, h("tr", {}, ["Ай", "Циклдер", "Мақсат", "Барлығы"].map((t) => h("th", {}, t)))),
-        h("tbody", {}, f.map((r) => h("tr", {}, h("td", {}, MONTHS[Number(r.month.slice(5)) - 1]), h("td", {}, fmt(r.cycles)), h("td", {}, fmt(r.goals)), h("td", {}, h("b", {}, fmt(r.total))))))),
+      h("table", { class: "num" }, h("thead", {}, h("tr", {}, ["Ай", "Циклдер", "Мақсат", "Бөліп-төлем", "Барлығы"].map((t) => h("th", {}, t)))),
+        h("tbody", {}, f.map((r) => h("tr", {}, h("td", {}, MONTHS[Number(r.month.slice(5)) - 1]), h("td", {}, fmt(r.cycles)), h("td", {}, fmt(r.goals)), h("td", {}, fmt(r.installments)), h("td", {}, h("b", {}, fmt(r.total))))))),
       h("p", { class: "muted" }, `Барлығы ішінде тұрақты шығын бар: ${tg(S.settings.fixed)} / ай. Айлық кіріс: ${tg(S.settings.income)}.`)),
   ];
 }
 
+let accTab = (() => { try { return localStorage.getItem("fs-acc") === "goal" ? "goal" : "freq"; } catch { return "freq"; } })();
+const addInst = (pre = {}, then) => ask("Жаңа бөліп-төлем", [
+  { name: "name", label: "Не үшін", value: pre.name ?? "" },
+  { name: "total", label: "Жалпы сома, ₸", type: "number", min: 1, value: pre.total ?? "" },
+  { name: "months", label: "Неше ай", type: "number", min: 1, step: 1 },
+  { name: "start", label: "Бірінші төлем күні", type: "date", value: today() },
+], (v) => { put("installments", { id: crypto.randomUUID(), name: v.name.trim(), total: num(v.total), months: Math.round(num(v.months)), start: v.start, paid: 0 }); then?.(); save(); });
+const addWish = () => ask("Жаңа тілек", [{ name: "name", label: "Не қалайсың" }, { name: "price", label: "Бағасы, ₸", type: "number", min: 1 }],
+  (v) => { put("wishes", { id: crypto.randomUUID(), name: v.name.trim(), price: num(v.price) }); save(); });
+const payInst = (x) => ask(`Төлем: ${x.name}`, [{ name: "amount", label: "Сома, ₸", type: "number", min: 0.01, value: FS.instPay(x) }, ...accField()], (v) => {
+  put("tx", withAcc({ id: crypto.randomUUID(), kind: "expense", amount: num(v.amount), category: "Бөліп-төлем", note: x.name, date: today() }, v));
+  put("installments", { ...x, paid: x.paid + 1 }); save(); });
+function instRow(x) {
+  const done = FS.instDone(x), paidSum = Math.min(x.total, x.total - FS.instLeft(x)), pct = Math.round(paidSum / x.total * 100), due = FS.instDue(x);
+  return h("div", { class: "row" + (done ? " gold" : "") }, h("div", { class: "main" }, h("b", {}, x.name),
+    h("small", { class: "num muted" }, `${tg(paidSum)} / ${tg(x.total)} · ${x.paid}/${x.months} ай`),
+    h("small", { class: done ? "" : due < today() ? "warn" : "muted" }, done ? "Толық төленді" : `${due < today() ? "Мерзімі өтті" : "Келесі"}: ${due} · ${tg(FS.instPay(x))}`), bar(pct)),
+    !done && h("button", { onclick: () => payInst(x) }, ic("check"), "Төледім"), del("installments", x.id, x.name));
+}
+function wishRow(w) {
+  return h("div", { class: "row wish" }, h("div", { class: "main" }, h("b", {}, w.name), h("small", { class: "num muted" }, tg(w.price))),
+    h("button", { onclick: () => ask("Неше айда жинайсың?", [{ name: "months", label: "Неше ай", type: "number", min: 1, step: 1 }], (v) => { put("goals", { id: crypto.randomUUID(), name: w.name, target: w.price, months: Math.round(num(v.months)), saved: 0, start: today() }); rm("wishes", w.id); save(); }) }, "Жинауды бастау"),
+    h("button", { onclick: () => addInst({ name: w.name, total: w.price }, () => rm("wishes", w.id)) }, "Бөліп-төлемге алдым"),
+    del("wishes", w.id, w.name));
+}
 function stock() {
   const matchCard = (m) => {
     const r = FS.brandMatch(m.brands);
@@ -357,10 +382,21 @@ function stock() {
         h("tbody", {}, r.rows.map((x, i) => h("tr", { class: i === r.best ? "best" : "" }, h("td", {}, i === r.best ? `${x.name} · үздік` : x.name), h("td", {}, fmt(x.price)), h("td", {}, x.days), h("td", {}, x.perDay.toFixed(1)))))),
       h("small", { class: "good" }, `Үздігін таңдасаң, жылына ${tg(r.yearSaving)} үнем`)), del("matches", m.id, m.name));
   };
-  return [
-    head("Циклдер"),
-    sec("Мақсаттар", add(addGoal), S.goals.length ? FS.goalsView(S).map((g) => goalRow(g, true)) : empty("Мақсат жоқ.")),
-    sec("Циклдер", add(() => addCycle()), liveCycles().length ? liveCycles().map((c) => cycleRow(c, true)) : empty("Цикл жоқ. Мысалы: тіс пастасы, 45 күн.")),
+  const T = today(), soon = FS.addDays(T, 14), seg = h("div", { class: "seg tabs", role: "tablist" }, ...[["freq", "Жиі-төлем"], ["goal", "Мақсат"]].map(([k, t]) =>
+    h("button", { type: "button", role: "tab", "aria-selected": String(accTab === k), "aria-pressed": String(accTab === k), onclick: () => { accTab = k; try { localStorage.setItem("fs-acc", k); } catch {} render(); } }, t)));
+  if (accTab === "goal") {
+    const insts = S.installments.slice().sort((a, b) => FS.instDone(a) - FS.instDone(b) || FS.instDue(a).localeCompare(FS.instDue(b)));
+    return [head("Есеп"), seg,
+      sec("Бөліп-төлем", add(() => addInst()), insts.length ? insts.map(instRow) : empty("Бөліп-төлем жоқ. Мысалы: Mac, 12 ай.")),
+      sec("Жинақ", add(addGoal), S.goals.length ? FS.goalsView(S).map((g) => goalRow(g, true)) : empty("Жинақ жоқ. Мысалы: саяхат, 1 000 000 ₸.")),
+      sec("Wish List", add(addWish), S.wishes.length ? S.wishes.map(wishRow) : empty("Арманыңды жаз, кейін жинаққа немесе бөліп-төлемге айналдырасың."))];
+  }
+  const upcoming = [...liveCycles().filter((c) => c.every > 0 && FS.nextBuy(c) <= soon).map((c) => ({ date: FS.nextBuy(c), name: c.name, sum: c.price, ok: () => buyAgain(c), label: "Сатып алынды" })),
+    ...S.installments.filter((x) => !FS.instDone(x) && FS.instDue(x) <= soon).map((x) => ({ date: FS.instDue(x), name: x.name, sum: FS.instPay(x), ok: () => payInst(x), label: "Төледім" }))].sort((a, b) => a.date.localeCompare(b.date));
+  return [head("Есеп"), seg,
+    sec("Алда күтілетін (14 күн)", null, upcoming.length ? upcoming.map((u) => h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, u.name), h("small", { class: "num " + (u.date < T ? "warn" : "muted") }, `${u.date < T ? "Мерзімі өтті" : u.date} · ${tg(u.sum)}`)), h("button", { onclick: u.ok }, ic("check"), u.label))) : empty("Жақын 14 күнде төлем жоқ.")),
+    liveCycles().length ? sec("Тауарлар", null, h("div", { class: "catgrid fav" }, liveCycles().map((c) => h("button", { class: "catb", "aria-label": `Тіркеу: ${c.name}`, onclick: () => buyAgain(c) }, tile(c.name, ic(c.icon || "box")), h("span", {}, c.name), h("small", { class: "muted num" }, tg(c.price)))))) : null,
+    sec("Циклдар", add(() => addCycle()), liveCycles().length ? liveCycles().map((c) => cycleRow(c, true)) : empty("Цикл жоқ. Мысалы: тіс пастасы, 45 күн.")),
     S.cycles.some((c) => c.status === "archived") ? sec("Архив", null, S.cycles.filter((c) => c.status === "archived").map((c) => cycleRow(c, true))) : null,
     sec("Өнімдер қоры", add(addStock), S.stock.length ? S.stock.map((s) => h("div", { class: "row" },
       h("div", { class: "main" }, h("b", {}, s.name), h("small", { class: "muted num" }, `${fmt(s.qty)} ${s.unit} · ${tg(s.price)}`)),
@@ -642,6 +678,8 @@ const valid = (x) => {
     a("tx", (t) => s(t.date) && n(t.amount) && s(t.category) && (t.kind === "income" || t.kind === "expense")) &&
     a("cycles", (c) => s(c.last) && n(c.every) && c.every >= 0 && n(c.price)) &&
     a("items", (i) => s(i.cycleId) && n(i.cost) && s(i.time)) &&
+    a("installments", (i) => s(i.name) && n(i.total) && i.total > 0 && n(i.months) && i.months >= 1 && n(i.paid) && s(i.start)) &&
+    a("wishes", (w) => s(w.name) && n(w.price) && w.price > 0) &&
     a("goals", (g) => s(g.start) && n(g.target) && n(g.saved) && n(g.months)) &&
     a("stock", (i) => n(i.qty)) &&
     a("matches", (m) => Array.isArray(m.brands) && m.brands.length > 1 && m.brands.every((b) => n(b.price) && n(b.days) && b.days > 0)) &&
@@ -709,7 +747,7 @@ function settings() {
 }
 
 const PAGES = { home, plan, stock, set: settings };
-const NAV = [["home", "Журнал", "home"], ["plan", "Summary", "bars"], ["+"], ["stock", "Циклдер", "box"], ["set", "Профиль", "sliders"]];
+const NAV = [["home", "Журнал", "home"], ["plan", "Summary", "bars"], ["+"], ["stock", "Есеп", "box"], ["set", "Профиль", "sliders"]];
 
 function render() {
   document.getElementById("view").replaceChildren(...PAGES[tab]().filter(Boolean));

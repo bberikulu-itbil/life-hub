@@ -38,6 +38,20 @@ function buysIn(c, from, to, today) {
   return n;
 }
 
+// Бөліп-төлем: { id, name, total, months, start (бірінші төлем күні), paid (төленген ай саны) }
+const instMonthly = (i) => Math.round(i.total / i.months);
+const instDone = (i) => i.paid >= i.months;
+const instLeft = (i) => (instDone(i) ? 0 : Math.max(0, i.total - i.paid * instMonthly(i)));
+const instPay = (i) => (i.paid + 1 >= i.months ? instLeft(i) : instMonthly(i)); // соңғы төлем қалдықты жабады
+const instDue = (i) => { const [y, m, d] = i.start.split("-").map(Number); return dstr(Date.UTC(y, m - 1 + i.paid, Math.min(d, 28)) / MS); };
+
+// i-ші айдағы (0 = осы ай) төлем: соңғы төлем қалдықты жабады
+function instIn(x, i, today) {
+  if (instDone(x)) return 0;
+  const [y, m] = today.split("-").map(Number), [dy, dm] = instDue(x).split("-").map(Number), j = i - Math.max(0, (dy - y) * 12 + dm - m), rest = x.months - x.paid;
+  return j < 0 || j >= rest ? 0 : j === rest - 1 ? instLeft(x) - instMonthly(x) * (rest - 1) : instMonthly(x);
+}
+
 // Алдағы айлардың болжамы: тұрақты шығын + циклдік тауарлар + мақсатты жарналар
 function forecast(S, today, count = 3) {
   const [y, m] = today.split("-").map(Number);
@@ -45,8 +59,8 @@ function forecast(S, today, count = 3) {
   return Array.from({ length: count }, (_, i) => {
     const from = Math.max(Date.UTC(y, m - 1 + i, 1) / MS, dnum(today)), to = Date.UTC(y, m + i, 0) / MS;
     const cycles = S.cycles.filter((c) => c.status !== "archived" && c.every > 0).reduce((t, c) => t + c.price * buysIn(c, from, to, today), 0);
-    const fixed = S.settings.fixed;
-    return { month: dstr(Date.UTC(y, m - 1 + i, 1) / MS).slice(0, 7), fixed, cycles, goals, total: fixed + cycles + goals };
+    const fixed = S.settings.fixed, installments = (S.installments ?? []).reduce((t, x) => t + instIn(x, i, today), 0);
+    return { month: dstr(Date.UTC(y, m - 1 + i, 1) / MS).slice(0, 7), fixed, cycles, goals, installments, total: fixed + cycles + goals + installments };
   });
 }
 
@@ -82,7 +96,7 @@ function wallet(S) {
 
 // ---- Supabase `items` ↔ жергілікті күй ----
 // tx — ассистентпен ортақ `money` (data: kind, amount, category, note, date); қалғаны — fs_* қолданбасына тән
-const APP_OF = { categories: "fs_category", incomes: "fs_income", tx: "money", cycles: "fs_cycle", items: "fs_item", goals: "fs_goal", stock: "fs_stock", matches: "fs_match", contribs: "fs_contrib", accounts: "fs_account", transfers: "fs_transfer", settings: "fs_settings" };
+const APP_OF = { categories: "fs_category", incomes: "fs_income", tx: "money", cycles: "fs_cycle", items: "fs_item", goals: "fs_goal", stock: "fs_stock", installments: "fs_install", wishes: "fs_wish", matches: "fs_match", contribs: "fs_contrib", accounts: "fs_account", transfers: "fs_transfer", settings: "fs_settings" };
 const KEY_OF = Object.fromEntries(Object.entries(APP_OF).map(([k, a]) => [a, k]));
 const localDate = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
@@ -94,6 +108,8 @@ function fromRow(r) {
     ? { id: r.id, kind: d.kind, amount: Number(d.amount), category: normCat(d.category), note: String(d.note ?? ""), date: /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : localDate(r.created_at), ...(typeof d.account === "string" && d.account ? { account: d.account } : {}), ...(typeof d.store === "string" && d.store ? { store: d.store } : {}), ...(typeof d.sub === "string" && d.sub ? { sub: d.sub } : {}) } : null;
   if (k === "settings") return { key: "settings", item: { capital: Number(d.capital) || 0, income: Number(d.income) || 0, fixed: Number(d.fixed) || 0, city: typeof d.city === "string" && d.city.trim() ? d.city.trim() : "Астана" }, id: r.id };
   const ok = { cycles: n(d.price) && n(d.every) && d.every >= 0 && typeof d.last === "string", goals: n(d.target) && n(d.saved) && n(d.months) && typeof d.start === "string",
+    installments: typeof d.name === "string" && n(d.total) && d.total > 0 && n(d.months) && d.months >= 1 && n(d.paid) && /^\d{4}-\d{2}-\d{2}$/.test(d.start),
+    wishes: typeof d.name === "string" && d.name.trim() && n(d.price) && d.price > 0,
     stock: n(d.qty), matches: Array.isArray(d.brands) && d.brands.length > 1, contribs: n(d.amount) && typeof d.goalId === "string",
     categories: typeof d.name === "string" && d.name.trim() && Array.isArray(d.subs ?? []), incomes: typeof d.name === "string" && d.name.trim() && n(d.amount) && d.amount > 0,
     items: typeof d.cycleId === "string" && n(d.cost) && /^\d{4}-\d{2}-\d{2}$/.test(d.time),
@@ -108,7 +124,7 @@ const toRow = (k, e, settingsId) => {
 
 // Серверден келген жолдар + әлі жіберілмеген өзгерістер → жаңа күй (сервер негіз, кезектегі өзгеріс үстінен жазылады)
 function mergePull(S, rows) {
-  const next = { tx: [], cycles: [], items: [], categories: [], incomes: [], goals: [], stock: [], matches: [], contribs: [], accounts: [], transfers: [] }, pend = new Map((S.pending || []).map((p) => [p.k + ":" + p.id, p.op]));
+  const next = { tx: [], cycles: [], items: [], categories: [], incomes: [], goals: [], installments: [], wishes: [], stock: [], matches: [], contribs: [], accounts: [], transfers: [] }, pend = new Map((S.pending || []).map((p) => [p.k + ":" + p.id, p.op]));
   let settings = null, settingsId = null;
   for (const r of rows) {
     const e = fromRow(r);
@@ -166,5 +182,5 @@ function groupReceipt(pos, cycles, fallbackCat = "Басқа") {
   return { rows, byCat };
 }
 
-const FS = { recalcCycle, perDay, migrate, itemIdOf, matchCycle, groupReceipt, addDays, daysBetween, cycleDaysLeft, stockPct, nextBuy, brandMatch, goalSaved, goalsView, goalMonthly, forecast, normCat, monthTotals, balance, wallet, APP_OF, fromRow, toRow, mergePull };
+const FS = { instMonthly, instLeft, instDone, instPay, instDue, instIn, recalcCycle, perDay, migrate, itemIdOf, matchCycle, groupReceipt, addDays, daysBetween, cycleDaysLeft, stockPct, nextBuy, brandMatch, goalSaved, goalsView, goalMonthly, forecast, normCat, monthTotals, balance, wallet, APP_OF, fromRow, toRow, mergePull };
 if (typeof module !== "undefined") module.exports = FS;
