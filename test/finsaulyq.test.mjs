@@ -84,7 +84,7 @@ test("fromRow: жарамсыз жолдар және бөтен қолданб�
   const r = (app, data) => FS.fromRow({ id: "z", app, data, created_at: "2026-10-01T00:00:00Z" });
   assert.equal(r("money", { amount: "abc", kind: "expense" }), null);
   assert.equal(r("money", { amount: 5, kind: "transfer" }), null);
-  assert.equal(r("fs_cycle", { price: 5, every: 0, last: "2026-10-01" }), null);
+  assert.equal(r("fs_cycle", { price: 5, every: -1, last: "2026-10-01" }), null);
   assert.equal(r("lang", { word: "x" }), null);
 });
 
@@ -199,4 +199,14 @@ test("санат/ішкі санат және кіріс көзі: fromRow, mont
   assert.equal(r("money", { amount: 5, kind: "expense", category: "тамақ", date: "2026-10-01", sub: "Кафе" }).sub, "Кафе");
   const m = FS.monthTotals([{ kind: "expense", amount: 5, category: "Тамақ", sub: "Кафе", date: "2026-10-01" }, { kind: "expense", amount: 7, category: "тамақ", sub: "Кафе", date: "2026-10-02" }, { kind: "expense", amount: 1, category: "Тамақ", date: "2026-10-02" }], "2026-10-26");
   assert.deepEqual([m.byCat["Тамақ"], m.bySub["Тамақ"]], [13, { Кафе: 12 }]);
+});
+
+test("цикл-күн белгісіз (every=0): ескерту/болжам жоқ, 2 сатып алудан кейін өздігінен есептеледі", () => {
+  const c = { id: "c", every: 0, last: "2026-10-01", price: 1000 };
+  assert.equal(FS.cycleDaysLeft(c, "2026-10-26"), Infinity);
+  assert.equal(FS.nextBuy(c), ""); assert.equal(FS.perDay(c), 0);
+  assert.equal(FS.forecast({ settings: { fixed: 0 }, cycles: [c], goals: [] }, "2026-10-26", 1)[0].cycles, 0); // әйтпесе шексіз цикл болар еді
+  assert.equal(FS.fromRow({ id: "z", app: "fs_cycle", data: { price: 5, every: 0, last: "2026-10-01" }, created_at: "2026-10-01T00:00:00Z" }).every, 0);
+  FS.recalcCycle(c, [{ cycleId: "c", time: "2026-10-01", cost: 1000 }, { cycleId: "c", time: "2026-10-31", cost: 1100 }]);
+  assert.equal(c.every, 30);
 });

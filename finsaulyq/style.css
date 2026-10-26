@@ -116,3 +116,33 @@ button:disabled{opacity:.45;cursor:default}
 .tiles2{display:flex;gap:8px;padding:8px}
 .tiles2 button{flex:1;flex-direction:column;border:0;background:transparent;font-size:.9rem}
 .back{padding-left:0;color:var(--acc)}
+/* Журнал: күндер бойынша плиткалар */
+.hbtns{display:flex;gap:6px}.round{border-radius:50%;width:38px;height:38px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+.jbal{display:flex;flex-direction:column;gap:2px;margin:.2rem 0 .6rem}.jbal .big{font-size:1.5rem}
+.jday{margin:.7rem 0}.jh{display:flex;justify-content:space-between;margin-bottom:6px}
+.jgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.jt{position:relative;overflow:hidden;aspect-ratio:1;border:0;border-radius:16px;color:#fff;padding:8px;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;text-align:left;font:inherit;min-width:0}
+.jt small{font-size:.75rem;opacity:.95;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jt b{font-size:.95rem;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.jt .wm{position:absolute;right:-8px;top:-8px;opacity:.22}.jt .wm svg{width:64px;height:64px}
+.jt.tr{background:#5b6470}.jt.jadd{background:var(--glass-2);color:var(--mute);align-items:center;justify-content:center;border:2px dashed var(--line)}
+/* Санаттар */
+.tile.big{width:64px;height:64px;border-radius:20px}.tile.big .ic svg{width:32px;height:32px}
+.chead{text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
+.mrow .ml{flex:1;text-align:left}.mrow .mr{margin-right:4px}
+.fbar{position:sticky;bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:1rem}
+.fnew{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:.7rem 1.1rem;font-weight:600;background:var(--acc);color:#fff;border:0}
+.seg2{display:flex;background:var(--glass-2);border-radius:999px;padding:3px}.seg2 button{border:0;background:transparent;border-radius:999px;padding:.5rem .9rem}.seg2 button[aria-pressed=true]{background:var(--acc);color:#fff}
+.chdr{position:relative;overflow:hidden;color:#fff;border-radius:22px;padding:14px;margin-bottom:.8rem}.chdr h1{margin:.4rem 0 .8rem}.chdr .wm{position:absolute;right:-10px;top:-10px;opacity:.18}.chdr .wm svg{width:150px;height:150px}
+.chdr .back{background:rgba(255,255,255,.25);color:#fff}.hacts{display:flex;gap:8px;position:relative}
+.hact{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;background:rgba(255,255,255,.22);color:#fff;border:0;border-radius:14px;padding:.6rem .2rem;font-size:.8rem}
+.hh{margin:1rem 0 .3rem}
+/* Санат формасы */
+.catdlg{max-height:92vh;overflow:auto}.ctitle{text-align:center;margin:0}.cprev{width:72px;height:72px;border-radius:22px;margin:.6rem auto;display:flex;align-items:center;justify-content:center;color:#fff}.cprev svg{width:36px;height:36px}
+.crow{display:flex;flex-direction:column;gap:6px}.inl{display:flex;justify-content:space-between;align-items:center;gap:10px}.inl input,.inl select{text-align:right;border:0;background:transparent;flex:1;min-width:0}
+.swatches{display:flex;flex-wrap:wrap;gap:8px}.sw{width:34px;height:34px;border-radius:50%;border:3px solid transparent;padding:0;position:relative}.sw.on{border-color:var(--fg,#fff);box-shadow:0 0 0 2px var(--acc)}
+.rainbow{background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);overflow:hidden}.rainbow input{opacity:0;position:absolute;inset:0;width:100%;height:100%}
+.ib{width:42px;height:42px;border-radius:12px;border:0;background:var(--glass-2);color:inherit;padding:0;display:inline-flex;align-items:center;justify-content:center}.ib.on{background:var(--acc);color:#fff}
+.end.sticky{position:sticky;bottom:0;padding-top:8px}
+.mrow .ml{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mrow>.num{margin-left:auto}
+.end.sticky{background:var(--card,#fff);margin:0 -4px;padding:10px 4px;border-radius:14px}

@@ -27,6 +27,36 @@ const ICONS = {
   down: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
   up: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
   grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+  utensils: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/>',
+  coffee: '<path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>',
+  cart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
+  car: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+  bus: '<rect x="3" y="3" width="18" height="14" rx="2"/><path d="M3 11h18"/><circle cx="7.5" cy="19.5" r="1.5"/><circle cx="16.5" cy="19.5" r="1.5"/>',
+  plane: '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+  book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+  grad: '<path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>',
+  pill: '<path d="M10.5 20.5 3.5 13.5a4.95 4.95 0 0 1 7-7l7 7a4.95 4.95 0 0 1-7 7z"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5"/>',
+  smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>',
+  film: '<rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/>',
+  music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  gift: '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
+  phone: '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+  monitor: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+  wifi: '<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>',
+  briefcase: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  sun: '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>',
+  tag: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+  card: '<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
+  trend: '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  tool: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  pin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
   bars: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
   bag: '<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>',
   heart: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
@@ -91,22 +121,24 @@ function h(tag, a = {}, ...kids) {
 const ic = (n) => { const s = h("span", { class: "ic", "aria-hidden": "true" }); s.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[n]}</svg>`; return s; };
 const head = (t) => h("div", { class: "head" }, h("h1", {}, t));
 let sub = null; // Профильдің ішкі беті
-const go = (t) => { tab = t; sub = null; render(); scrollTo(0, 0); };
+const go = (t) => { tab = t; sub = null; catView = null; render(); scrollTo(0, 0); };
 const sec = (title, action, ...body) => h("section", { class: "sec" }, h("header", {}, h("h2", {}, title), action), ...body);
 const add = (fn) => h("button", { class: "ghost", onclick: fn }, ic("plus"), "Қосу");
 const empty = (t) => h("p", { class: "empty" }, t);
 const bar = (pct, low) => h("div", { class: "bar" + (low ? " low" : ""), role: "progressbar", "aria-valuenow": pct, "aria-valuemin": 0, "aria-valuemax": 100 }, h("i", { style: `width:${pct}%` }));
+// чектен/енгізуден түскен тауарлар да кетеді
+const removeTx = (id) => { dropItems(S.items.filter((i) => i.txId === id)); rm("tx", id); save(); };
 const del = (key, id, what) => h("button", { class: "ghost sm", "aria-label": `Өшіру: ${what}`, onclick: () => {
   const goal = key === "goals";
   if (!confirm(`«${what}» өшіру ме?` + (goal ? " Жиналған жарналар қолжетімді қалдыққа қайтады." : key === "cycles" ? " Сатып алу тарихы да өшеді." : key === "tx" ? " Байланысқан тауар жазбалары да өшеді." : ""))) return;
   if (goal) S.contribs.filter((c) => c.goalId === id).forEach((c) => rm("contribs", c.id));
-  if (key === "tx") dropItems(S.items.filter((i) => i.txId === id)); // чектен/енгізуден түскен тауарлар да кетеді
+  if (key === "tx") return removeTx(id);
   if (key === "cycles") S.items.filter((i) => i.cycleId === id).forEach((i) => rm("items", i.id));
   rm(key, id); save();
 } }, ic("trash"));
 
 // Бір диалог — барлық енгізу формалары үшін. fields: { name, label, type, value, options, min, step, optional }
-function ask(title, fields, ok) {
+function ask(title, fields, ok, extra) {
   const form = h("form", { method: "dialog" }, h("h3", {}, title));
   const dlg = h("dialog", {}, form);
   for (const f of fields) {
@@ -117,7 +149,7 @@ function ask(title, fields, ok) {
     if (f.suggest) { const id = "dl-" + f.name; input.setAttribute("list", id); input.setAttribute("autocomplete", "off"); form.append(h("datalist", { id }, f.suggest.map((v) => h("option", { value: v })))); }
     form.append(h("label", {}, f.label, input));
   }
-  form.append(h("div", { class: "end" }, h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"), h("button", { class: "primary" }, "Сақтау")));
+  form.append(h("div", { class: "end" }, extra && h("button", { type: "button", class: "ghost warn", style: "margin-right:auto", onclick: () => { dlg.close(); extra.fn(); } }, extra.label), h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"), h("button", { class: "primary" }, "Сақтау")));
   form.addEventListener("submit", () => ok(Object.fromEntries(new FormData(form))));
   dlg.addEventListener("close", () => dlg.remove());
   document.body.append(dlg);
@@ -132,7 +164,7 @@ const accOpts = (cur) => [...S.accounts.map((a) => [a.id, a.name]), ...(cur !== 
 const accField = (cur) => hasAcc() ? [{ name: "account", label: "Шот", options: accOpts(cur), value: cur ?? (S.accounts.some((a) => a.id === S.settings.lastAcc) ? S.settings.lastAcc : S.accounts[0].id) }] : [];
 const withAcc = (e, v) => { if (v.account) { e.account = v.account; S.settings.lastAcc = v.account; } return e; };
 const catList = () => [...new Set([...S.tx.map((t) => FS.normCat(t.category)), ...CATS])];
-const subsOf = (cat) => S.categories.find((c) => FS.normCat(c.name) === FS.normCat(cat))?.subs ?? [];
+const subsOf = (cat) => catInfo(cat).subs.map((x) => x.name);
 const stores = () => [...new Set([...S.tx.map((t) => t.store), ...S.items.map((i) => i.store)].filter(Boolean))];
 const txForm = (t, pre) => { const d = t ?? pre ?? {}; ask(t ? "Транзакцияны өзгерту" : pre ? "Чектен оқылды: тексеріп сақта" : "Жаңа транзакция", [
   { name: "kind", label: "Түрі", options: [["expense", "Шығыс"], ["income", "Кіріс"]], value: d.kind },
@@ -143,7 +175,8 @@ const txForm = (t, pre) => { const d = t ?? pre ?? {}; ask(t ? "Транзакц
   { name: "note", label: "Ескертпе", optional: true, value: d.note },
   { name: "date", label: "Күні", type: "date", value: d.date ?? today() },
   ...accField(t ? (t.account ?? "") : undefined),
-], (v) => { put("tx", withAcc({ id: t?.id ?? crypto.randomUUID(), kind: v.kind, amount: num(v.amount), category: FS.normCat(v.category), note: v.note.trim(), date: v.date, ...(v.store.trim() ? { store: v.store.trim() } : {}), ...(v.sub.trim() ? { sub: v.sub.trim() } : {}) }, v)); save(); }); };
+], (v) => { put("tx", withAcc({ id: t?.id ?? crypto.randomUUID(), kind: v.kind, amount: num(v.amount), category: FS.normCat(v.category), note: v.note.trim(), date: v.date, ...(v.store.trim() ? { store: v.store.trim() } : {}), ...(v.sub.trim() ? { sub: v.sub.trim() } : {}) }, v)); save(); },
+  t && { label: "Өшіру", fn: () => confirm(`«${t.category} ${tg(t.amount)}» өшіру ме? Байланысқан тауар жазбалары да өшеді.`) && removeTx(t.id) }); };
 
 // Чекті түсіру: суретті кішірейтіп, `receipt` функциясына жібереміз; нәтиже форманы толтырады, сақтауды өзің растайсың
 async function shrink(file, max = 1800) {
@@ -183,21 +216,17 @@ const addCycle = (pre, then) => ask("Жаңа тауар (цикл)", [
   { name: "cat", label: "Санат", value: "Тұрмыс", suggest: catList() },
   { name: "unit", label: "Өлшем бірлігі", value: "дана" },
   { name: "price", label: "Бір реттік баға, ₸", type: "number", min: 0.01, value: pre?.price },
-  { name: "every", label: "Бастапқы болжам: қанша күнге жетеді", type: "number", min: 1, step: 1 },
+  { name: "every", label: "Қанша күнге жетеді (білмесең бос қалдыр: 2 сатып алудан кейін өздігінен есептеледі)", type: "number", min: 1, step: 1, optional: true },
   { name: "buffer", label: "Неше күн бұрын ескерту", type: "number", value: 3, step: 1 },
   { name: "alert", label: "Ескерту", options: [["1", "Қосулы"], ["0", "Өшірулі"]], value: "1" },
   ...(pre ? [] : [{ name: "last", label: "Соңғы сатып алған күні", type: "date", value: today() }]),
 ], (v) => {
-  const c = { id: crypto.randomUUID(), name: v.name.trim(), icon: v.icon, price: num(v.price), unit: v.unit.trim() || "дана", every: num(v.every), buffer: num(v.buffer), cat: FS.normCat(v.cat), last: v.last || today(), status: "active", alert: v.alert === "1" };
+  const c = { id: crypto.randomUUID(), name: v.name.trim(), icon: v.icon, price: num(v.price), unit: v.unit.trim() || "дана", every: num(v.every) || 0, buffer: num(v.buffer), cat: FS.normCat(v.cat), last: v.last || today(), status: "active", alert: v.alert === "1" };
   put("cycles", c);
   if (!pre) put("items", { id: FS.itemIdOf(c.id), cycleId: c.id, name: c.name, cost: c.price, amount: 1, store: "", discount: false, note: "", time: c.last, city: S.settings.city });
   save(); then?.(c);
 });
 
-const catForm = (c) => ask(c ? "Санатты өзгерту" : "Жаңа санат", [
-  { name: "name", label: "Санат", value: c?.name },
-  { name: "subs", label: "Ішкі санаттар (үтірмен бөл)", optional: true, value: (c?.subs ?? []).join(", ") },
-], (v) => { put("categories", { id: c?.id ?? crypto.randomUUID(), name: FS.normCat(v.name), subs: [...new Map(v.subs.split(",").map((x) => x.trim()).filter(Boolean).map((x) => [x.toLowerCase(), x])).values()] }); save(); });
 const incForm = (i) => ask(i ? "Кіріс көзін өзгерту" : "Жаңа кіріс көзі", [
   { name: "name", label: "Көзі (жалақы, репетиторлық…)", value: i?.name },
   { name: "amount", label: "Айлық сома, ₸", type: "number", min: 0.01, value: i?.amount },
@@ -229,10 +258,10 @@ const buyAgain = (c) => openAdd({ kind: "expense", amount: String(c.price), cycl
 /* ---------- бөлшектер ---------- */
 function cycleRow(c, full) {
   const T = today(), left = FS.cycleDaysLeft(c, T), pct = FS.stockPct(c, T), low = c.alert !== false && left <= (c.buffer ?? 3), gone = c.status === "archived";
-  const status = gone ? "Архивте" : left < 0 ? `${-left} күн кешікті` : `${left} күн қалды`;
+  const status = gone ? "Архивте" : !c.every ? "Цикл-күн әлі белгісіз" : left < 0 ? `${-left} күн кешікті` : `${left} күн қалды`;
   return h("div", { class: "row" + (gone ? " gone" : "") },
     h("span", { class: "cic" }, ic(c.icon || "box")),
-    h("div", { class: "main" }, h("b", {}, c.name), h("small", { class: "num " + (low ? "warn" : "muted") }, `${status} · ${pct}% · ${tg(c.price)} · ${FS.perDay(c).toFixed(1)} ₸/күн`), !gone && bar(pct, low)),
+    h("div", { class: "main" }, h("b", {}, c.name), h("small", { class: "num " + (low ? "warn" : "muted") }, c.every ? `${status} · ${pct}% · ${tg(c.price)} · ${FS.perDay(c).toFixed(1)} ₸/күн` : `${status} · ${tg(c.price)}`), !gone && c.every > 0 && bar(pct, low)),
     !gone && h("button", { onclick: () => buyAgain(c) }, ic("check"), "Сатып алынды"),
     h("button", { class: "ghost sm", "aria-label": `Тарих: ${c.name}`, onclick: () => cycleDetail(c) }, ic("eye")),
     full && del("cycles", c.id, c.name));
@@ -267,38 +296,44 @@ function donut(m) {
 }
 
 /* ---------- беттер ---------- */
+let jMonth = "";
+const WD = ["Жексенбі", "Дүйсенбі", "Сейсенбі", "Сәрсенбі", "Бейсенбі", "Жұма", "Сенбі"];
 function home() {
-  const T = today(), m = FS.monthTotals(S.tx, T), hide = S.settings.hide, mon = (n) => hide ? "*** ₸" : tg(n);
-  const cycles = liveCycles().sort((a, b) => FS.cycleDaysLeft(a, T) - FS.cycleDaysLeft(b, T)).slice(0, 3);
-  const gv = FS.goalsView(S), goals = gv.slice(0, 2), inGoals = gv.reduce((t, g) => t + g.saved, 0);
-  const all = S.tx.slice().sort((a, b) => b.date.localeCompare(a.date)), recent = allTx ? all : all.slice(0, 5);
+  const T = today(), hide = S.settings.hide, mon = (n) => hide ? "*** ₸" : tg(n), ym = jMonth || T.slice(0, 7), m = FS.monthTotals(S.tx, ym + "-15");
+  const days = {}, at = (d) => (days[d] ??= { tx: [], tr: [] });
+  for (const t of S.tx) if (t.date.slice(0, 7) === ym) at(t.date).tx.push(t);
+  for (const t of S.transfers) if (t.date.slice(0, 7) === ym) at(t.date).tr.push(t);
+  if (ym === T.slice(0, 7)) at(T); // бүгінгі күнде әрқашан «+» бар
+  const nm = (id) => S.accounts.find((a) => a.id === id)?.name ?? "Шотсыз";
+  const pick = () => ask("Айды таңдау", [{ name: "m", label: "Ай", type: "month", value: ym }], (v) => { jMonth = v.m; render(); });
+  const mk = (t) => { const c = catInfo(t.category), sgn = t.kind === "income" ? "+" : "";
+    return h("button", { class: "jt", style: `background:${c.color}`, "aria-label": `${t.category} ${tg(t.amount)}`, onclick: () => txForm(t) },
+      h("span", { class: "wm", "aria-hidden": "true" }, ic(c.icon)), h("small", {}, t.sub || t.category), h("b", { class: "num" }, `${sgn}${mon(t.amount)}`)); };
   return [
-    head("Журнал"),
-    h("section", { class: "sec" },
-      h("header", {}, h("span", { class: "muted" }, "Қолжетімді қалдық"),
-        h("button", { class: "ghost sm", "aria-label": hide ? "Балансты көрсету" : "Балансты жасыру", onclick: () => { S.settings.hide = !hide; save(); } }, ic(hide ? "eye-off" : "eye"))),
-      h("div", { class: "big num" }, mon(FS.balance(S))),
-      h("div", { class: "split num" }, h("span", { class: "good" }, `Кіріс ${mon(m.income)}`), h("span", { class: "warn" }, `Шығын ${mon(m.expense)}`)),
-      h("div", { class: "muted num" }, `Мақсаттарда: ${mon(inGoals)} · Барлығы: ${mon(FS.balance(S) + inGoals)}`),
-    ),
-    sec("Циклдер", null, cycles.length ? cycles.map((c) => cycleRow(c)) : empty("Цикл жоқ. «Циклдер» бөлімінде қос.")),
-    sec("Мақсаттар", null, goals.length ? goals.map((g) => goalRow(g)) : empty("Мақсат жоқ. «Циклдер» бөлімінде қос.")),
-    sec(allTx ? "Барлық жазбалар" : "Соңғы жазбалар", all.length > 5 ? h("button", { class: "ghost", onclick: () => { allTx = !allTx; render(); } }, allTx ? "Жасыру" : "Барлығы") : null, recent.length ? recent.map((t) => h("div", { class: "row" },
-      h("div", { class: "main" }, h("b", {}, t.category), h("small", { class: "muted" }, [t.note, t.date].filter(Boolean).join(" · "))),
-      h("span", { class: "num " + (t.kind === "income" ? "good" : "") }, `${t.kind === "income" ? "+" : "−"}${tg(t.amount)}`),
-      h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${t.category} ${tg(t.amount)}`, onclick: () => txForm(t) }, ic("edit")),
-      del("tx", t.id, `${t.category} ${tg(t.amount)}`))) : empty("Әзірге жазба жоқ.")),
+    h("div", { class: "head" }, h("h1", {}, `${MONTHS[Number(ym.slice(5)) - 1]} ${ym.slice(0, 4)}`),
+      h("div", { class: "hbtns" }, h("button", { class: "ghost round", "aria-label": "Айды таңдау", onclick: pick }, ic("calendar")),
+        h("button", { class: "ghost round", "aria-label": hide ? "Балансты көрсету" : "Балансты жасыру", onclick: () => { S.settings.hide = !hide; save(); } }, ic(hide ? "eye-off" : "eye")))),
+    h("div", { class: "jbal" }, h("span", { class: "muted" }, "Қалдық"), h("b", { class: "big num" }, mon(FS.balance(S))),
+      h("small", { class: "num" }, h("span", { class: "good" }, `+${mon(m.income)}`), " ", h("span", { class: "warn" }, `−${mon(m.expense)}`))),
+    ...Object.keys(days).sort().reverse().map((d) => { const x = days[d], tot = x.tx.reduce((a, t) => a + (t.kind === "income" ? t.amount : -t.amount), 0);
+      return h("section", { class: "jday" },
+        h("div", { class: "jh" }, h("b", {}, `${Number(d.slice(8))} ${WD[new Date(d + "T00:00:00").getDay()]}`), h("span", { class: "num " + (tot < 0 ? "warn" : "good") }, x.tx.length ? `${tot > 0 ? "+" : "−"}${mon(Math.abs(tot))}` : "")),
+        h("div", { class: "jgrid" }, ...x.tx.map(mk),
+          ...x.tr.map((t) => h("div", { class: "jt tr", "aria-label": `${nm(t.from)} → ${nm(t.to)} ${tg(t.amount)}` }, h("span", { class: "wm", "aria-hidden": "true" }, ic("swap")), h("small", {}, `${nm(t.from)} → ${nm(t.to)}`), h("b", { class: "num" }, mon(t.amount)))),
+          h("button", { class: "jt jadd", "aria-label": `Қосу: ${d}`, onclick: () => openAdd({ date: d }) }, ic("plus"))));
+    }),
+    Object.keys(days).length ? null : empty("Бұл айда жазба жоқ."),
   ];
 }
 
 function plan() {
-  const T = today(), m = FS.monthTotals(S.tx, T), w = FS.wallet(S), hide = S.settings.hide, mon = (n) => hide ? "*** ₸" : tg(n), next = liveCycles().sort((a, b) => FS.nextBuy(a).localeCompare(FS.nextBuy(b))), f = FS.forecast(S, T, 3);
+  const T = today(), m = FS.monthTotals(S.tx, T), w = FS.wallet(S), hide = S.settings.hide, mon = (n) => hide ? "*** ₸" : tg(n), next = liveCycles().filter((c) => c.every > 0).sort((a, b) => FS.nextBuy(a).localeCompare(FS.nextBuy(b))), f = FS.forecast(S, T, 3);
   return [
     head("Summary"),
     sec("Шығындар бөлінісі", null, donut(m)),
     Object.keys(m.byCat).length ? sec("Санаттар", null, h("div", { class: "cards" }, Object.entries(m.byCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => h("div", { class: "card2" },
-      h("span", { class: "nm" }, h("i", { style: `background:${catColor(k)}` }), k), h("b", { class: "num" }, mon(v)),
-      h("small", { class: "muted" }, Object.entries(m.bySub[k] ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([sk, sv]) => `${sk} · ${mon(sv)}`).join("\n") || " "))))) : null,
+      h("span", { class: "nm" }, h("i", { style: `background:${catInfo(k).color}` }), k), h("b", { class: "num" }, mon(v)),
+      h("small", { class: "muted" }, (catInfo(k).budget ? `Бюджет ${mon(catInfo(k).budget)} · ${Math.round(v / catInfo(k).budget * 100)}%\n` : "") + Object.entries(m.bySub[k] ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([sk, sv]) => `${sk} · ${mon(sv)}`).join("\n") || " "))))) : null,
     S.incomes.length ? sec("Кіріс көздері", null, S.incomes.map((i) => { const got = S.tx.filter((t) => t.kind === "income" && t.date.slice(0, 7) === T.slice(0, 7) && FS.normCat(t.category) === FS.normCat(i.name)).reduce((a, t) => a + t.amount, 0), pct = Math.min(100, Math.round(got / i.amount * 100));
       return h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, i.name), h("small", { class: "num muted" }, `${mon(got)} / ${mon(i.amount)} · ${pct}%`), bar(pct))); })) : null,
     S.goals.length ? sec("Жинақтар", null, FS.goalsView(S).map((g) => goalRow(g))) : null,
@@ -373,11 +408,26 @@ function walletPage() {
 /* ---------- санпернелі енгізу: 1) сома 2) санат не тауар 3) егжей-тегжей ---------- */
 const PALETTE = ["#f59e0b", "#6d4ad8", "#3b82f6", "#10b981", "#ec4899", "#84cc16", "#06b6d4", "#ef4444"];
 const catColor = (n) => PALETTE[[...FS.normCat(n)].reduce((a, ch) => a + ch.charCodeAt(0), 0) % PALETTE.length];
-const tile = (name, inner) => h("span", { class: "tile", style: `background:${catColor(name)}`, "aria-hidden": "true" }, inner ?? [...name][0]?.toUpperCase());
+// Санат көрінісі: сақталған жазба, болмаса әдепкі стиль; ішкі санат — { name, icon }
+const DEF_STYLE = { "Тамақ": ["utensils", "#ef9b37"], "Көлік": ["car", "#5b3cc4"], "Тұрмыс": ["home", "#8ecb3e"], "Кітап": ["book", "#ec4899"], "Күтім": ["heart", "#62d6c0"], "Жалақы": ["wallet", "#8ecb3e"], "Басқа": ["tag", "#d9d9d9"] };
+const COLORS_PICK = ["#e5534b", "#ef9b37", "#e3be40", "#8ecb3e", "#62d6c0", "#3b82f6", "#5b3cc4", "#ec4899", "#a21cf3", "#5b6470", "#d9d9d9"];
+const ICON_KEYS = ["utensils", "coffee", "bag", "cart", "car", "bus", "plane", "home", "book", "grad", "heart", "pill", "smile", "film", "music", "gift", "phone", "monitor", "wifi", "zap", "drop", "scissors", "briefcase", "star", "moon", "sun", "tag", "card", "trend", "shield", "tool", "pin", "box", "wallet", "camera", "target"];
+function catInfo(name) {
+  const n = FS.normCat(name), rec = S.categories.find((c) => FS.normCat(c.name) === n), d = DEF_STYLE[n];
+  return { name: n, rec, color: rec?.color || d?.[1] || catColor(n), icon: rec?.icon || d?.[0] || "tag", budget: rec?.budget || 0, subs: (rec?.subs ?? []).map((x) => (typeof x === "string" ? { name: x, icon: "" } : x)) };
+}
+// Санаттар тізімі: сақталғандар, қолданылғандар, әдепкілер
+function allCats(kind) {
+  const used = {}; for (const t of S.tx) if (t.kind === kind) used[FS.normCat(t.category)] = (used[FS.normCat(t.category)] || 0) + 1;
+  const dflt = kind === "income" ? ["Жалақы", ...S.incomes.map((i) => i.name)] : CATS.filter((c) => c !== "Жалақы");
+  const names = [...S.categories.filter((c) => (c.kind || "expense") === kind).map((c) => c.name), ...Object.keys(used).sort((a, b) => used[b] - used[a]), ...dflt];
+  return [...new Set(names.map(FS.normCat))].map(catInfo);
+}
+const tile = (name, inner, big) => { const c = catInfo(name); return h("span", { class: "tile" + (big ? " big" : ""), style: `background:${c.color}`, "aria-hidden": "true" }, inner ?? (ICONS[c.icon] ? ic(c.icon) : [...name][0]?.toUpperCase())); };
 const grp = (s) => { const [a, b] = String(s || "0").split("."); return a.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + (b !== undefined ? "." + b : ""); };
 const topCats = (kind) => {
   const m = {}; for (const t of S.tx) if (t.kind === kind) m[FS.normCat(t.category)] = (m[FS.normCat(t.category)] || 0) + 1;
-  return [...new Set([...Object.keys(m), ...(kind === "income" ? [...S.incomes.map((i) => FS.normCat(i.name)), "Жалақы"] : [...S.categories.map((c) => FS.normCat(c.name)), ...CATS.filter((c) => c !== "Жалақы")])])].sort((a, b) => (m[b] || 0) - (m[a] || 0));
+  return allCats(kind).map((c) => c.name).sort((a, b) => (m[b] || 0) - (m[a] || 0));
 };
 const sel = (name, opts, val) => h("select", { name }, opts.map(([v, t]) => h("option", { value: v, selected: v === val }, t)));
 const fld = (label, input) => h("label", {}, label, input);
@@ -449,7 +499,7 @@ function openAdd(init = {}) {
       c && fld("Жеңілдікпен алдың ба?", sel("discount", [["0", "Жоқ"], ["1", "Иә"]], "0")),
       !c && subsOf(cat).length > 0 && fld("Ішкі санат", sel("sub", [["", "—"], ...subsOf(cat).map((x) => [x, x])], "")),
       fld(c ? "Баға/пікір" : "Ескертпе", h("input", { name: "note" })),
-      fld("Күні", h("input", { type: "date", name: "date", value: today(), required: true })),
+      fld("Күні", h("input", { type: "date", name: "date", value: st.date || today(), required: true })),
       h("div", { class: "end" }, h("button", { type: "button", class: "ghost", onclick: () => { st.step = 2; draw(); } }, "Артқа"), h("button", { class: "primary" }, "Сақтау")));
     return [h("h3", { class: "paid" }, inc ? "Түсті " : "Төледім ", h("span", { class: "amtchip num" }, tg(num(st.amount)))),
       h("p", { class: "kv" }, h("span", { class: "muted" }, c ? "Тауар" : "Санат"), h("span", { class: "pill" }, tile(c ? c.name : cat), c ? c.name : cat)),
@@ -473,7 +523,7 @@ function cycleDetail(c) {
       h("small", { class: "muted" }, [i.store, i.discount && "жеңілдікпен", gap > 0 && `${(i.cost / gap).toFixed(1)} ₸/күн`, i.city].filter(Boolean).join(" · ") || " ")),
       h("button", { class: "ghost sm", "aria-label": `Өшіру: ${i.time}`, onclick: () => { if (!confirm("Бұл сатып алуды тарихтан өшіру ме? Транзакция қалады.")) return; dropItems([i]); save(); again(); } }, ic("trash"))); }) : empty("Тарих жоқ.");
   dlg.append(h("h3", {}, c.name),
-    h("p", { class: "num muted" }, `Цикл-күн: ${c.every} · Баға: ${tg(c.price)} · ${FS.perDay(c).toFixed(1)} ₸/күн`), ...hist,
+    h("p", { class: "num muted" }, c.every ? `Цикл-күн: ${c.every} · Баға: ${tg(c.price)} · ${FS.perDay(c).toFixed(1)} ₸/күн` : `Цикл-күн әлі белгісіз (2 сатып алудан кейін есептеледі) · Баға: ${tg(c.price)}`), ...hist,
     h("div", { class: "end" },
       h("button", { onclick: () => { c.alert = c.alert === false; put("cycles", c); save(); again(); } }, `Ескерту: ${c.alert === false ? "өшірулі" : "қосулы"}`),
       h("button", { onclick: () => { c.status = gone ? "active" : "archived"; put("cycles", c); save(); dlg.close(); } }, gone ? "Архивтен қайтару" : "Архивке"),
@@ -510,11 +560,77 @@ function receiptReview(r) {
   document.body.append(dlg); dlg.showModal();
 }
 
+/* ---------- санаттар беті (Gem үлгісінде): тізім → санат ішіне кіру → жаңа санат ---------- */
+let catKind = "expense", catView = null;
+const ensureCat = (name) => {
+  const i = catInfo(name); if (i.rec) return i.rec;
+  const rec = { id: crypto.randomUUID(), name: i.name, kind: catKind, color: i.color, icon: i.icon, subs: [], budget: 0 }; put("categories", rec); return rec;
+};
+// opts: { cat } санатты өзгерту · { parent } ішкі санат қосу · { parent, sub } ішкі санатты өзгерту
+function catForm(opts = {}) {
+  const info = opts.cat, parent0 = opts.parent ? catInfo(opts.parent) : null, sub0 = opts.sub;
+  const st = { name: sub0?.name ?? info?.name ?? "", parent: parent0?.name ?? "", budget: info?.budget || "", color: info?.color ?? parent0?.color ?? COLORS_PICK[Math.floor(Math.random() * 9)], icon: sub0?.icon || info?.icon || "tag" };
+  const dlg = h("dialog", { class: "sheet catdlg" });
+  const editing = !!(info || sub0), lock = editing; // атау өзгермейді: ескі транзакциялар атпен байланған
+  const draw = () => {
+    const par = st.parent ? catInfo(st.parent) : null, color = par && !info ? par.color : st.color;
+    dlg.replaceChildren(
+      h("h2", { class: "ctitle" }, sub0 ? "Ішкі санатты өзгерту" : info ? "Санатты өзгерту" : st.parent ? "Жаңа ішкі санат" : "Жаңа санат"),
+      h("div", { class: "cprev", style: `background:${color}` }, ic(st.icon)),
+      h("div", { class: "sec crow" },
+        h("label", { class: "inl" }, "Атауы", h("input", { value: st.name, placeholder: "Қысқа әрі нақты", readonly: lock, "aria-label": "Атауы", oninput: (e) => { st.name = e.target.value; } })),
+        !info && h("label", { class: "inl" }, "Орны", h("select", { "aria-label": "Орны", onchange: (e) => { st.parent = e.target.value; draw(); } }, [["", "Санаттар"], ...allCats(catKind).map((c) => [c.name, c.name])].map(([v, t]) => h("option", { value: v, selected: v === st.parent }, t))))),
+      !st.parent && h("div", { class: "sec crow" }, h("label", { class: "inl" }, "Бюджет", h("input", { type: "number", min: 0, step: "any", inputmode: "decimal", value: st.budget, placeholder: "₸0", "aria-label": "Бюджет", oninput: (e) => { st.budget = e.target.value; } }))),
+      !st.parent && h("div", { class: "sec swatches" }, ...COLORS_PICK.map((c) => h("button", { type: "button", class: "sw" + (c === st.color ? " on" : ""), style: `background:${c}`, "aria-label": `Түс ${c}`, onclick: () => { st.color = c; draw(); } })),
+        h("label", { class: "sw rainbow", "aria-label": "Басқа түс" }, h("input", { type: "color", value: st.color, onchange: (e) => { st.color = e.target.value; draw(); } }))),
+      h("div", { class: "sec swatches" }, ...ICON_KEYS.map((k) => h("button", { type: "button", class: "ib" + (k === st.icon ? " on" : ""), "aria-label": `Белгіше ${k}`, onclick: () => { st.icon = k; draw(); } }, ic(k)))),
+      h("div", { class: "end sticky" }, editing && (sub0 || info?.rec) && h("button", { type: "button", class: "ghost warn", style: "margin-right:auto", onclick: () => {
+          if (!confirm(`«${sub0?.name ?? info.name}» өшіру ме? Бұрынғы транзакциялар сол атпен қала береді.`)) return;
+          if (sub0) { const r = ensureCat(parent0.name); r.subs = r.subs.filter((x) => (x.name ?? x) !== sub0.name); put("categories", r); } else rm("categories", info.rec.id);
+          dlg.close(); if (!sub0) catView = null; save(); } }, "Өшіру"),
+        h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"),
+        h("button", { type: "button", class: "primary", onclick: () => {
+          const name = FS.normCat(st.name); if (!st.name.trim()) return alert("Атауын жаз.");
+          if (st.parent) { const r = ensureCat(st.parent), subs = r.subs.map((x) => (typeof x === "string" ? { name: x, icon: "" } : x)).filter((x) => x.name !== (sub0?.name ?? "")); if (subs.some((x) => x.name.toLowerCase() === st.name.trim().toLowerCase())) return alert("Мұндай ішкі санат бар.");
+            r.subs = [...subs, { name: st.name.trim(), icon: st.icon }]; put("categories", r); }
+          else { if (!info && catInfo(name).rec) return alert("Мұндай санат бар."); const r = info?.rec ?? { id: crypto.randomUUID(), name, kind: catKind, subs: [] };
+            put("categories", { ...r, name: r.name, color: st.color, icon: st.icon, budget: num(st.budget) || 0, kind: r.kind || catKind }); }
+          dlg.close(); save(); } }, editing ? "Сақтау" : "Қосу")));
+  };
+  dlg.addEventListener("close", () => dlg.remove());
+  document.body.append(dlg); draw(); dlg.showModal();
+}
+
+const backBtn = (label, fn) => h("button", { class: "ghost back round", "aria-label": label, onclick: fn }, ic("chevl"));
+function catsPage() {
+  return [h("div", { class: "head" }, backBtn("Артқа", () => { sub = null; render(); scrollTo(0, 0); })),
+    h("section", { class: "sec chead" }, h("span", { class: "tile big", style: "background:var(--glass-2);color:var(--acc)" }, ic("grid")), h("h2", {}, "Санаттар"), h("p", { class: "muted" }, "Санаттар арқылы тамаққа, жолға, үйге кететін шығынды қадағала.")),
+    h("section", { class: "sec menu" }, allCats(catKind).map((c) => h("button", { class: "mrow", onclick: () => { catView = c.name; render(); scrollTo(0, 0); } }, tile(c.name), h("span", { class: "ml" }, c.name), h("small", { class: "muted mr" }, c.subs.length || ""), ic("chev")))),
+    h("div", { class: "fbar" }, h("button", { class: "fnew", onclick: () => catForm() }, ic("plus"), "Жаңа"),
+      h("div", { class: "seg2" }, [["expense", "Шығыс"], ["income", "Кіріс"]].map(([k, t]) => h("button", { "aria-pressed": String(catKind === k), onclick: () => { catKind = k; render(); } }, t))))];
+}
+function catDetail(name) {
+  const c = catInfo(name), list = S.tx.filter((t) => FS.normCat(t.category) === c.name).sort((a, b) => b.date.localeCompare(a.date));
+  const summary = () => { const dlg = h("dialog", {}, h("h3", {}, `${c.name} · Summary`)), mon = {};
+    for (const t of list) mon[t.date.slice(0, 7)] = (mon[t.date.slice(0, 7)] || 0) + t.amount;
+    dlg.append(...(Object.keys(mon).sort().reverse().slice(0, 6).map((k) => h("div", { class: "row" }, h("span", {}, `${MONTHS[Number(k.slice(5)) - 1]} ${k.slice(0, 4)}`), h("b", { class: "num" }, tg(mon[k])))) || []), !list.length && empty("Әзірге жазба жоқ."), c.budget ? h("p", { class: "muted" }, `Бюджет: ${tg(c.budget)} / ай`) : null, h("div", { class: "end" }, h("button", { onclick: () => dlg.close() }, "Жабу")));
+    dlg.addEventListener("close", () => dlg.remove()); document.body.append(dlg); dlg.showModal(); };
+  const act = (label, icon, fn) => h("button", { class: "hact", onclick: fn }, ic(icon), label);
+  return [h("div", { class: "chdr", style: `background:${c.color}` }, h("span", { class: "wm", "aria-hidden": "true" }, ic(c.icon)),
+      h("div", { class: "head" }, backBtn("Артқа", () => { catView = null; render(); scrollTo(0, 0); })), h("h1", {}, c.name),
+      h("div", { class: "hacts" }, act("Өзгерту", "edit", () => catForm({ cat: c })), act("Тарих", "grid", () => document.getElementById("hist")?.scrollIntoView({ behavior: "smooth" })), act("Summary", "bars", summary))),
+    c.subs.length ? h("section", { class: "sec menu" }, c.subs.map((x) => h("button", { class: "mrow", "aria-label": `Ішкі санат: ${x.name}`, onclick: () => catForm({ parent: c.name, sub: x }) }, h("span", { class: "tile", style: `background:${c.color}`, "aria-hidden": "true" }, ic(x.icon || "tag")), h("span", { class: "ml" }, x.name), ic("chev")))) : h("section", { class: "sec" }, empty("Ішкі санат жоқ. «Жаңа» арқылы қос.")),
+    h("h3", { id: "hist", class: "muted hh" }, "Тарих"),
+    h("section", { class: "sec menu" }, list.length ? list.slice(0, 30).map((t) => h("div", { class: "mrow" }, h("span", { class: "tile", style: `background:${c.color}`, "aria-hidden": "true" }, ic(c.icon)), h("span", { class: "ml" }, h("b", {}, t.sub || t.note || c.name), h("small", { class: "muted" }, t.date)), h("span", { class: "num" }, tg(t.amount)))) : empty("Әзірге жазба жоқ.")),
+    h("p", { class: "muted" }, `${list.length} жазбада қолданылған`),
+    h("div", { class: "fbar" }, h("button", { class: "fnew", onclick: () => catForm({ parent: c.name }) }, ic("plus"), "Жаңа"))];
+}
+
 const valid = (x) => {
   const n = Number.isFinite, s = (v) => typeof v === "string", a = (k, f) => Array.isArray(x[k] ?? []) && (x[k] ?? []).every((i) => i && s(i.id) && f(i));
   return x && typeof x === "object" && (!x.settings || [x.settings.capital, x.settings.income, x.settings.fixed].every((v) => v == null || n(v))) &&
     a("tx", (t) => s(t.date) && n(t.amount) && s(t.category) && (t.kind === "income" || t.kind === "expense")) &&
-    a("cycles", (c) => s(c.last) && n(c.every) && c.every > 0 && n(c.price)) &&
+    a("cycles", (c) => s(c.last) && n(c.every) && c.every >= 0 && n(c.price)) &&
     a("items", (i) => s(i.cycleId) && n(i.cost) && s(i.time)) &&
     a("goals", (g) => s(g.start) && n(g.target) && n(g.saved) && n(g.months)) &&
     a("stock", (i) => n(i.qty)) &&
@@ -548,9 +664,6 @@ function settings() {
   // «ok» ескіруі мүмкін: кейін жазба қосылса не желі жоқ болса, кезекте күтіп тұр. Кіргенбіз, бірақ желі жоқ — «local» емес
   const state = (Sync.state === "local" && S.synced) || (Sync.state === "ok" && S.pending.length) ? "wait" : Sync.state;
   const cloud = CLOUD[state] + (state === "wait" ? `: ${S.pending.length}` : "") + (state === "err" ? `: ${Sync.error}` : "");
-  const catsSec = sec("Санаттар", add(() => catForm()), S.categories.length ? S.categories.map((c) => h("div", { class: "row" },
-      h("div", { class: "main" }, h("b", {}, c.name), h("small", { class: "muted" }, (c.subs ?? []).join(", ") || "Ішкі санат жоқ")),
-      h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${c.name}`, onclick: () => catForm(c) }, ic("edit")), del("categories", c.id, c.name))) : empty("Санат жоқ. Мысалы: Тамақ → Азық-түлік, Мейрамхана."));
   const incSec = sec("Кіріс көздері", add(() => incForm()), S.incomes.length ? S.incomes.map((i) => h("div", { class: "row" },
       h("div", { class: "main" }, h("b", {}, i.name), h("small", { class: "muted num" }, `${tg(i.amount)} / ай`)),
       h("button", { onclick: () => gotIncome(i) }, ic("check"), "Түсті"),
@@ -571,14 +684,15 @@ function settings() {
       h("div", { class: "end", style: "margin-top:0;justify-content:flex-start" }, state === "local" ? h("a", { class: "btn", href: "../" }, "Hub-қа кіру") : h("button", { onclick: () => Sync.now() }, "Қазір синхрондау")),
       h("p", { class: "muted" }, "Қосымша интернетсіз де жұмыс істейді: өзгерістер құрылғыда сақталып, желі мен кіру болғанда бұлтқа жіберіледі.")),
     sec("Байланыс", null, h("span", { class: "chip" }, navigator.onLine ? "Желіде" : "Офлайн режим"))];
-  const SUBS = { cats: ["Санаттар", [catsSec]], wallets: ["Шоттар", walletPage().slice(1)], income: ["Кіріс көздері", [incSec]], savings: ["Жинақтар", [savSec]], fin: ["Қаржылық параметрлер", [finSec]], city: ["Қала және енгізу", [citySec]], cloud: ["Бұлт", cloudSec] };
+  const SUBS = { wallets: ["Шоттар", walletPage().slice(1)], income: ["Кіріс көздері", [incSec]], savings: ["Жинақтар", [savSec]], fin: ["Қаржылық параметрлер", [finSec]], city: ["Қала және енгізу", [citySec]], cloud: ["Бұлт", cloudSec] };
+  if (sub === "cats") return catView ? catDetail(catView) : catsPage();
   if (sub && SUBS[sub]) return [h("button", { class: "ghost back", onclick: () => { sub = null; render(); scrollTo(0, 0); } }, ic("chevl"), "Профиль"), head(SUBS[sub][0]), ...SUBS[sub][1]];
   const mrow = (label, key, icon, color, right) => h("button", { class: "mrow", onclick: () => { sub = key; render(); scrollTo(0, 0); } }, h("span", { class: "tile", style: `background:${color}`, "aria-hidden": "true" }, ic(icon)), h("span", { class: "ml" }, label), right && h("small", { class: "muted mr" }, right), ic("chev"));
   return [
     head("Профиль"),
     h("section", { class: "sec tiles2" },
       h("button", { onclick: () => file.click() }, ic("up"), "Файлдан қосу"), h("button", { onclick: exportJson }, ic("down"), "Көшірме жүктеу"), file),
-    h("section", { class: "sec menu" }, mrow("Санаттар", "cats", "grid", "#f59e0b", String(S.categories.length || "")), mrow("Шоттар", "wallets", "wallet", "#3b82f6", tg(FS.balance(S)))),
+    h("section", { class: "sec menu" }, mrow("Санаттар", "cats", "grid", "#f59e0b", String(allCats("expense").length)), mrow("Шоттар", "wallets", "wallet", "#3b82f6", tg(FS.balance(S)))),
     h("section", { class: "sec menu" }, mrow("Кіріс көздері", "income", "plus", "#84cc16", String(S.incomes.length || "")), mrow("Жинақтар", "savings", "target", "#10b981", String(S.goals.length || "")), mrow("Қаржылық параметрлер", "fin", "sliders", "#6b7280")),
     h("section", { class: "sec menu" }, mrow("Қала және енгізу", "city", "home", "#8b5cf6", st.city), mrow("Бұлт", "cloud", "swap", "#ec4899", cloud)),
   ];
@@ -589,6 +703,7 @@ const NAV = [["home", "Журнал", "home"], ["plan", "Summary", "bars"], ["+"
 
 function render() {
   document.getElementById("view").replaceChildren(...PAGES[tab]().filter(Boolean));
+  document.getElementById("nav").hidden = tab === "set" && sub === "cats"; // санаттар беті толық экран
   document.getElementById("nav").replaceChildren(...NAV.map(([id, label, icon]) => id === "+"
     ? h("button", { class: "plus primary", "aria-label": "Қосу", onclick: () => openAdd() }, ic("plus"))
     : h("button", { "aria-current": id === tab ? "page" : null, onclick: () => go(id) }, ic(icon), label)));

@@ -7,9 +7,10 @@ const addDays = (s, n) => dstr(dnum(s) + n);
 const daysBetween = (a, b) => dnum(b) - dnum(a);
 
 // Цикл: { every: күн, last: соңғы сатып алу күні, price }
-const cycleDaysLeft = (c, today) => c.every - daysBetween(c.last, today);
-const stockPct = (c, today) => Math.max(0, Math.min(100, Math.round(cycleDaysLeft(c, today) / c.every * 100)));
-const nextBuy = (c) => addDays(c.last, c.every);
+// every = 0 — цикл-күн әлі белгісіз (2 сатып алудан кейін өздігінен есептеледі): ескерту де, болжам да жоқ
+const cycleDaysLeft = (c, today) => (c.every > 0 ? c.every - daysBetween(c.last, today) : Infinity);
+const stockPct = (c, today) => (c.every > 0 ? Math.max(0, Math.min(100, Math.round(cycleDaysLeft(c, today) / c.every * 100))) : 100);
+const nextBuy = (c) => (c.every > 0 ? addDays(c.last, c.every) : "");
 
 // Бренд салыстыру: ₸/күн, үздігі және ең қымбатқа қарағандағы жылдық үнем
 function brandMatch(brands) {
@@ -43,7 +44,7 @@ function forecast(S, today, count = 3) {
   const goals = goalsView(S).reduce((t, g) => t + (g.saved >= g.target ? 0 : goalMonthly(g, today)), 0);
   return Array.from({ length: count }, (_, i) => {
     const from = Math.max(Date.UTC(y, m - 1 + i, 1) / MS, dnum(today)), to = Date.UTC(y, m + i, 0) / MS;
-    const cycles = S.cycles.filter((c) => c.status !== "archived").reduce((t, c) => t + c.price * buysIn(c, from, to, today), 0);
+    const cycles = S.cycles.filter((c) => c.status !== "archived" && c.every > 0).reduce((t, c) => t + c.price * buysIn(c, from, to, today), 0);
     const fixed = S.settings.fixed;
     return { month: dstr(Date.UTC(y, m - 1 + i, 1) / MS).slice(0, 7), fixed, cycles, goals, total: fixed + cycles + goals };
   });
@@ -92,7 +93,7 @@ function fromRow(r) {
   if (k === "tx") return n(d.amount) && (d.kind === "income" || d.kind === "expense")
     ? { id: r.id, kind: d.kind, amount: Number(d.amount), category: normCat(d.category), note: String(d.note ?? ""), date: /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : localDate(r.created_at), ...(typeof d.account === "string" && d.account ? { account: d.account } : {}), ...(typeof d.store === "string" && d.store ? { store: d.store } : {}), ...(typeof d.sub === "string" && d.sub ? { sub: d.sub } : {}) } : null;
   if (k === "settings") return { key: "settings", item: { capital: Number(d.capital) || 0, income: Number(d.income) || 0, fixed: Number(d.fixed) || 0, city: typeof d.city === "string" && d.city.trim() ? d.city.trim() : "Астана" }, id: r.id };
-  const ok = { cycles: n(d.price) && n(d.every) && d.every > 0 && typeof d.last === "string", goals: n(d.target) && n(d.saved) && n(d.months) && typeof d.start === "string",
+  const ok = { cycles: n(d.price) && n(d.every) && d.every >= 0 && typeof d.last === "string", goals: n(d.target) && n(d.saved) && n(d.months) && typeof d.start === "string",
     stock: n(d.qty), matches: Array.isArray(d.brands) && d.brands.length > 1, contribs: n(d.amount) && typeof d.goalId === "string",
     categories: typeof d.name === "string" && d.name.trim() && Array.isArray(d.subs ?? []), incomes: typeof d.name === "string" && d.name.trim() && n(d.amount) && d.amount > 0,
     items: typeof d.cycleId === "string" && n(d.cost) && /^\d{4}-\d{2}-\d{2}$/.test(d.time),
@@ -139,7 +140,7 @@ function recalcCycle(c, items) {
   if (gaps.length) c.every = Math.max(1, Math.round(gaps.reduce((t, g) => t + g, 0) / gaps.length));
   return c;
 }
-const perDay = (c) => c.price / c.every; // баға тиімділігі, ₸/күн
+const perDay = (c) => (c.every > 0 ? c.price / c.every : 0); // баға тиімділігі, ₸/күн
 // Ескі цикл (status жоқ) → бір бастапқы item; id цикл id-інен алынады, сондықтан екі құрылғыда да бірдей
 const itemIdOf = (cid) => (cid[0] === "f" ? "e" : "f") + cid.slice(1);
 function migrate(S) {
