@@ -82,3 +82,61 @@ test("mergePull: сервер негіз, кезектегі өзгеріс же
   assert.deepEqual(m.habits.map((h) => h.id), ["g"]);
   assert.deepEqual(m.logs[0].done, [0, 1]);
 });
+
+const task = (o = {}) => ({ id: "t", title: "ClassFlow коды", goal: "", due: "", time: "", dur: 0, done: false, doneAt: "", ...o });
+
+test("rate: жақсы әдет — бүгін тек орындалса есептеледі; жаман — бүгін есептелмейді; бейтарап — null", () => {
+  const S = { logs: ["2026-10-24", "2026-10-25"].map((d) => log("g", d, { done: [0, 1] })) };
+  assert.deepEqual(JO.rate(S, good, T), { done: 2, total: 6 }); // 20–25: екеуі орындалды, бүгін әлі орындалмады — санамайды
+  S.logs.push(log("g", T, { done: [0, 1] }));
+  assert.deepEqual(JO.rate(S, good, T), { done: 3, total: 7 });
+  assert.deepEqual(JO.rate({ logs: [log("b", "2026-10-23", { slip: true })] }, bad, T), { done: 5, total: 6 }); // 20–25, бүгін жоқ
+  assert.deepEqual(JO.rate({ logs: [] }, { ...good, created: "2026-09-01" }, T, 30), { done: 0, total: 29 }); // 30 күндік терезе: 27.09–25.10
+  assert.equal(JO.rate({ logs: [] }, { ...bad, kind: "neutral" }, T), null);
+});
+
+test("goalProgress: тек осы мақсатқа байланған тапсырмалар", () => {
+  const S = { tasks: [task({ id: "1", goal: "G", done: true }), task({ id: "2", goal: "G" }), task({ id: "3", goal: "X", done: true }), task({ id: "4" })] };
+  assert.deepEqual(JO.goalProgress(S, { id: "G" }), { done: 1, total: 2 });
+  assert.deepEqual(JO.goalProgress(S, { id: "Z" }), { done: 0, total: 0 });
+});
+
+test("todayTask: бүгінгі, мерзімі өткен орындалмаған, бүгін орындалған — иә; болашақ, мерзімсіз, ескі орындалған — жоқ", () => {
+  const y = "2026-10-25", tm = "2026-10-27";
+  assert.ok(JO.todayTask(task({ due: T }), T));
+  assert.ok(JO.todayTask(task({ due: y }), T));
+  assert.ok(JO.todayTask(task({ due: y, done: true, doneAt: T }), T));
+  assert.ok(JO.todayTask(task({ due: T, done: true, doneAt: y }), T)); // мерзімі бүгін болса, ертерек орындалса да көрінеді
+  assert.ok(!JO.todayTask(task({ due: y, done: true, doneAt: y }), T));
+  assert.ok(!JO.todayTask(task({ due: tm }), T));
+  assert.ok(!JO.todayTask(task({}), T));
+});
+
+test("monthStats: тапсырма, жақсы әдет %, күрес күндері, сүрінулер — тек осы ай", () => {
+  const S = {
+    habits: [good, bad],
+    tasks: [task({ done: true, doneAt: "2026-10-03" }), task({ id: "2", done: true, doneAt: "2026-09-30" }), task({ id: "3" })],
+    logs: [log("g", "2026-10-24", { done: [0, 1] }), log("b", "2026-10-22", { resist: 2 }), log("b", "2026-10-23", { slip: true }), log("b", "2026-09-15", { slip: true, resist: 1 })],
+  };
+  assert.deepEqual(JO.monthStats(S, T), { tasksDone: 1, goodPct: 17, fights: 1, slips: 1 }); // 20–25 қазанда 1/6
+  assert.equal(JO.monthStats({ habits: [], tasks: [], logs: [] }, T).goodPct, null);
+});
+
+test("fromRow: тапсырма мен мақсат", () => {
+  const row = (app, data) => ({ id: "x", app, data });
+  assert.equal(JO.fromRow(row("jo_task", { title: "  " })), null);
+  assert.equal(JO.fromRow(row("jo_goal", { title: "А", deadline: "жақында" })), null);
+  assert.deepEqual(JO.fromRow(row("jo_task", { title: "А", due: "2026-10-30", time: "9", done: true, doneAt: "2026-10-26" })), { id: "x", title: "А", goal: "", due: "2026-10-30", time: "", dur: 0, done: true, doneAt: "2026-10-26" });
+  assert.equal(JO.fromRow(row("jo_task", { title: "А", done: false, doneAt: "2026-10-26" })).doneAt, ""); // орындалмаған — doneAt жоқ
+  const g = { id: "x", title: "Олимпиада банкі", why: "Оқушыларға", deadline: "2026-12-20" };
+  assert.deepEqual(JO.fromRow(JO.toRow("goals", g)), g);
+  assert.deepEqual(JO.fromRow(JO.toRow("tasks", task({ id: "x" }))), task({ id: "x" }));
+});
+
+test("mergePull: тапсырма мен мақсат та біріктіріледі", () => {
+  const t = task({ id: "t1", title: "Жергілікті", done: true, doneAt: T });
+  const S = { habits: [], logs: [], tasks: [t], goals: [], pending: [{ k: "tasks", id: "t1", op: "put", n: 1 }] };
+  const m = JO.mergePull(S, [JO.toRow("tasks", task({ id: "t1", title: "Серверде" })), JO.toRow("goals", { id: "g1", title: "М", why: "", deadline: "2026-12-01" })]);
+  assert.equal(m.tasks[0].title, "Жергілікті");
+  assert.equal(m.goals.length, 1);
+});

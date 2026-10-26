@@ -1,11 +1,14 @@
 "use strict";
 /* Jospar есептеу ядросы: DOM-сыз, тестке ыңғайлы. Күндер — «YYYY-MM-DD» жолдары.
    Әдет: { id, name, kind: good|bad|neutral, steps: [ішкі пункттер], time: "HH:MM"|"", dur: минут, created }
-   Күн жазбасы (әдет + күн үшін біреу): { id, habit, date, done: [орындалған пункт нөмірлері], slip, resist, count } */
+   Күн жазбасы (әдет + күн үшін біреу): { id, habit, date, done: [орындалған пункт нөмірлері], slip, resist, count }
+   Тапсырма: { id, title, goal: мақсат id|"", due: күн|"", time, dur, done, doneAt: күн|"" }
+   Мақсат (SMART): { id, title, why, deadline } — өлшемі: оған байланған тапсырмалардың орындалуы */
 const MS = 864e5;
 const dnum = (s) => { const [y, m, d] = s.split("-").map(Number); return Date.UTC(y, m - 1, d) / MS; };
 const dstr = (n) => new Date(n * MS).toISOString().slice(0, 10);
 const addDays = (s, n) => dstr(dnum(s) + n);
+const daysBetween = (a, b) => dnum(b) - dnum(a);
 const KINDS = ["good", "bad", "neutral"];
 
 const stepCount = (h) => Math.max(1, h.steps.length); // пунктсіз жақсы әдет — бір «пункт»
@@ -35,6 +38,33 @@ function runs(S, h, today) {
   return { cur, best };
 }
 
+// Соңғы `days` күндегі орындалу: { done, total } (бейтараптан — null). Бүгін: жақсы әдет орындалса ғана есептеледі, жаман әдет бүгін есептелмейді
+function rate(S, h, today, days = 30) {
+  if (h.kind === "neutral") return null;
+  const m = new Map(S.logs.filter((l) => l.habit === h.id).map((l) => [l.date, l]));
+  let done = 0, total = 0;
+  for (let d = dnum(h.created) > dnum(today) - days + 1 ? h.created : addDays(today, 1 - days); dnum(d) <= dnum(today); d = addDays(d, 1)) {
+    const ok = dayStatus(h, m.get(d)) === "done";
+    if (d === today && (h.kind === "bad" || !ok)) continue;
+    total++; if (ok) done++;
+  }
+  return { done, total };
+}
+
+// Мақсат: байланған тапсырмалар бойынша прогресс
+const goalProgress = (S, g) => { const t = S.tasks.filter((x) => x.goal === g.id); return { done: t.filter((x) => x.done).length, total: t.length }; };
+
+// Басты бетке түсетін тапсырма: мерзімі бүгін, мерзімі өтіп орындалмаған, не бүгін орындалған
+const todayTask = (t, today) => t.due === today || (!t.done && t.due !== "" && t.due < today) || (t.done && t.doneAt === today);
+
+// Осы айдың статистикасы (ай басынан бүгінге дейін)
+function monthStats(S, today) {
+  const month = today.slice(0, 7), r = S.habits.filter((h) => h.kind === "good").map((h) => rate(S, h, today, Number(today.slice(8)))).filter((x) => x.total);
+  const total = r.reduce((t, x) => t + x.total, 0);
+  return { tasksDone: S.tasks.filter((t) => t.done && t.doneAt.startsWith(month)).length, goodPct: total ? Math.round(r.reduce((t, x) => t + x.done, 0) / total * 100) : null,
+    fights: S.habits.reduce((t, h) => t + (h.kind === "bad" ? fightDays(S, h, month) : 0), 0), slips: S.logs.filter((l) => l.slip && l.date.startsWith(month)).length };
+}
+
 // Күрес күндері: «Шыдадым» кемінде бір рет басылған күндер (month: «YYYY-MM» болса, сол ай ғана)
 const fightDays = (S, h, month = "") => S.logs.filter((l) => l.habit === h.id && l.resist > 0 && l.date.startsWith(month)).length;
 
@@ -52,16 +82,20 @@ function pickMsg(list, vars, last = -1, rand = Math.random) {
 }
 
 // ---- Supabase `items` ↔ жергілікті күй ----
-const APP_OF = { habits: "jo_habit", logs: "jo_log" };
+const APP_OF = { habits: "jo_habit", logs: "jo_log", tasks: "jo_task", goals: "jo_goal" };
 const KEY_OF = Object.fromEntries(Object.entries(APP_OF).map(([k, a]) => [a, k]));
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/, TIME = /^\d{2}:\d{2}$/;
+const text = (v) => typeof v === "string" && v.trim() !== "";
 const nn = (v) => Number.isInteger(v) && v >= 0;
 
 // Жарамсыз жол — null (интерфейсті бұзбау үшін)
 function fromRow(r) {
   const k = KEY_OF[r.app], d = r.data || {};
   if (k === "habits") return typeof d.name === "string" && d.name.trim() && KINDS.includes(d.kind) && DATE.test(d.created)
-    ? { id: r.id, name: d.name, kind: d.kind, steps: Array.isArray(d.steps) ? d.steps.filter((s) => typeof s === "string") : [], time: /^\d{2}:\d{2}$/.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, created: d.created } : null;
+    ? { id: r.id, name: d.name, kind: d.kind, steps: Array.isArray(d.steps) ? d.steps.filter((s) => typeof s === "string") : [], time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, created: d.created } : null;
+  if (k === "tasks") return text(d.title)
+    ? { id: r.id, title: d.title, goal: typeof d.goal === "string" ? d.goal : "", due: DATE.test(d.due) ? d.due : "", time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, done: d.done === true, doneAt: d.done === true && DATE.test(d.doneAt) ? d.doneAt : "" } : null;
+  if (k === "goals") return text(d.title) && DATE.test(d.deadline) ? { id: r.id, title: d.title, why: typeof d.why === "string" ? d.why : "", deadline: d.deadline } : null;
   if (k === "logs") return typeof d.habit === "string" && DATE.test(d.date)
     ? { id: r.id, habit: d.habit, date: d.date, done: Array.isArray(d.done) ? d.done.filter(nn) : [], slip: d.slip === true, resist: nn(d.resist) ? d.resist : 0, count: nn(d.count) ? d.count : 0 } : null;
   return null;
@@ -70,7 +104,7 @@ const toRow = (k, e) => { const { id, ...data } = e; return { id, app: APP_OF[k]
 
 // Сервер негіз; әлі жіберілмеген жергілікті өзгерістер оның үстінен жазылады
 function mergePull(S, rows) {
-  const next = { habits: [], logs: [] }, pend = new Map((S.pending || []).map((p) => [p.k + ":" + p.id, p.op]));
+  const next = Object.fromEntries(Object.keys(APP_OF).map((k) => [k, []])), pend = new Map((S.pending || []).map((p) => [p.k + ":" + p.id, p.op]));
   for (const r of rows) {
     const e = fromRow(r);
     if (e && pend.get(KEY_OF[r.app] + ":" + e.id) !== "del") next[KEY_OF[r.app]].push(e);
@@ -85,5 +119,5 @@ function mergePull(S, rows) {
   return next;
 }
 
-const JO = { addDays, stepCount, logOf, dayStatus, runs, fightDays, RESIST, SLIP, pickMsg, APP_OF, fromRow, toRow, mergePull };
+const JO = { addDays, daysBetween, stepCount, logOf, dayStatus, runs, rate, goalProgress, todayTask, monthStats, fightDays, RESIST, SLIP, pickMsg, APP_OF, fromRow, toRow, mergePull };
 if (typeof module !== "undefined") module.exports = JO;

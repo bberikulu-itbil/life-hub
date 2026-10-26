@@ -57,11 +57,13 @@ div.line{cursor:default}
 .step .dot .ic svg{width:13px;height:13px}
 .acts{display:flex;gap:8px;margin:2px 0 0 40px;flex-wrap:wrap}
 .acts button{min-height:44px}
+.row .line{flex:1;min-width:0}
+dialog button.menu{width:100%;justify-content:flex-start;margin-top:8px;min-height:52px}
 .count{min-width:2ch;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
 
 #nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));width:min(420px,calc(100% - 24px));
   display:flex;justify-content:space-around;align-items:flex-end;padding:6px;border-radius:var(--r-nav);z-index:5}
-#nav button{flex:1;flex-direction:column;gap:0;border:0;background:transparent;font-size:.72rem;padding:.35rem 0;color:var(--mute)}
+#nav button{flex:1;min-width:0;flex-direction:column;gap:0;border:0;background:transparent;font-size:.68rem;padding:.35rem 0;color:var(--mute)}
 #nav button[aria-current=page]{color:var(--acc)}
 #nav button.plus{flex:none;width:56px;height:56px;min-height:56px;border-radius:50%;padding:0;margin:0 4px 6px;transform:translateY(-14px);
   background:linear-gradient(160deg,var(--acc-2),var(--acc));color:var(--acc-ink);border:0;box-shadow:var(--shadow-primary)}
