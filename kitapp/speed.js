@@ -139,6 +139,7 @@ function runDrill(cfg, words, start, S, done) {
   };
   q('#spOpt').onclick = openOpts; q('#spW').onclick = openOpts;
   main.onclick = () => playing ? pause() : play();
+  stat(); // санау басталғанша слайдер әдепкі ортаны емес, таңдалған нақты қарқынды көрсетсін
   (async () => {
     if (S.countdown) for (const n of [3, 2, 1]) { main.innerHTML = `<div class="chunk">${n}</div>`; await sleep(700); if (gone) return; }
     play();
