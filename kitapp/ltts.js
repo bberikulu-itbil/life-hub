@@ -21,8 +21,10 @@ const VOICES = [
 // Бір таңдау: ISSAI дауысы (әдепкі) немесе браузер дауысы. mp3 файлдарды әрқашан ISSAI жасайды.
 const ttsEngine = () => localStorage.kTtsEngine === 'browser' ? 'browser' : 'issai';
 const voiceCur = () => VOICES.find(v => v.key === (localStorage.kIssaiVoice || (localStorage.kIssaiSpk ? 'h' + localStorage.kIssaiSpk : 'raya'))) || VOICES[0];
-const haveModels = new Set(); // құрылғыда сақталған модельдер (батырма басылған сәтте синхронды тексеру үшін)
+const savedModels = () => { try { return JSON.parse(localStorage.kTtsModels || '[]'); } catch { return []; } };
+const haveModels = new Set(savedModels()); // кэш асинхронды тексерілгенше соңғы сәтті жүктеуді есте ұстаймыз
 const voiceHave = (vo = voiceCur()) => haveModels.has(vo.model);
+const rememberModels = () => { try { localStorage.kTtsModels = JSON.stringify([...haveModels]); } catch { /* сақтау өшік */ } };
 
 let ttsW = null, ttsSeq = 0;
 const ttsWait = new Map();
@@ -50,13 +52,23 @@ function ttsWorker() {
 const ttsCall = msg => new Promise((res, rej) => { const id = ++ttsSeq; ttsWait.set(id, { res, rej }); ttsWorker().postMessage({ ...msg, id }); });
 
 const modelCache = () => caches.open('kitapp-tts-models');
-async function checkModels() { try { const c = await modelCache(); for (const [id, m] of Object.entries(MODELS)) (await c.match(m.url)) ? haveModels.add(id) : haveModels.delete(id); } catch { /* Cache API жоқ */ } return haveModels; }
-checkModels();
-async function issaiRemove(model) { haveModels.delete(model); try { await (await modelCache()).delete(MODELS[model].url); } catch { /* жоқ */ } ttsW?.terminate(); ttsW = null; }
+async function checkModels() {
+  try {
+    const c = await modelCache();
+    for (const [id, m] of Object.entries(MODELS)) (await c.match(m.url)) ? haveModels.add(id) : haveModels.delete(id);
+    rememberModels();
+  } catch { /* Cache API жоқ: соңғы сәтті жүктеу белгісін қолданамыз */ }
+  return haveModels;
+}
+const modelsReady = checkModels();
+async function issaiRemove(model) { haveModels.delete(model); rememberModels(); try { await (await modelCache()).delete(MODELS[model].url); } catch { /* жоқ */ } ttsW?.terminate(); ttsW = null; }
 // Модельді жүктеп, іске қосу
 async function issaiInit(model = voiceCur().model) {
   DL[model] = { t0: performance.now(), loaded: 0, total: MODELS[model].mb * 1048576 };
-  try { await ttsCall({ t: 'init', voice: model }); haveModels.add(model); } finally { delete DL[model]; onDl.forEach(f => f(model, null)); }
+  try {
+    await ttsCall({ t: 'init', voice: model });
+    haveModels.add(model); rememberModels();
+  } finally { delete DL[model]; onDl.forEach(f => f(model, null)); }
 }
 
 // Осы құрылғыдағы дыбыстау жылдамдығы (таңба/сек), әр модель үшін бөлек

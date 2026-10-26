@@ -279,6 +279,7 @@ async function updateMini() {
 const Player = {
   // ci берілсе — сол бөлімнің басынан, әйтпесе тоқтаған жерден.
   async open(b, ci, opts = {}) {
+    await modelsReady; // бет жаңарғаннан кейін Cache Storage тексерілмей тұрып қайта сұрап үлгермесін
     const saved = JSON.parse(localStorage['kPlay:' + b.id] || 'null');
     // дайындау бетінен кейін кітап бетіне қайтып, плеерді ашамыз
     const v = await withPrepared(b, opts.vid || saved?.vid, () => { showBook(b.id); Player.open(b, ci, opts); }, () => showBook(b.id), 'аудио');
@@ -290,8 +291,9 @@ const Player = {
     const recs = (await byBook('audio', b.id)).filter(a => a.versionId === v.id);
     Object.assign(P, { b, v, chs, durs: chs.map((c, i) => recs.find(r => r.ci === i)?.dur || estSecs(c.text)), has: new Set(recs.map(r => r.ci)) });
     const at = opts.at && opts.vid === v.id && opts.at.ci < chs.length ? opts.at : null; // бетбелгіден ашу
-    const resume = !at && ci == null && saved?.vid === v.id && saved.ci < chs.length;
-    await pLoad(at ? at.ci : resume ? saved.ci : (ci || 0), at || (resume ? saved : null));
+    const fromReader = Number.isFinite(opts.pi) ? chs.findIndex(c => opts.pi >= c.from && opts.pi <= c.to) : -1;
+    const resume = !at && fromReader < 0 && ci == null && saved?.vid === v.id && saved.ci < chs.length;
+    await pLoad(at ? at.ci : fromReader >= 0 ? fromReader : resume ? saved.ci : (ci || 0), at || (resume ? saved : null));
     if (opts.expand !== false) showSheet();
     pPlay();
   },

@@ -4,6 +4,9 @@
 const KIND = { clean: 'Таза нұсқа', original: 'Түпнұсқа', translation: 'Аударма', other: 'Басқа' };
 const isReady = v => v.prepV === 3; // 3 = тазартылған мәтін + бөлімдер (+ ішкі тақырыпшалар) + бөлшек нөмірлері
 const verOrder = v => v.kind === 'clean' ? 0 : v.kind === 'original' ? 1 : 2; // таза нұсқа бірінші
+const prepError = err => /object can not be found|notfounderror/i.test(`${err?.name || ''} ${err?.message || ''}`)
+  ? 'Кітап файлы браузер жадынан табылмады. Кітап нұсқасын қайта жүктеп, тағы бір рет дайындап көріңіз.'
+  : (err?.message || 'Белгісіз қате. Қайтадан байқап көріңіз.');
 
 // Дайын нұсқаны қайтарады. Дайын нұсқа жоқ болса, прогресс-панельді көрсетіп, өзі дайындайды
 // және аяқталғанда again() шақырады; бұл жағдайда null қайтады.
@@ -31,7 +34,7 @@ function renderPrep(b, v, again, back, what) {
   indexVersion(b, v, ctl).then(() => { if (!ctl.stopped) again(); }).catch(err => {
     if (err === STOP || ctl.stopped) return;
     console.error(err);
-    view.innerHTML = `<button class="back" id="pBack">${ic('back')} Кітапқа</button><div class="glass sec"><h3>${ic('alert')} Дайындау сәтсіз</h3><p>${esc(err.message)}</p>
+    view.innerHTML = `<button class="back" id="pBack">${ic('back')} Кітапқа</button><div class="glass sec"><h3>${ic('alert')} Дайындау сәтсіз</h3><p>${esc(prepError(err))}</p>
       <div class="row"><button class="primary" id="pRetry">${ic('refresh', 16)} Қайталау</button></div></div>`;
     $('#pBack').onclick = back; $('#pRetry').onclick = () => renderPrep(b, v, again, back, what);
   });

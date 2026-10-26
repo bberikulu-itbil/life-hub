@@ -194,7 +194,7 @@ async function openReader(b, v) {
   Object.assign(R, { book: b, ver: v, kind: v.type, toc: [], cur: null, book_epub: null });
   $('#rTitle').textContent = b.title; $('#rAuthor').textContent = b.author || v.name;
   $('#rCh').textContent = ''; $('#rLeft').textContent = ''; $('#rPosText').textContent = '';
-  stage.innerHTML = ''; rEl.hidden = false; rEl.classList.remove('bare'); $('#rPanel').hidden = true;
+  stage.innerHTML = '<div class="empty">Кітап ашылуда…</div>'; rEl.hidden = false; rEl.classList.remove('bare'); $('#rPanel').hidden = true;
   if (!history.state?.kReader) history.pushState({ kReader: 1 }, ''); // Android/браузер «артқа» батырмасы оқығышты жабады
   applyPaper();
   if (b.status === 'plan') applyStatus(b, 'reading');
@@ -248,12 +248,16 @@ async function openEpub(buf) {
     progress({ cfi: loc.start.cfi }, pct, pct + '%');
     $('#rSlider').value = pct;
   });
+  R.rend.on('displayError', err => { console.error(err); stage.innerHTML = `<div class="empty">EPUB бетін көрсету мүмкін болмады: ${esc(err?.message || 'белгісіз қате')}</div>`; });
   bindGestures(R.rend);
   const s = $('#rSlider'); s.min = 0; s.max = 100; s.step = 1;
   await book.ready;
   const flat = (list, lvl = 0) => (list || []).flatMap(t => [{ title: t.label.replace(/\s+/g, ' ').trim(), href: t.href, file: t.href.split('#')[0].split('/').pop(), spine: book.spine.get(t.href.split('#')[0])?.index ?? 0, lvl }, ...flat(t.subitems, lvl + 1)]);
   R.toc = flat(book.navigation?.toc);
-  await R.rend.display(R.ver.pos?.cfi || undefined);
+  // Кей EPUB-тың алғашқы spine файлы бос мұқаба/титул болады. Сақталған орын жоқ болса,
+  // мазмұндағы алғашқы нақты бөлімнен ашамыз.
+  const useful = R.toc.find(t => !/^(басы|мұқаба|титул|мазмұн(?:ы)?|cover|title|contents?)$/i.test(t.title));
+  await R.rend.display(R.ver.pos?.cfi || useful?.href || undefined);
   book.locations.generate(1200).then(() => {
     const st = R.rend?.currentLocation()?.start;
     if (st) { const pct = Math.round(book.locations.percentageFromCfi(st.cfi) * 100); progress({ cfi: st.cfi }, pct, pct + '%'); $('#rSlider').value = pct; }
@@ -427,7 +431,7 @@ function showMore() {
       if (a === 'toc') showToc();
       if (a === 'search') showSearch();
       if (a === 'shelf') openShelfDlg(b.id);
-      if (a === 'listen') Player.open(b);
+      if (a === 'listen') readerListen();
       if (a === 'speed') readerSpeed();
       if (a === 'ai') closeReader(() => showChat(b.id));
       if (a === 'done' || a === 'reading') { applyStatus(b, a); await put('books', b); toast(a === 'done' ? 'Оқылды деп белгіленді' : 'Оқып жатырмын'); }
@@ -438,7 +442,14 @@ $('#rToc').onclick = showToc;
 $('#rMore').onclick = showMore;
 $('#rAdd').onclick = () => openShelfDlg(R.book.id);
 $('#rAa').onclick = showAa;
-$('#rListen').onclick = () => Player.open(R.book);
+const readerListen = () => {
+  const b = R.book, v = R.ver;
+  const pi = R.kind === 'pdf' ? R.page - 1 : (R.rend?.currentLocation()?.start?.index ?? 0);
+  // Дайындау қажет болса, оның прогресі оқығыштың артында жасырылып қалмасын.
+  if (!isReady(v)) return closeReader(() => Player.open(b, null, { vid: v.id, pi }));
+  Player.open(b, null, { vid: v.id, pi });
+};
+$('#rListen').onclick = readerListen;
 $('#rAi').onclick = () => closeReader(() => showChat(R.book.id));
 $('#rSpeed').onclick = () => readerSpeed();
 $('#rMark').onclick = () => readerMark();

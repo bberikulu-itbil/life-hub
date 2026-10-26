@@ -63,9 +63,9 @@ function subsAt(text, titles = []) {
 // Бөлім мәтіндерін жинап, тым қысқа бөлімдерді көрші бөліммен біріктіреді (нәтиже әрдайым бірдей).
 async function audioChapters(v) {
   const cs = (await byBook('chunks', v.bookId)).filter(c => c.versionId === v.id).sort((a, b) => a.n - b.n);
-  const raw = v.chapters.map(ch => { const text = ttsText(cs.filter(c => c.pi >= ch.from && c.pi <= ch.to).map(c => c.text).join(' ')); return { title: ch.title, text, subs: subsAt(text, ch.subs) }; }).filter(c => c.text);
+  const raw = v.chapters.map(ch => { const text = ttsText(cs.filter(c => c.pi >= ch.from && c.pi <= ch.to).map(c => c.text).join(' ')); return { title: ch.title, text, subs: subsAt(text, ch.subs), from: ch.from, to: ch.to }; }).filter(c => c.text);
   const out = [];
-  const join = (a, b) => { const off = a.text.length + 1; a.subs.push(...b.subs.map(x => ({ ...x, at: x.at + off }))); a.text += ' ' + b.text; };
+  const join = (a, b) => { const off = a.text.length + 1; a.subs.push(...b.subs.map(x => ({ ...x, at: x.at + off }))); a.text += ' ' + b.text; a.to = b.to; };
   for (const c of raw) {
     const last = out[out.length - 1];
     if (last && last.text.length < TTS_MIN_CHARS) { join(last, c); last.title = c.title; } else out.push({ ...c, subs: [...c.subs] });
@@ -101,7 +101,9 @@ const voiceLabel = () => ttsEngine() === 'issai' ? voiceCur().name : `Брауз
 // Модель жоқ болса, жүктеуге рұқсат сұрайды (батырма басылған сәтте, синхронды)
 function askModel(vo = voiceCur()) {
   if (voiceHave(vo)) return true;
-  return confirm(`«${vo.name}» дауысының моделі (~${MODELS[vo.model].mb} МБ) бір рет жүктеледі, содан кейін интернетсіз жұмыс істейді. Жүктейміз бе?`);
+  const ok = confirm(`«${vo.name}» дауысының моделі (~${MODELS[vo.model].mb} МБ) бір рет жүктеледі, содан кейін интернетсіз жұмыс істейді. Жүктейміз бе?`);
+  if (ok) navigator.storage?.persist?.().catch(() => {}); // Safari/Chrome сайт деректерін өшірмей сақтау мүмкіндігін сұраймыз
+  return ok;
 }
 function audioSettingsHTML() {
   const r = +(localStorage.kRate || 1);

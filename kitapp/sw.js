@@ -1,4 +1,4 @@
-const C = 'kitapp-v27';
+const C = 'kitapp-v28';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'rag.js', 'chat.js', 'audio.js', 'ltts.js', 'jobs.js', 'tts-worker.js', 'vendor/piper/piper.js', 'vendor/piper/piper-o91UDS6e.js', 'icons.js', 'covers.js', 'home.js', 'player.js', 'prep.js', 'shelves.js', 'marks.js', 'brand.js', 'profile.js', 'kstats.js', 'kspeed.js', 'kconvert.js', 'convert.js', 'speed.js', 'stats.js', 'edit.js', 'cloud.js', 'manifest.webmanifest',
   'vendor/lib/pdf.min.js', 'vendor/lib/pdf.worker.min.js', 'vendor/lib/epub.min.js', 'vendor/lib/jszip.min.js']; // кітап ашуға міндетті: CDN-сіз, қосымшамен бірге
 // Сыртқы кітапханалар: интернетсіз оқу үшін алдын ала сақталады (нұсқасы бекітілген, өзгермейді).
@@ -10,7 +10,10 @@ self.addEventListener('install', e => e.waitUntil(caches.open(C).then(async c =>
   await c.addAll(SHELL);
   await Promise.all(LIBS.map(u => c.add(u).catch(() => {}))); // біреуі жүктелмесе де орнату тоқтамасын
 }).then(() => self.skipWaiting())));
-self.addEventListener('activate', e => e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== C).map(x => caches.delete(x)))).then(() => self.clients.claim())));
+self.addEventListener('activate', e => e.waitUntil(caches.keys().then(k => Promise.all(
+  // Тек ескі интерфейс кэшін тазалаймыз. kitapp-tts-models (21–128 МБ) және басқа дерек кэштері сақталуы керек.
+  k.filter(x => x.startsWith('kitapp-v') && x !== C).map(x => caches.delete(x))
+)).then(() => self.clients.claim())));
 
 self.addEventListener('fetch', e => {
   const r = e.request;
