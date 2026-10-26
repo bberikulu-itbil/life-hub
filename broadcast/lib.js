@@ -1,4 +1,4 @@
-// Pure helpers for class broadcasts: contacts, data tables, names, Kazakh genitive, audiences, filling templates.
+// Pure helpers for Broadcast (messages to groups: classes and their parents, or plain lists of people): contacts, data tables, names, Kazakh genitive, audiences, filling templates.
 // Nothing here talks to the network; the page feeds it data and renders the result.
 
 // Kazakhstan numbers to the 11-digit international form WhatsApp links need ("77011234567"), or null.
@@ -10,6 +10,16 @@ export function normalizePhone(raw) {
 }
 
 const clean = (s) => String(s ?? "").replace(/\s+/g, " ").trim();
+
+// Telegram username from "@name", "t.me/name" or "name"; null if it cannot be one (5–32 letters, digits, _).
+export function normalizeTelegram(raw) {
+  const u = clean(raw).replace(/^(https?:\/\/)?(t\.me|telegram\.me)\//i, "").replace(/^@/, "").split(/[/?]/)[0];
+  return /^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(u) ? u : null;
+}
+
+// Where a message goes on a channel: "wa" needs a phone; "tg" prefers the username, else the phone.
+export const CHANNELS = { wa: "WhatsApp", tg: "Telegram" };
+export const addressOf = (c, channel = "wa") => (channel === "tg" && c.telegram ? "@" + c.telegram : c.phone || null);
 
 // Rows of cells. Excel / Google Sheets copies are tab-separated, and a cell with a line break comes in quotes.
 export function rows(text) {
@@ -63,6 +73,32 @@ export function parseContacts(text) {
     const parts = cells.filter(Boolean), at = parts.findIndex((c) => normalizePhone(c));
     const names = parts.filter((_, k) => k !== at);
     contacts.push({ student: names[0] || "", parent: names[1] || "", phone: normalizePhone(parts[at]), role: "" });
+  }
+  const extraColumns = [...new Set(Object.values(extras).flatMap(Object.keys))];
+  return { contacts, bad, extras, extraColumns };
+}
+
+// A plain list of people (not a class): Аты-жөні | Телефон | (Telegram) | own columns…
+// Each person is their own recipient: student = parent = the name, role "өзі".
+export function parsePeople(text) {
+  const contacts = [], bad = [], extras = {};
+  let header = null;
+  for (const [i, raw] of rows(String(text)).entries()) {
+    const cells = raw.map(clean);
+    if (!cells.some(Boolean)) continue;
+    const phoneAt = cells.findIndex((c) => normalizePhone(c)), tgAt = cells.findIndex((c, k) => k > 0 && /^@|t\.me\//i.test(c) && normalizeTelegram(c));
+    if (i === 0 && phoneAt < 0 && tgAt < 0) { header = cells; continue; }
+    const name = cells[0];
+    if (!name || /\d{5}/.test(name)) { bad.push({ line: i + 1, text: cells.filter(Boolean).join(" · ") }); continue; }
+    const tgCol = tgAt >= 0 ? tgAt : header ? header.findIndex((h) => /telegram|телеграм/i.test(h)) : -1;
+    const phoneCell = phoneAt >= 0 ? cells[phoneAt] : header ? cells[header.findIndex((h) => /телефон|нөмір|номер|phone/i.test(h))] ?? "" : "";
+    cells.forEach((v, k) => {
+      if (k === 0 || k === phoneAt || k === tgCol || !v || (phoneAt < 0 && v === phoneCell)) return;
+      const col = columnName(header?.[k] || `Баған ${k + 1}`);
+      if (col) (extras[name] ??= {})[col] = v;
+    });
+    const phone = normalizePhone(phoneCell), telegram = tgCol >= 0 ? normalizeTelegram(cells[tgCol]) : null;
+    contacts.push({ student: name, parent: name, role: "өзі", phone, telegram, ...(phoneCell && !phone ? { note: phoneCell } : {}) });
   }
   const extraColumns = [...new Set(Object.values(extras).flatMap(Object.keys))];
   return { contacts, bad, extras, extraColumns };
@@ -180,6 +216,7 @@ export function genitive(word) {
 
 // Tags every broadcast has; a pasted table adds its own column names.
 export const BUILTIN_TAGS = ["Алушы", "Оқушы аты", "Оқушы аты-жөні", "Анасы", "Әкесі"];
+export const PEOPLE_TAGS = ["Алушы", "Аты", "Аты-жөні"]; // a list of people: each is their own recipient
 const ALIASES = { "ата_ана": "Алушы", "оқушы": "Оқушы аты" }; // tags from the first version
 
 const TAG = /\{([^{}:]{1,40})(?::(ның))?\}/g;
@@ -208,7 +245,8 @@ export const AUDIENCES = {
 
 // Who gets a message for each student, plus notes for students nobody can be reached for.
 // One phone gets one message (a parent of twins hears once) unless the template carries per-student data.
-export function plan(contacts, audience, { perStudent = false } = {}) {
+export function plan(contacts, audience, { perStudent = false, channel = "wa" } = {}) {
+  if (channel === "tg") contacts = contacts.map((c) => ({ ...c, phone: addressOf(c, "tg") })); // a username counts as a way to reach
   const byStudent = new Map();
   for (const c of contacts) byStudent.set(c.student, [...(byStudent.get(c.student) || []), c]);
   const picks = [], notes = [];
@@ -233,7 +271,9 @@ export function plan(contacts, audience, { perStudent = false } = {}) {
     else chosen = reach;
     chosen = chosen.filter(Boolean);
     if (!chosen.length) {
-      const why = { father: noPhone("әке") ? "әкесінің нөмірі жоқ" : "әкесі тізімде жоқ", nearby: "жақын тұратын жауаптысы белгіленбеген" }[audience] || "нөмірі бар ата-анасы жоқ";
+      const self = list.every((c) => c.role === "өзі");
+      const how = channel === "tg" ? "нөмірі не Telegram-ы" : "нөмірі";
+      const why = self ? `${how} жоқ` : { father: noPhone("әке") ? "әкесінің нөмірі жоқ" : "әкесі тізімде жоқ", nearby: "жақын тұратын жауаптысы белгіленбеген" }[audience] || `${how} бар ата-анасы жоқ`;
       notes.push({ student, text: why, unreached: true });
     }
     for (const c of chosen) picks.push({ student, contact: c });
@@ -250,11 +290,11 @@ export function plan(contacts, audience, { perStudent = false } = {}) {
 
 // Every message of a broadcast, filled in and checked: what the teacher previews and sends.
 // `fields` are the group's own columns: { student: { column: value } }.
-export function messagesFor({ contacts, template = "", table = null, audience = "mother_first", naming = "name_patronymic", fields = {}, columns = [] }) {
+export function messagesFor({ contacts, template = "", table = null, audience = "mother_first", naming = "name_patronymic", fields = {}, columns = [], channel = "wa" }) {
   const used = placeholders(template);
   const tableTags = table ? table.headers.filter((h) => used.includes(h)) : [];
   const fieldTags = columns.filter((c) => used.includes(c));
-  const { messages, notes } = plan(contacts, audience, { perStudent: tableTags.length + fieldTags.length > 0 });
+  const { messages, notes } = plan(contacts, audience, { perStudent: tableTags.length + fieldTags.length > 0, channel });
   const match = table ? matchTable(table, [...new Set(contacts.map((c) => c.student))]) : null;
   for (const m of messages) {
     const one = m.students.length === 1 ? m.students[0] : null;
@@ -265,6 +305,8 @@ export function messagesFor({ contacts, template = "", table = null, audience = 
       "Оқушы аты-жөні": joinNames(m.students),
       "Анасы": addressName(rel("ана"), naming, "ана"),
       "Әкесі": addressName(rel("әке"), naming, "әке"),
+      "Аты": joinNames(m.students.map((s) => nameParts(s).given)),
+      "Аты-жөні": joinNames(m.students),
     };
     for (const c of columns) if (!(c in values)) values[c] = (one && fields[one]?.[c]) || "";
     const row = one && match?.byStudent.get(one);
@@ -277,3 +319,7 @@ export function messagesFor({ contacts, template = "", table = null, audience = 
 }
 
 export const waLink = (phone, text) => `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+// Telegram opens the chat with the text in the input bar (t.me/<username>?text= or t.me/+<phone>?text=).
+// By phone it works only if that person lets others find them by number or is in your contacts.
+export const tgLink = (address, text) => `https://t.me/${address.startsWith("@") ? address.slice(1) : "+" + address}?text=${encodeURIComponent(text)}`;
+export const linkFor = (channel, address, text) => (channel === "tg" ? tgLink(address, text) : waLink(address, text));

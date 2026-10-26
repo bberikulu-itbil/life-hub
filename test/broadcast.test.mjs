@@ -1,7 +1,7 @@
 // Run: node --test test/broadcast.test.mjs   (all names and numbers below are made up)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizePhone, parseContacts, columnName, parseTable, matchTable, addressName, firstName, genitive, fill, unknownPlaceholders, plan, messagesFor, waLink, BUILTIN_TAGS } from "../broadcast/lib.js";
+import { normalizePhone, parseContacts, columnName, parseTable, matchTable, addressName, firstName, genitive, fill, unknownPlaceholders, plan, messagesFor, waLink, BUILTIN_TAGS, normalizeTelegram, parsePeople, tgLink, linkFor } from "../broadcast/lib.js";
 
 const TABLE = [
   "Аты жөні\tАнасы\tАнасының номері\tӘкесі\tӘкесінің номері",
@@ -113,4 +113,31 @@ test("group columns: extra Excel columns and their tags", () => {
   const { messages } = messagesFor({ contacts: cs, template: "{Алушы}: {Оқушы аты} — {Бөлме}", fields: extras, columns: extraColumns });
   assert.deepEqual(messages.map((m) => [m.text, m.empty]), [["Айжан Боранқызы: Ален — 204", []], ["Сара Нұрқызы: Тимур — ", ["Бөлме"]]]);
   assert.equal(columnName("  Туған {күні}: "), "Туған күні");
+});
+
+test("telegram: usernames, links, and reach by username or phone", () => {
+  assert.equal(normalizeTelegram("@aizhan_s"), "aizhan_s");
+  assert.equal(normalizeTelegram("https://t.me/aizhan_s"), "aizhan_s");
+  assert.equal(normalizeTelegram("@ab"), null);
+  assert.equal(tgLink("@aizhan_s", "Сәлем!"), "https://t.me/aizhan_s?text=%D0%A1%D3%99%D0%BB%D0%B5%D0%BC!");
+  assert.equal(tgLink("77010000001", "x"), "https://t.me/+77010000001?text=x");
+  assert.equal(linkFor("wa", "77010000001", "x"), "https://wa.me/77010000001?text=x");
+  const cs = [
+    { student: "Серіков Ален", parent: "Серікова Айжан", role: "ана", phone: null, telegram: "aizhan_s" },
+    { student: "Омаров Сұлтан", parent: "Омарова Дина", role: "ана", phone: "77010000002", telegram: null },
+  ];
+  assert.equal(plan(cs, "mother_first").messages.length, 1); // WhatsApp needs a phone
+  const tg = plan(cs, "mother_first", { channel: "tg" });
+  assert.deepEqual(tg.messages.map((m) => m.phone), ["@aizhan_s", "77010000002"]);
+});
+
+test("people lists: each person is the recipient, own columns become tags", () => {
+  const { contacts, extraColumns, bad } = parsePeople("Аты-жөні\tТелефон\tTelegram\tБөлім\nАхметова Сара Нұрқызы\t8 701 000 00 01\t@sara_a\tМатематика\nОмаров Бауыржан\t87010000002\t\tФизика\nБос жол\n");
+  assert.equal(contacts.length, 3);
+  assert.deepEqual(contacts[0], { student: "Ахметова Сара Нұрқызы", parent: "Ахметова Сара Нұрқызы", role: "өзі", phone: "77010000001", telegram: "sara_a" });
+  assert.deepEqual(extraColumns, ["Бөлім"]);
+  assert.equal(bad.length, 0);
+  const { messages, notes } = messagesFor({ contacts, template: "Құрметті {Алушы}! {Аты}, сіздің бөліміңіз: {Бөлім}.", audience: "all", naming: "title", fields: { "Ахметова Сара Нұрқызы": { "Бөлім": "Математика" } }, columns: ["Бөлім"] });
+  assert.equal(messages[0].text, "Құрметті Сара апай! Сара, сіздің бөліміңіз: Математика.");
+  assert.equal(notes.find((n) => n.student === "Бос жол").text, "нөмірі жоқ");
 });
