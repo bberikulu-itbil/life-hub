@@ -185,7 +185,7 @@ $('#addForm').onsubmit = async e => {
 /* ---------- Оқығыш ---------- */
 const R = { book: null, ver: null, kind: null, pdf: null, rend: null, page: 1, total: 1, zoom: 1, toc: [] };
 const rEl = $('#reader'), stage = $('#rStage');
-const RS_DEF = { font: 100, family: 'serif', lh: 1.6, theme: 'auto' };
+const RS_DEF = { font: 100, family: 'serif', lh: 1.6, theme: 'auto', flow: 'paginated', autoHide: true };
 const rs = () => ({ ...RS_DEF, font: +(localStorage.kFont || 100), ...JSON.parse(localStorage.kReader || '{}') });
 const PAPER = { light: ['#fbfbfd', '#1b2130'], sepia: ['#f4ecdc', '#3b2f1e'], dark: ['#161b26', '#e3e8f0'] };
 const FAMILY = { serif: 'Georgia, "Times New Roman", serif', sans: '-apple-system, system-ui, sans-serif' };
@@ -195,7 +195,7 @@ async function openReader(b, v) {
   Object.assign(R, { book: b, ver: v, kind: v.type, toc: [], cur: null, book_epub: null });
   $('#rTitle').textContent = b.title; $('#rAuthor').textContent = b.author || v.name;
   $('#rCh').textContent = ''; $('#rLeft').textContent = ''; $('#rPosText').textContent = '';
-  stage.innerHTML = '<div class="empty">Кітап ашылуда…</div>'; rEl.hidden = false; rEl.classList.remove('bare'); $('#rPanel').hidden = true;
+  stage.innerHTML = '<div class="empty">Кітап ашылуда…</div>'; rEl.hidden = false; rEl.dataset.flow = rs().flow; showReaderBars(); $('#rPanel').hidden = true;
   if (!history.state?.kReader) history.pushState({ kReader: 1 }, ''); // Android/браузер «артқа» батырмасы оқығышты жабады
   applyPaper();
   if (b.status === 'plan') applyStatus(b, 'reading');
@@ -240,7 +240,7 @@ async function openEpub(buf) {
   const book = ePub(buf);
   R.book_epub = book;
   stage.innerHTML = '<div class="epub"></div>';
-  R.rend = book.renderTo(stage.firstChild, { width: '100%', height: '100%', flow: 'paginated', spread: 'none' });
+  R.rend = book.renderTo(stage.firstChild, { width: '100%', height: '100%', flow: rs().flow === 'scrolled' ? 'scrolled-doc' : 'paginated', spread: 'none' });
   applyEpubTheme();
   R.rend.on('relocated', loc => {
     const pct = book.locations.length() ? Math.round(book.locations.percentageFromCfi(loc.start.cfi) * 100) : (R.ver.pct || 0);
@@ -294,10 +294,20 @@ function progress(pos, pct, label) {
 }
 
 const go = d => R.kind === 'pdf' ? renderPdf(R.page + d) : (d > 0 ? R.rend?.next() : R.rend?.prev());
-const toggleBars = () => { rEl.classList.toggle('bare'); setTimeout(() => R.rend?.resize?.(), 260); };
+let rBarsTimer;
+function scheduleReaderBars() {
+  clearTimeout(rBarsTimer);
+  if (rs().autoHide && !rEl.hidden && !$('#rSheet').open) rBarsTimer = setTimeout(() => rEl.classList.add('bare'), 2000);
+}
+function showReaderBars() { rEl.classList.remove('bare'); scheduleReaderBars(); setTimeout(() => R.rend?.resize?.(), 260); }
+const toggleBars = () => { rEl.classList.contains('bare') ? showReaderBars() : (rEl.classList.add('bare'), clearTimeout(rBarsTimer)); };
 
 // Беттің шетін басу — бет ауыстыру, ортасы — жолақтарды жасыру; саусақпен сырғыту — бет ауыстыру
-function zoneTap(x, w) { if (x < w * .28) go(-1); else if (x > w * .72) go(1); else toggleBars(); }
+function zoneTap(x, w) {
+  if (rEl.classList.contains('bare')) return showReaderBars();
+  if (R.kind === 'epub' && rs().flow === 'scrolled') return toggleBars();
+  if (x < w * .28) go(-1); else if (x > w * .72) go(1); else toggleBars();
+}
 function bindGestures(rend) {
   let sx = 0, sy = 0, st = 0;
   const down = e => { const t = e.changedTouches?.[0] || e; sx = t.screenX; sy = t.screenY; st = Date.now(); };
@@ -352,6 +362,7 @@ $('#rClose').onclick = () => history.state?.kReader ? history.back() : closeRead
 addEventListener('popstate', () => { if (!rEl.hidden) closeReader(); });
 document.addEventListener('keydown', e => {
   if (rEl.hidden || /TEXTAREA|INPUT/.test(e.target.tagName) || $('#rSheet').open) return;
+  if (R.kind === 'epub' && rs().flow === 'scrolled' && ['ArrowRight', 'ArrowLeft', 'PageDown', 'PageUp', ' '].includes(e.key)) return;
   if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); go(1); }
   if (e.key === 'ArrowLeft' || e.key === 'PageUp') go(-1);
   if (e.key === 'Escape') $('#rClose').click();
@@ -407,7 +418,8 @@ function showAa() {
   const o = rs(), seg = (id, opts, cur) => `<div class="seg" id="${id}">${opts.map(([k, t]) => `<button data-v="${k}" class="${String(k) === String(cur) ? 'on' : ''}">${t}</button>`).join('')}</div>`;
   rSheet(`<h3>Мәтін баптаулары</h3>
     <div class="row" style="flex-wrap:nowrap;justify-content:space-between"><button id="aaM" class="big" style="flex:1">A−</button><b id="aaV" style="min-width:4.5rem;text-align:center">${R.kind === 'pdf' ? Math.round(R.zoom * 100) : o.font}%</b><button id="aaP" class="big" style="flex:1">A+</button></div>
-    ${R.kind === 'pdf' ? '<small class="muted">PDF-те қаріпті өзгерту мүмкін емес, бет үлкейеді. Ыңғайлы оқу үшін кітаптың «Таза нұсқасын» аш.</small>' : `<label>Қаріп</label>${seg('aaF', [['serif', 'Serif'], ['sans', 'Sans']], o.family)}<label>Жол аралығы</label>${seg('aaL', [[1.4, 'Тығыз'], [1.6, 'Қалыпты'], [1.9, 'Кең']], o.lh)}`}
+    ${R.kind === 'pdf' ? '<small class="muted">PDF-те қаріпті өзгерту мүмкін емес, бет үлкейеді. Ыңғайлы оқу үшін кітаптың «Таза нұсқасын» аш.</small>' : `<label>Қаріп</label>${seg('aaF', [['serif', 'Serif'], ['sans', 'Sans']], o.family)}<label>Жол аралығы</label>${seg('aaL', [[1.4, 'Тығыз'], [1.6, 'Қалыпты'], [1.9, 'Кең']], o.lh)}<label>Оқу бағыты</label>${seg('aaFlow', [['paginated', 'Беттеп оқу'], ['scrolled', 'Тігінен оқу']], o.flow)}`}
+    <label>Басқару батырмалары</label>${seg('aaHide', [[1, '2 секундта жасыру'], [0, 'Әрдайым көрсету']], +o.autoHide)}
     <label>Бет түсі</label>${seg('aaT', [['auto', 'Жүйе'], ['light', 'Ақ'], ['sepia', 'Сепия'], ['dark', 'Қараңғы']], o.theme)}`, D => {
     const save = p => { localStorage.kReader = JSON.stringify({ ...rs(), ...p }); if (p.font) localStorage.kFont = p.font; applyPaper(); };
     const size = d => {
@@ -417,6 +429,8 @@ function showAa() {
     D.querySelector('#aaM').onclick = () => size(-1); D.querySelector('#aaP').onclick = () => size(1);
     const segBind = (id, k, num) => { const el = D.querySelector('#' + id); if (el) el.onclick = e => { const v = e.target.closest('[data-v]')?.dataset.v; if (v == null) return; save({ [k]: num ? +v : v }); el.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); }; };
     segBind('aaF', 'family'); segBind('aaL', 'lh', true); segBind('aaT', 'theme');
+    const flow = D.querySelector('#aaFlow'); if (flow) flow.onclick = e => { const v = e.target.closest('[data-v]')?.dataset.v; if (!v) return; save({ flow: v }); rEl.dataset.flow = v; flow.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); R.rend?.flow(v === 'scrolled' ? 'scrolled-doc' : 'paginated'); R.rend?.resize?.(); };
+    const hide = D.querySelector('#aaHide'); hide.onclick = e => { const v = e.target.closest('[data-v]')?.dataset.v; if (v == null) return; save({ autoHide: v === '1' }); hide.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); v === '1' ? scheduleReaderBars() : (clearTimeout(rBarsTimer), rEl.classList.remove('bare')); };
   });
 }
 function showMore() {

@@ -31,12 +31,12 @@ function runDrill(cfg, words, start, S, done) {
   const WIN = 70, total = cfg.mins * 60000, o = KSP.opts(S.punct, S.long);
   const D = { mode: cfg.mode, per: cfg.per, font: S.font, orp: S.orp, jump: S.freeJump || 10 };
   const ov = document.createElement('div'); ov.className = 'sp-ov';
-  ov.innerHTML = `<div class="sp-bar"><button id="spX" class="icon-btn" aria-label="Жабу">${ic('x')}</button><div class="sp-t"><b>${esc(cfg.title)}</b><small id="spC"></small></div><span style="flex:1"></span><button id="spW" class="sp-wpm" aria-label="Жылдам оқу баптауы"></button><button id="spOpt" class="icon-btn" aria-label="Жылдам оқу баптауы">${ic('sliders', 18)}</button></div>
+  ov.innerHTML = `<div class="sp-bar"><button id="spX" class="icon-btn" aria-label="Жабу">${ic('x')}</button><div class="sp-t"><b>${esc(cfg.title)}</b><small id="spC"></small></div><span style="flex:1"></span><span id="spW" class="sp-wpm"></span></div>
     <div class="sp-main" id="spMain" style="font-family:${FF[S.family]};font-size:${S.font}px"></div><div class="sp-ctx" id="spCtx"></div>
     <div class="sp-foot"><div class="sp-meta"><span id="spElapsed">0:00</span><span id="spProgress">0%</span></div><div class="bar-p"><i id="spBar" style="width:0"></i></div><div class="sp-reader-controls"><button id="spB"></button><button id="spPlay" class="primary sp-play" aria-label="Ойнату">${ic('play')}</button><button id="spF"></button><button id="spTools" class="reader-menu-btn" aria-label="Оқу құралдары">${ic('list', 26)}</button></div></div>`;
   document.body.append(ov);
   const q = s => ov.querySelector(s), main = q('#spMain');
-  let i = start, maxI = start, adj = 0, playing = false, timer = 0, active = 0, seg = 0, gone = false, ws = -1, shown = start;
+  let i = start, maxI = start, adj = 0, playing = false, timer = 0, active = 0, seg = 0, gone = false, ws = -1, shown = start, runId = 0, barsTimer = 0;
   const setCh = () => { const m = markAt(cfg.marks, i); q('#spC').textContent = m ? `${m.n}. ${m.title}` : ''; };
   const jumpLabels = () => {
     q('#spB').innerHTML = `${ic('skip-back', 18)} <span>${D.jump} сөз артқа</span>`;
@@ -63,24 +63,26 @@ function runDrill(cfg, words, start, S, done) {
     q('#spElapsed').textContent = KS.fmtDur(el() / 1000); q('#spProgress').textContent = cfg.book ? `${Math.round(i / words.length * 100)}% · ${i.toLocaleString('kk')}/${words.length.toLocaleString('kk')} сөз` : `${Math.round(pct)}% · ${KS.fmtDur(Math.max(0, (total - el()) / 1000))} қалды`;
   };
 
-  const step = () => {
-    if (!playing || gone) return;
+  const step = id => {
+    if (!playing || gone || id !== runId) return;
     if (el() >= total) return finish();
     // Жаңа бөлім басталғанда: бөлім атын көрсетіп, баптаудағы уақытқа кідіреміз
     const m = cfg.marks?.get(i);
     if (m && i !== shown) {
       shown = i; setCh();
-      if (S.chapPause > 0) { main.innerHTML = `<div class="ch-card"><small>${m.n}-бөлім</small><b>${esc(m.title)}</b></div>`; timer = setTimeout(step, S.chapPause * 1000); return; }
+      if (S.chapPause > 0) { main.innerHTML = `<div class="ch-card"><small>${m.n}-бөлім</small><b>${esc(m.title)}</b></div>`; timer = setTimeout(() => step(id), S.chapPause * 1000); return; }
     }
     const c = KSP.chunkAt(words, i, D.per, cfg.marks);
     if (!c) return finish();
     show(c); stat(); cfg.onStep?.();
-    timer = setTimeout(() => { i = c.end; maxI = Math.max(maxI, i); step(); }, KSP.delayFor(c.words, wpm(), o));
+    timer = setTimeout(() => { if (id !== runId || !playing) return; i = c.end; maxI = Math.max(maxI, i); step(id); }, KSP.delayFor(c.words, wpm(), o));
   };
-  const play = () => { playing = true; seg = Date.now(); q('#spPlay').innerHTML = ic('pause'); q('#spCtx').textContent = ''; step(); };
+  const scheduleBars = () => { clearTimeout(barsTimer); if (rs().autoHide) barsTimer = setTimeout(() => ov.classList.add('sp-clean'), 2000); };
+  const showBars = () => { ov.classList.remove('sp-clean'); scheduleBars(); };
+  const play = () => { if (playing || gone) return; clearTimeout(timer); playing = true; seg = Date.now(); runId++; q('#spPlay').innerHTML = ic('pause'); q('#spCtx').textContent = ''; step(runId); scheduleBars(); };
   const pause = () => {
     if (!playing) return;
-    playing = false; clearTimeout(timer); active += Date.now() - seg; q('#spPlay').innerHTML = ic('play');
+    playing = false; runId++; clearTimeout(timer); active += Date.now() - seg; q('#spPlay').innerHTML = ic('play');
     if (D.mode !== 'pacer') q('#spCtx').innerHTML = words.slice(Math.max(start, i - 12), i + 24).map(w => esc(w)).join(' ');
     stat();
   };
@@ -128,6 +130,7 @@ function runDrill(cfg, words, start, S, done) {
       <label>Бір минутта неше сөз</label><div class="sp-speed"><button data-rate="-10">−10</button><b data-rate-v>${Math.round(wpm())}</b><button data-rate="10">+10</button></div>
       <label>Артқа/алға жылжыту</label><div class="seg" data-jump>${[5, 10, 20, 50].map(n => `<button data-v="${n}" class="${D.jump === n ? 'on' : ''}">${n} сөз</button>`).join('')}</div>
       <label>Қаріп өлшемі</label><div class="sp-speed"><button data-font="-4">A−</button><b data-font-v>${D.font}px</b><button data-font="4">A+</button></div>
+      <label>Басқару батырмалары</label><div class="seg" data-hide><button data-v="1" class="${rs().autoHide ? 'on' : ''}">2 секундта жасыру</button><button data-v="0" class="${!rs().autoHide ? 'on' : ''}">Әрдайым көрсету</button></div>
       <label class="tgl"><input data-orp type="checkbox" ${D.orp ? 'checked' : ''}><span>Бір сөзде көз тоқтайтын әріпті бояу</span></label>
       <button class="primary" data-ok>Жалғастыру</button></div>`;
     ov.append(box);
@@ -143,21 +146,23 @@ function runDrill(cfg, words, start, S, done) {
       if (jumpBy) { D.jump = +jumpBy; box.querySelectorAll('[data-jump] button').forEach(x => x.classList.toggle('on', x.dataset.v === jumpBy)); jumpLabels(); }
       const fd = +e.target.closest('[data-font]')?.dataset.font;
       if (fd) { D.font = Math.max(24, Math.min(120, D.font + fd)); main.style.fontSize = D.font + 'px'; main.querySelector('.pacer')?.style.setProperty('font-size', Math.max(18, D.font / 2.4) + 'px'); box.querySelector('[data-font-v]').textContent = D.font + 'px'; }
+      const hide = e.target.closest('[data-hide] [data-v]')?.dataset.v;
+      if (hide != null) { const o = rs(); o.autoHide = hide === '1'; localStorage.kReader = JSON.stringify(o); box.querySelectorAll('[data-hide] button').forEach(x => x.classList.toggle('on', x.dataset.v === hide)); o.autoHide ? scheduleBars() : (clearTimeout(barsTimer), ov.classList.remove('sp-clean')); }
       if (e.target.matches('[data-orp]')) D.orp = e.target.checked;
       if (e.target.closest('[data-ok]')) { saveReaderDefaults(); box.remove(); const c = KSP.chunkAt(words, i, D.per, cfg.marks); if (c) show(c); play(); }
     };
   };
-  q('#spOpt').onclick = openOpts; q('#spW').onclick = openOpts;
   q('#spTools').onclick = () => {
     pause();
     const box = document.createElement('div'); box.className = 'sp-toc glass sp-tool-sheet';
     box.innerHTML = `<div class="psl-hd"><b>Оқу құралдары</b><button class="icon-btn" data-x aria-label="Жабу">${ic('x', 20)}</button></div><div class="sp-tool-list">
-      <button data-a="toc">${ic('list', 21)}<span>Мазмұн</span></button><button data-a="notes">${ic('note', 21)}<span>Белгілер мен ескертпелер</span></button><button data-a="search">${ic('search', 21)}<span>Кітаптан іздеу</span></button><button data-a="text"><b>Aa</b><span>Мәтін баптаулары</span></button><button data-a="mark">${ic('bookmark', 21)}<span>Бетбелгілер</span></button></div>`;
+      <button data-a="speed">${ic('sliders', 21)}<span>Жылдам оқу баптауы</span></button><button data-a="toc">${ic('list', 21)}<span>Мазмұн</span></button><button data-a="notes">${ic('note', 21)}<span>Белгілер мен ескертпелер</span></button><button data-a="search">${ic('search', 21)}<span>Кітаптан іздеу</span></button><button data-a="text"><b>Aa</b><span>Мәтін баптаулары</span></button><button data-a="mark">${ic('bookmark', 21)}<span>Бетбелгілер</span></button></div>`;
     ov.append(box);
     box.onclick = e => {
       if (e.target.closest('[data-x]')) return box.remove();
       const a = e.target.closest('[data-a]')?.dataset.a; if (!a) return;
       box.remove();
+      if (a === 'speed') return openOpts();
       if (a === 'toc') return openToc();
       ov.classList.add('sp-behind');
       if (a === 'search') showSearch();
@@ -166,12 +171,13 @@ function runDrill(cfg, words, start, S, done) {
       document.querySelector('#rSheet')?.addEventListener('close', () => ov.classList.remove('sp-behind'), { once: true });
     };
   };
-  main.onclick = () => playing ? pause() : play();
+  main.onclick = () => { if (ov.classList.contains('sp-clean')) return showBars(); playing ? pause() : play(); };
+  ov.addEventListener('pointerdown', e => { if (!e.target.closest('#spMain')) showBars(); }, { passive: true });
   jumpLabels();
   stat(); // санау басталғанша слайдер әдепкі ортаны емес, таңдалған нақты қарқынды көрсетсін
   (async () => {
     if (S.countdown) for (const n of [3, 2, 1]) { main.innerHTML = `<div class="chunk">${n}</div>`; await sleep(700); if (gone) return; }
-    play();
+    if (!playing) play();
   })();
 }
 

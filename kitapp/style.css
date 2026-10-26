@@ -410,6 +410,7 @@ dialog.bsheet{margin:auto auto 0;width:100%;max-width:640px;max-height:80vh;bord
 #reader[data-paper=sepia] #rStage canvas{filter:sepia(.35)}
 .r-side{position:absolute;top:50%;transform:translateY(-50%);z-index:2;width:44px;height:80px;border:0;background:color-mix(in srgb,var(--rink) 6%,transparent);color:var(--rink);opacity:0;transition:opacity .2s;display:none}
 .r-side.l{left:6px}.r-side.r{right:6px}
+#reader[data-flow=scrolled] .r-side{display:none!important}
 @media(hover:hover) and (min-width:900px){.r-side{display:flex}.r-body:hover .r-side{opacity:.7}}
 #rSheet .rs-body h3{margin:.2rem 0 .7rem}
 .rs-list{display:flex;flex-direction:column;max-height:62vh;overflow:auto;margin-top:.4rem}
@@ -442,6 +443,7 @@ details.sec>summary{display:flex;flex-direction:column;gap:.2rem;list-style:none
 .sp-main .pacer{font-family:Georgia,"Times New Roman",serif;line-height:1.9}.pacer .hl{background:color-mix(in srgb,var(--acc) 22%,transparent);box-shadow:0 2px 0 var(--acc)}
 .sp-ov .sp-bar{border:0;background:linear-gradient(var(--paper) 65%,transparent);padding:.8rem 1rem 2rem}.sp-ov .sp-main{padding:1rem 1rem 0}.sp-ov .sp-foot{border:0;background:linear-gradient(transparent,var(--paper) 24%);padding:1.4rem 1rem calc(.8rem + env(safe-area-inset-bottom))}
 .sp-reader-controls{display:grid;grid-template-columns:minmax(0,1fr) 64px minmax(0,1fr) 52px;align-items:center;gap:.55rem;margin-top:.65rem}.sp-reader-controls>button:not(.sp-play):not(.reader-menu-btn){min-height:48px;padding:.45rem .65rem;display:flex;align-items:center;justify-content:center;gap:.3rem;font-size:.82rem}.sp-reader-controls .reader-menu-btn{grid-column:4;width:50px;height:50px}.sp-behind{visibility:hidden}.sp-tool-sheet{max-height:76vh}.sp-tool-list{display:flex;flex-direction:column;padding:.2rem .8rem 1rem}.sp-tool-list button{display:flex;align-items:center;gap:.8rem;width:100%;padding:.9rem .7rem;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;text-align:left;font-size:1rem}.sp-tool-list button span{flex:1}.sp-tool-list button b{width:21px;text-align:center;font:700 1rem Georgia,serif}
+.sp-ov .sp-bar,.sp-ov .sp-foot{transition:transform .25s ease,opacity .25s ease}.sp-ov.sp-clean .sp-bar{transform:translateY(-110%);opacity:0;pointer-events:none}.sp-ov.sp-clean .sp-foot{transform:translateY(110%);opacity:0;pointer-events:none}
 @media(max-width:560px){.sp-preset-grid.two{grid-template-columns:1fr}#reader .r-bar{padding-left:.75rem;padding-right:.75rem}.r-top-status{font-size:.88rem}}
 @media(max-width:560px){.sp-reader-controls{grid-template-columns:1fr 58px 1fr 48px;gap:.35rem}.sp-reader-controls>button:not(.sp-play):not(.reader-menu-btn) span{display:none}.sp-reader-controls .reader-menu-btn{width:46px;height:46px}.sp-ov .sp-main .pacer{padding:.6rem;line-height:1.75}}
 /* аудио мазмұны: бөлім ішіндегі тақырыпшалар */
