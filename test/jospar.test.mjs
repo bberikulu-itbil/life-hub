@@ -101,11 +101,11 @@ test("goalProgress: тек осы мақсатқа байланған тапсы
   assert.deepEqual(JO.goalProgress(S, { id: "Z" }), { done: 0, total: 0 });
 });
 
-test("todayTask: бүгінгі, мерзімі өткен орындалмаған, бүгін орындалған — иә; болашақ, мерзімсіз, ескі орындалған — жоқ", () => {
+test("todayTask: жоспаргерде тек бүгінге белгіленген тапсырмалар", () => {
   const y = "2026-10-25", tm = "2026-10-27";
   assert.ok(JO.todayTask(task({ due: T }), T));
-  assert.ok(JO.todayTask(task({ due: y }), T));
-  assert.ok(JO.todayTask(task({ due: y, done: true, doneAt: T }), T));
+  assert.ok(!JO.todayTask(task({ due: y }), T));
+  assert.ok(!JO.todayTask(task({ due: y, done: true, doneAt: T }), T));
   assert.ok(JO.todayTask(task({ due: T, done: true, doneAt: y }), T)); // мерзімі бүгін болса, ертерек орындалса да көрінеді
   assert.ok(!JO.todayTask(task({ due: y, done: true, doneAt: y }), T));
   assert.ok(!JO.todayTask(task({ due: tm }), T));
@@ -177,4 +177,41 @@ test("profileStats: апта/ай ұпайы, қатар, жылу картас�
   assert.deepEqual([st.week, st.month, st.cur, st.best, st.max], [2, 6, 1, 2, 2]);
   assert.equal(JO.profileStats(S, "2026-10-27").cur, 1); // бүгін бос — кешегі қатар үзілмейді
   assert.equal(JO.profileStats({ ...S, tasks: [] }, T).max, 0);
+});
+
+
+test("апталық кесте: демалыс күні серияны үзбейді және пайызға кірмейді", () => {
+  const hb = { id: "weekly", name: "Оқу", kind: "good", steps: [], created: "2026-11-02", days: [1, 3, 5] };
+  const state = { habits: [hb], logs: ["2026-11-02", "2026-11-04"].map(date => ({ habit: hb.id, date, done: [0] })) };
+  assert.equal(JO.scheduled(hb, "2026-11-03"), false);
+  assert.equal(JO.scheduled(hb, "2026-11-04"), true);
+  assert.deepEqual(JO.runs(state, hb, "2026-11-05"), { cur: 2, best: 2 });
+  assert.deepEqual(JO.rate(state, hb, "2026-11-05"), { done: 2, total: 2 });
+});
+
+test("жаңа мақсат пен әдет өрістері бұлттан қайтқанда сақталады", () => {
+  const hb = { id: "weekly", name: "Оқу", kind: "good", steps: [], time: "", dur: 0, created: "2026-11-02", w: 1, days: [1, 3], goal: "books" };
+  const goal = { id: "books", title: "12 кітап", why: "Даму", deadline: "2026-12-31", current: 3, target: 12, unit: "кітап" };
+  assert.deepEqual(JO.fromRow(JO.toRow("habits", hb)), hb);
+  assert.deepEqual(JO.fromRow(JO.toRow("goals", goal)), goal);
+});
+
+
+test("сандық әдет: меже мен ішкі қадамдар бірге орындалады", () => {
+  const hb = { ...good, target: 2.5, unit: "км", steps: ["Қыздырыну"] };
+  assert.equal(JO.dayStatus(hb, { count: 2.5, done: [] }), "todo");
+  assert.equal(JO.dayStatus(hb, { count: 2, done: [0] }), "todo");
+  assert.equal(JO.dayStatus(hb, { count: 2.5, done: [0] }), "done");
+  assert.equal(JO.dayStatus({ ...hb, steps: [] }, { count: 3 }), "done");
+  const row = JO.toRow("habits", { ...hb, id: "metric" });
+  assert.equal(JO.fromRow(row).target, 2.5);
+  assert.equal(JO.fromRow(row).unit, "км");
+  assert.equal(JO.fromRow(JO.toRow("logs", { id: "log", habit: "metric", date: T, count: 2.5 })).count, 2.5);
+});
+
+test("мақсаттың прогресіне өз қадамдары мен жоспарланған әдет күндері кіреді", () => {
+  const hb = { ...good, id: "h", goal: "G", created: "2026-11-02", steps: [], days: [1,3,5] };
+  const S = { habits: [hb], tasks: [task({ goal: "G", done: true }), task({ goal: "X" })], logs: [{ habit: "h", date: "2026-11-02", done: [0] }] };
+  assert.deepEqual(JO.goalOverview(S, { id: "G", deadline: "2026-12-31" }, "2026-11-04"), { done: 2, total: 3, pct: 67 });
+  assert.deepEqual(JO.goalOverview(S, { id: "empty", deadline: "2026-12-31" }, "2026-11-04"), { done: 0, total: 0, pct: 0 });
 });

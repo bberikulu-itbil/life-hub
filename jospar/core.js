@@ -11,12 +11,15 @@ const addDays = (s, n) => dstr(dnum(s) + n);
 const daysBetween = (a, b) => dnum(b) - dnum(a);
 const KINDS = ["good", "bad", "neutral"];
 
+const scheduled = (h, date) => date >= h.created && (!h.days?.length || h.days.includes(new Date(date + "T12:00:00Z").getUTCDay()));
+const goalMetric = (g) => ({ current: Math.max(0, Number(g.current) || 0), target: Math.max(0, Number(g.target) || 0) });
+const amount = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0;
 const stepCount = (h) => Math.max(1, h.steps.length); // пунктсіз жақсы әдет — бір «пункт»
 const logOf = (S, id, date) => S.logs.find((l) => l.habit === id && l.date === date);
 
 // Жақсы: барлық пункт белгіленсе орындалды. Жаман: сүрінбесе — автоматты орындалды. Бейтарап: бақылау ғана.
 function dayStatus(h, log) {
-  if (h.kind === "good") { const d = new Set(log?.done); return Array.from({ length: stepCount(h) }, (_, i) => d.has(i)).every(Boolean) ? "done" : "todo"; }
+  if (h.kind === "good") { const d = new Set(log?.done); const stepsDone = !h.steps.length || h.steps.every((_, i) => d.has(i)); return (h.target > 0 ? amount(log?.count) >= h.target && stepsDone : Array.from({ length: stepCount(h) }, (_, i) => d.has(i)).every(Boolean)) ? "done" : "todo"; }
   if (h.kind === "bad") return log?.slip ? "slip" : "done";
   return "tally";
 }
@@ -27,12 +30,12 @@ function runs(S, h, today) {
   const ok = (d) => dayStatus(h, m.get(d)) === "done";
   const bad = h.kind === "bad", last = bad ? addDays(today, -1) : today;
   let cur = 0, best = 0, run = 0;
-  for (let d = h.created; dnum(d) <= dnum(last); d = addDays(d, 1)) { run = ok(d) ? run + 1 : 0; best = Math.max(best, run); }
+  for (let d = h.created; dnum(d) <= dnum(last); d = addDays(d, 1)) { if (!scheduled(h, d)) continue; run = ok(d) ? run + 1 : 0; best = Math.max(best, run); }
   if (h.kind === "neutral") return { cur: 0, best: 0 };
   cur = run; // соңғы күнге дейінгі қатар
   if (!bad && !ok(today)) { // жақсы әдет: бүгін әлі орындалмаса, серия үзілмейді — кешегіге дейін санаймыз
     cur = 0;
-    for (let d = addDays(today, -1); dnum(d) >= dnum(h.created) && ok(d); d = addDays(d, -1)) cur++;
+    for (let d = addDays(today, -1); dnum(d) >= dnum(h.created) && (!scheduled(h, d) || ok(d)); d = addDays(d, -1)) { if (scheduled(h, d)) cur++; }
   }
   if (bad && m.get(today)?.slip) cur = 0;
   return { cur, best };
@@ -44,6 +47,7 @@ function rate(S, h, today, days = 30) {
   const m = new Map(S.logs.filter((l) => l.habit === h.id).map((l) => [l.date, l]));
   let done = 0, total = 0;
   for (let d = dnum(h.created) > dnum(today) - days + 1 ? h.created : addDays(today, 1 - days); dnum(d) <= dnum(today); d = addDays(d, 1)) {
+    if (!scheduled(h, d)) continue;
     const ok = dayStatus(h, m.get(d)) === "done";
     if (d === today && (h.kind === "bad" || !ok)) continue;
     total++; if (ok) done++;
@@ -54,8 +58,22 @@ function rate(S, h, today, days = 30) {
 // Мақсат: байланған тапсырмалар бойынша прогресс
 const goalProgress = (S, g) => { const t = S.tasks.filter((x) => x.goal === g.id); return { done: t.filter((x) => x.done).length, total: t.length }; };
 
+// Мақсаттың қадамдары және бүгінге дейінгі жоспарланған әдет күндері.
+function goalOverview(S, g, today) {
+  const tasks = goalProgress(S, g), habits = S.habits.filter(h => h.goal === g.id && h.kind !== "neutral");
+  let done = tasks.done, total = tasks.total;
+  for (const hb of habits) {
+    const end = g.deadline < today ? g.deadline : today;
+    for (let d = hb.created; d <= end; d = addDays(d, 1)) {
+      if (!scheduled(hb, d) || (hb.kind === "bad" && d === today)) continue;
+      total++; if (dayStatus(hb, logOf(S, hb.id, d)) === "done") done++;
+    }
+  }
+  return { done, total, pct: total ? Math.round(done / total * 100) : 0 };
+}
+
 // Басты бетке түсетін тапсырма: мерзімі бүгін, мерзімі өтіп орындалмаған, не бүгін орындалған
-const todayTask = (t, today) => t.due === today || (!t.done && t.due !== "" && t.due < today) || (t.done && t.doneAt === today);
+const todayTask = (t, today) => t.due === today;
 
 // Осы айдың статистикасы (ай басынан бүгінге дейін)
 function monthStats(S, today) {
@@ -67,10 +85,10 @@ function monthStats(S, today) {
 
 // Күн ұпайы: орындалған тапсырмалар (doneAt) + орындалған жақсы әдеттер + сүрінбеген жаман әдеттер (күн жабылғанда) — әрқайсысы өз салмағымен
 function dayPoints(S, date, today) {
-  let p = S.tasks.reduce((t, x) => t + (x.done && x.doneAt === date ? x.w : 0), 0);
+  let p = S.tasks.reduce((t, x) => t + (x.done && x.doneAt === date ? wt(x.w) : 0), 0);
   for (const h of S.habits) {
-    if (h.kind === "neutral" || date < h.created || date > today) continue;
-    if (dayStatus(h, logOf(S, h.id, date)) === "done" && (h.kind === "good" || date < today)) p += h.w;
+    if (h.kind === "neutral" || !scheduled(h, date) || date > today) continue;
+    if (dayStatus(h, logOf(S, h.id, date)) === "done" && (h.kind === "good" || date < today)) p += wt(h.w);
   }
   return p;
 }
@@ -115,12 +133,12 @@ const nn = (v) => Number.isInteger(v) && v >= 0;
 function fromRow(r) {
   const k = KEY_OF[r.app], d = r.data || {};
   if (k === "habits") return typeof d.name === "string" && d.name.trim() && KINDS.includes(d.kind) && DATE.test(d.created)
-    ? { id: r.id, name: d.name, kind: d.kind, steps: Array.isArray(d.steps) ? d.steps.filter((s) => typeof s === "string") : [], time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, w: wt(d.w), created: d.created } : null;
+    ? { id: r.id, name: d.name, kind: d.kind, steps: Array.isArray(d.steps) ? d.steps.filter((s) => typeof s === "string") : [], time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, w: wt(d.w), created: d.created, ...(Array.isArray(d.days) ? { days: [...new Set(d.days.filter((n) => Number.isInteger(n) && n >= 0 && n <= 6))] } : {}), ...(typeof d.goal === "string" ? { goal: d.goal } : {}), ...(d.target !== undefined ? { target: amount(d.target), unit: typeof d.unit === "string" ? d.unit : "" } : {}) } : null;
   if (k === "tasks") return text(d.title)
     ? { id: r.id, title: d.title, goal: typeof d.goal === "string" ? d.goal : "", due: DATE.test(d.due) ? d.due : "", time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, w: wt(d.w), done: r.done === true, doneAt: r.done === true && DATE.test(d.doneAt) ? d.doneAt : "" } : null;
-  if (k === "goals") return text(d.title) && DATE.test(d.deadline) ? { id: r.id, title: d.title, why: typeof d.why === "string" ? d.why : "", deadline: d.deadline } : null;
+  if (k === "goals") return text(d.title) && DATE.test(d.deadline) ? { id: r.id, title: d.title, why: typeof d.why === "string" ? d.why : "", deadline: d.deadline, ...(d.target !== undefined || d.current !== undefined ? goalMetric(d) : {}), ...(typeof d.unit === "string" ? { unit: d.unit } : {}) } : null;
   if (k === "logs") return typeof d.habit === "string" && DATE.test(d.date)
-    ? { id: r.id, habit: d.habit, date: d.date, done: Array.isArray(d.done) ? d.done.filter(nn) : [], slip: d.slip === true, resist: nn(d.resist) ? d.resist : 0, count: nn(d.count) ? d.count : 0 } : null;
+    ? { id: r.id, habit: d.habit, date: d.date, done: Array.isArray(d.done) ? d.done.filter(nn) : [], slip: d.slip === true, resist: nn(d.resist) ? d.resist : 0, count: amount(d.count) } : null;
   return null;
 }
 const toRow = (k, e) => {
@@ -147,5 +165,5 @@ function mergePull(S, rows) {
   return next;
 }
 
-const JO = { addDays, daysBetween, stepCount, logOf, dayStatus, runs, rate, goalProgress, todayTask, monthStats, weekday, dayPoints, profileStats, fightDays, RESIST, SLIP, pickMsg, APP_OF, fromRow, toRow, mergePull };
+const JO = { weekday, dayPoints, profileStats, goalOverview, scheduled, goalMetric, addDays, daysBetween, stepCount, logOf, dayStatus, runs, rate, goalProgress, todayTask, monthStats, fightDays, RESIST, SLIP, pickMsg, APP_OF, fromRow, toRow, mergePull };
 if (typeof module !== "undefined") module.exports = JO;

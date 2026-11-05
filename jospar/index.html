@@ -2,8 +2,7 @@
 <html lang="kk" data-app="jospar">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<script>addEventListener('gesturestart', e => e.preventDefault()); // iOS Safari user-scalable=no-ды елемейді: екі саусақпен үлкейтуді тоқтатамыз</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Jospar</title>
 <meta name="theme-color" content="#c2410c">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,6 +14,7 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<header class="app-header"><a class="app-brand" href="../"><img src="../brand/logos/jospar.svg" alt="" width="30" height="30">Jospar</a><button id="quick-add" class="primary" aria-label="Жаңа жазба қосу">+ Қосу</button></header>
 <main id="view"></main>
 <div id="toast" role="status" aria-live="polite" hidden></div>
 <nav id="nav" aria-label="Негізгі мәзір"></nav>
