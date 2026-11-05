@@ -220,6 +220,8 @@ test("Төлемгер: бекітілген күндік цикл өзгерм�
   assert.equal(c.avgAll, 1100);
   assert.equal(c.avgRecent, 1125);
   assert.equal(c.suggestedEvery, 33); // соңғы үш аралық: 19, 40, 40 күн
+  assert.equal(FS.payerStats(c, items, 2).avgRecent, 1200); // X тек негізгі орташа сомаға әсер етеді
+  assert.equal(FS.payerStats(c, items, 2).suggestedEvery, 33); // цикл ұсынысы өз терезесін сақтайды
   assert.equal(FS.nextBuy(c), "2026-06-29");
   assert.deepEqual(FS.payerState(c, "2026-06-28"), { kind: "cycle", status: "upcoming", next: "2026-06-29" });
   assert.deepEqual(FS.payerState(c, "2026-06-29"), { kind: "cycle", status: "unpaid", next: "2026-06-29" });
@@ -228,6 +230,13 @@ test("Төлемгер: бекітілген күндік цикл өзгерм�
   assert.equal(FS.nextBuy(planned), "2026-06-15");
   assert.equal(FS.payerState(planned, "2026-06-14").status, "upcoming");
   assert.equal(FS.payerState(planned, "2026-06-15").status, "unpaid");
+});
+
+test("Төлемгер баптаулары серверге және кері сақталады", () => {
+  const s = { capital: 1, income: 2, fixed: 3, city: "Алматы", payerRecentCount: 2, payerReminderDays: 5, payerAutoLink: false };
+  const row = FS.toRow("settings", s, "settings-1");
+  const restored = FS.fromRow({ ...row, created_at: "2026-10-01T00:00:00Z" });
+  assert.deepEqual(restored.item, s);
 });
 
 test("чек: дүкен атауы арқылы Төлемгерді автоматты байланыстырады, бір чек бірнеше Төлемгерге бөлінеді", () => {
