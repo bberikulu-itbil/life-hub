@@ -143,7 +143,7 @@ const timeLabel = (hb) => {
 const dot = (cls, on) => h("span", { class: "dot " + (cls || "") }, on && ic(cls === "slip" ? "x" : "check"));
 const main = (name, sub) => h("span", { class: "main" }, h("b", {}, name), sub && h("small", { class: "muted" }, sub));
 
-function openHabit(hb) { selectedTask=""; habitOrigin = tab; selectedHabit = hb.id; habitDate = today(); render(); scrollTo(0, 0); }
+function openHabit(hb) { selectedTask=""; habitOrigin = tab; selectedHabit = hb.id; habitDate = today(); render(); document.getElementById("view").scrollTop = 0; }
 function closeHabit() { selectedHabit = ""; habitDate = ""; tab = habitOrigin; render(); }
 function dayRow(hb, detail = false) {
   const t = selectedDay(), l = JO.logOf(S, hb.id, t), st = JO.dayStatus(hb, l), r = JO.runs(S, hb, t), tl = timeLabel(hb);
@@ -302,7 +302,7 @@ function taskLine(t) {
     h("button",{class:"line",onclick:()=>openTask(t),"aria-label":`${t.title}: ашу`},main(t.title,sub),ic("chevron")),
     late(t) && h("button",{class:"ghost",onclick:()=>ask("Қайта жоспарлау",[{name:"due",label:"Жаңа күн",type:"date",value:today()}],v=>{put("tasks",{...t,due:v.due});save();})},"Күнін ауыстыру"));
 }
-function openTask(t) {taskOrigin=tab;selectedHabit="";selectedTask=t.id;render();scrollTo(0,0);}
+function openTask(t) {taskOrigin=tab;selectedHabit="";selectedTask=t.id;render();document.getElementById("view").scrollTop = 0;}
 function updateSubtasks(id,fn) {
   const t=S.tasks.find(t=>t.id===id);if(!t)return;
   const subtasks=(t.subtasks || []).map(s=>({...s}));
@@ -462,7 +462,7 @@ function plusMenu() {
 
 const PAGES = { habits: habitsPage, home, tasks: tasksPage, goals: goalsPage, profile: profilePage };
 const NAV = [["home", "Жоспаргер", "home"], ["tasks", "Қоржын", "tasks"], ["+"], ["goals", "Мақсат", "target"], ["profile", "Профиль", "user"]];
-const go = (t) => { selectedTask = ""; selectedHabit = ""; habitDate = ""; tab = t; render(); scrollTo(0, 0); };
+const go = (t) => { selectedTask = ""; selectedHabit = ""; habitDate = ""; tab = t; render(); document.getElementById("view").scrollTop = 0; };
 
 function render() {
   if (Sync.busy === false && !S.pending.length) checkpoint = JSON.stringify(Object.fromEntries(LISTS.map(k => [k,S[k]])));
