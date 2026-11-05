@@ -11,7 +11,7 @@ const addDays = (s, n) => dstr(dnum(s) + n);
 const daysBetween = (a, b) => dnum(b) - dnum(a);
 const KINDS = ["good", "bad", "neutral"];
 
-const scheduled = (h, date) => date >= h.created && (!h.days?.length || h.days.includes(new Date(date + "T12:00:00Z").getUTCDay()));
+const scheduled = (h, date) => date >= h.created && !(h.breaks || []).some(b => date >= b.start && (!b.end || date < b.end)) && (!h.days?.length || h.days.includes(new Date(date + "T12:00:00Z").getUTCDay()));
 const goalMetric = (g) => ({ current: Math.max(0, Number(g.current) || 0), target: Math.max(0, Number(g.target) || 0) });
 const amount = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0;
 const stepCount = (h) => Math.max(1, h.steps.length); // пунктсіз жақсы әдет — бір «пункт»
@@ -19,7 +19,7 @@ const logOf = (S, id, date) => S.logs.find((l) => l.habit === id && l.date === d
 
 // Жақсы: барлық пункт белгіленсе орындалды. Жаман: сүрінбесе — автоматты орындалды. Бейтарап: бақылау ғана.
 function dayStatus(h, log) {
-  if (h.kind === "good") { const d = new Set(log?.done); const stepsDone = !h.steps.length || h.steps.every((_, i) => d.has(i)); return (h.target > 0 ? amount(log?.count) >= h.target && stepsDone : Array.from({ length: stepCount(h) }, (_, i) => d.has(i)).every(Boolean)) ? "done" : "todo"; }
+  if (h.kind === "good") { const d = new Set(log?.done); const stepsDone = (!h.steps.length || h.steps.every((_, i) => d.has(i))) && (h.measures || []).every(step => amount(log?.values?.[step.id]) >= step.target); return (h.target > 0 ? amount(log?.count) >= h.target && stepsDone : (h.steps.length || h.measures?.length ? stepsDone : d.has(0))) ? "done" : "todo"; }
   if (h.kind === "bad") return log?.slip ? "slip" : "done";
   return "tally";
 }
@@ -121,6 +121,39 @@ function pickMsg(list, vars, last = -1, rand = Math.random) {
   return { i, text: fill(list[i], vars) };
 }
 
+
+// Өлшенетін қадамдар: секунд, рет немесе еркін өлшем; нәтиже межемен шектелмейді.
+function measuresOf(value) {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set();
+  return value.filter(x => x && typeof x.id === "string" && x.id && !ids.has(x.id) && ids.add(x.id) && typeof x.name === "string" && x.name.trim() && ["timer", "counter"].includes(x.mode) && Number.isFinite(x.target) && x.target > 0).map(x => ({ id:x.id, name:x.name.trim(), mode:x.mode, target:x.target, unit:x.mode === "timer" ? "сек" : typeof x.unit === "string" ? x.unit : "рет", increment:Number.isFinite(x.increment) && x.increment > 0 ? x.increment : 1 }));
+}
+function periodComparison(S, today, weekStart = 1) {
+  const day = new Date(today + "T12:00:00Z").getUTCDay(), offset = (day - weekStart + 7) % 7;
+  const week = addDays(today, -offset), month = today.slice(0,8) + "01";
+  const prevEnd = addDays(month, -1), prevMonth = prevEnd.slice(0,8) + "01";
+  const sum = (from, to) => { let n=0; for(let d=from; d<=to; d=addDays(d,1)) n+=dayPoints(S,d,today); return n; };
+  const elapsed = daysBetween(month,today);
+  return { week:sum(week,today), previousWeek:sum(addDays(week,-7),addDays(today,-7)), month:sum(month,today), previousMonth:sum(prevMonth, addDays(prevMonth, Math.min(elapsed,daysBetween(prevMonth,prevEnd)))) };
+}
+function restoreEntries(data) {
+  if (!data || data.version !== 1) throw new Error("Сақтық көшірме нұсқасы танылмады.");
+  const result = {}, allIds = new Set(), logKeys = new Set();
+  for(const k of Object.keys(APP_OF)) {
+    if(!Array.isArray(data[k])) throw new Error("Сақтық көшірме толық емес.");
+    result[k] = data[k].map(e => {
+      if(!e || typeof e.id !== "string" || !e.id || allIds.has(e.id)) throw new Error("Жазба нөмірі жарамсыз немесе қайталанған.");
+      allIds.add(e.id);
+      const decoded = fromRow(toRow(k,e));
+      if(!decoded) throw new Error("Сақтық көшірмеде жарамсыз жазба бар.");
+      if(k === "logs") { const key = decoded.habit + ":" + decoded.date; if(logKeys.has(key)) throw new Error("Бір күнге екі жазба бар."); logKeys.add(key); }
+      return decoded;
+    });
+  }
+  const habits = new Set(result.habits.map(h => h.id)), goals = new Set(result.goals.map(g => g.id));
+  if(result.logs.some(l => !habits.has(l.habit)) || [...result.habits,...result.tasks].some(e => e.goal && !goals.has(e.goal))) throw new Error("Жазбалар арасындағы байланыс толық емес.");
+  return result;
+}
 // ---- Supabase `items` ↔ жергілікті күй ----
 const APP_OF = { habits: "jo_habit", logs: "jo_log", tasks: "jo_task", goals: "jo_goal" };
 const KEY_OF = Object.fromEntries(Object.entries(APP_OF).map(([k, a]) => [a, k]));
@@ -133,12 +166,19 @@ const nn = (v) => Number.isInteger(v) && v >= 0;
 function fromRow(r) {
   const k = KEY_OF[r.app], d = r.data || {};
   if (k === "habits") return typeof d.name === "string" && d.name.trim() && KINDS.includes(d.kind) && DATE.test(d.created)
-    ? { id: r.id, name: d.name, kind: d.kind, steps: Array.isArray(d.steps) ? d.steps.filter((s) => typeof s === "string") : [], time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, w: wt(d.w), created: d.created, ...(Array.isArray(d.days) ? { days: [...new Set(d.days.filter((n) => Number.isInteger(n) && n >= 0 && n <= 6))] } : {}), ...(typeof d.goal === "string" ? { goal: d.goal } : {}), ...(d.target !== undefined ? { target: amount(d.target), unit: typeof d.unit === "string" ? d.unit : "" } : {}) } : null;
+    ? { id: r.id, name: d.name, kind: d.kind, steps: Array.isArray(d.steps) ? d.steps.filter((s) => typeof s === "string") : [], time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, w: wt(d.w), created: d.created,
+      ...(Array.isArray(d.measures) ? { measures: measuresOf(d.measures) } : {}),
+      ...(Array.isArray(d.breaks) ? { breaks:d.breaks.filter(b => b && DATE.test(b.start) && (!b.end || DATE.test(b.end))).map(b => ({start:b.start,end:b.end || ""})) } : {}),
+      ...(d.state === "paused" || d.state === "archived" ? {state:d.state} : {}),
+      ...(Array.isArray(d.days) ? { days: [...new Set(d.days.filter((n) => Number.isInteger(n) && n >= 0 && n <= 6))] } : {}), ...(typeof d.goal === "string" ? { goal: d.goal } : {}), ...(d.target !== undefined ? { target: amount(d.target), unit: typeof d.unit === "string" ? d.unit : "" } : {}) } : null;
   if (k === "tasks") return text(d.title)
-    ? { id: r.id, title: d.title, goal: typeof d.goal === "string" ? d.goal : "", due: DATE.test(d.due) ? d.due : "", time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, w: wt(d.w), done: r.done === true, doneAt: r.done === true && DATE.test(d.doneAt) ? d.doneAt : "" } : null;
-  if (k === "goals") return text(d.title) && DATE.test(d.deadline) ? { id: r.id, title: d.title, why: typeof d.why === "string" ? d.why : "", deadline: d.deadline, ...(d.target !== undefined || d.current !== undefined ? goalMetric(d) : {}), ...(typeof d.unit === "string" ? { unit: d.unit } : {}) } : null;
+    ? { id: r.id, title: d.title, goal: typeof d.goal === "string" ? d.goal : "", due: DATE.test(d.due) ? d.due : "", time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, w: wt(d.w), ...(d.milestone === true ? {milestone:true} : {}), done: r.done === true, doneAt: r.done === true && DATE.test(d.doneAt) ? d.doneAt : "" } : null;
+  if (k === "goals") return text(d.title) && DATE.test(d.deadline) ? { id: r.id, title: d.title, why: typeof d.why === "string" ? d.why : "", deadline: d.deadline, ...(Array.isArray(d.history) ? {history:d.history.filter(e => e && DATE.test(e.date) && Number.isFinite(e.current)).map(e => ({date:e.date,current:amount(e.current)}))} : {}), ...(d.target !== undefined || d.current !== undefined ? goalMetric(d) : {}), ...(typeof d.unit === "string" ? { unit: d.unit } : {}) } : null;
   if (k === "logs") return typeof d.habit === "string" && DATE.test(d.date)
-    ? { id: r.id, habit: d.habit, date: d.date, done: Array.isArray(d.done) ? d.done.filter(nn) : [], slip: d.slip === true, resist: nn(d.resist) ? d.resist : 0, count: amount(d.count) } : null;
+    ? { id: r.id, habit: d.habit, date: d.date, done: Array.isArray(d.done) ? d.done.filter(nn) : [], slip: d.slip === true, resist: nn(d.resist) ? d.resist : 0, count: amount(d.count),
+      ...(d.values && typeof d.values === "object" && !Array.isArray(d.values) ? {values:Object.fromEntries(Object.entries(d.values).filter(([k,v]) => !["__proto__","constructor","prototype"].includes(k) && Number.isFinite(v) && v >= 0))} : {}),
+      ...(d.focusSeconds !== undefined ? {focusSeconds:amount(d.focusSeconds)} : {}),
+      ...(typeof d.note === "string" ? {note:d.note} : {}), ...(typeof d.reason === "string" ? {reason:d.reason} : {}) } : null;
   return null;
 }
 const toRow = (k, e) => {
@@ -165,5 +205,5 @@ function mergePull(S, rows) {
   return next;
 }
 
-const JO = { weekday, dayPoints, profileStats, goalOverview, scheduled, goalMetric, addDays, daysBetween, stepCount, logOf, dayStatus, runs, rate, goalProgress, todayTask, monthStats, fightDays, RESIST, SLIP, pickMsg, APP_OF, fromRow, toRow, mergePull };
+const JO = { measuresOf, periodComparison, restoreEntries, weekday, dayPoints, profileStats, goalOverview, scheduled, goalMetric, addDays, daysBetween, stepCount, logOf, dayStatus, runs, rate, goalProgress, todayTask, monthStats, fightDays, RESIST, SLIP, pickMsg, APP_OF, fromRow, toRow, mergePull };
 if (typeof module !== "undefined") module.exports = JO;

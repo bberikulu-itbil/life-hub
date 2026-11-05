@@ -24,13 +24,22 @@ const ICONS = {
   heart: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
 };
 
-let S = structuredClone(DEF), tab = "home", habitDate = "", basketTab = "tasks", selectedHabit = "";
+let S = structuredClone(DEF), tab = "home", habitDate = "", basketTab = "tasks", selectedHabit = "", habitOrigin = "home";
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch { /* бұзылған жазба — бос күйден бастаймыз */ }
 if (!S.synced) S.pending = []; // алғашқы синхронда барлығы қайта кезекке қойылады
 
-const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+let preferences = { name:"", avatar:"🌱", timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Qostanay", weekStart:1 };
+try { Object.assign(preferences, JSON.parse(localStorage.getItem("jospar.preferences") || "{}")); new Intl.DateTimeFormat("en", {timeZone:preferences.timeZone}).format(); } catch { preferences.timeZone = "Asia/Qostanay"; }
+preferences.name = typeof preferences.name === "string" ? preferences.name : "";
+preferences.avatar = typeof preferences.avatar === "string" ? preferences.avatar : "🌱";
+preferences.weekStart = preferences.weekStart === 0 ? 0 : 1;
+const dateParts = () => new Intl.DateTimeFormat("en-CA", {timeZone:preferences.timeZone, year:"numeric", month:"2-digit", day:"2-digit"}).formatToParts(new Date()).reduce((p,x) => (p[x.type]=x.value,p), {});
+const localDate = dateParts;
+// Күн барлық бетте профильдің уақыт белдеуімен бірдей есептеледі.
+const today = () => { const p = localDate(); return `${p.year}-${p.month}-${p.day}`; };
 const persist = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { alert("Сақталмады: браузер жадына жазу мүмкін емес."); } };
-const save = () => { persist(); render(); Sync.schedule(); };
+let undoState = null, checkpoint = JSON.stringify(Object.fromEntries(LISTS.map(k => [k,S[k]])));
+const save = () => { undoState = JSON.parse(checkpoint); persist(); checkpoint = JSON.stringify(Object.fromEntries(LISTS.map(k => [k,S[k]]))); render(); Sync.schedule(); };
 
 // Әр өзгеріс кезекке түседі (бұлтқа жіберу үшін); n — кезектегі жазбаның бірегей нөмірі
 let seq = Date.now();
@@ -83,14 +92,14 @@ function ask(title, fields, ok, onDel) {
   form.append(h("div", { class: "end" },
     onDel && h("button", { type: "button", class: "ghost danger", onclick: () => { dlg.close(); onDel(); } }, "Өшіру"),
     h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"), h("button", { class: "primary" }, "Сақтау")));
-  form.addEventListener("submit", () => ok(Object.fromEntries(new FormData(form))));
+  form.addEventListener("submit", e => { e.preventDefault(); if(ok(Object.fromEntries(new FormData(form))) !== false) dlg.close(); });
   dlg.addEventListener("close", () => dlg.remove());
   document.body.append(dlg);
   dlg.showModal();
 }
 
 /* ---------- әрекеттер ---------- */
-const selectedDay = () => tab === "tasks" && selectedHabit && habitDate ? habitDate : today();
+const selectedDay = () => selectedHabit && habitDate ? habitDate : today();
 const dayLog = (hb) => JO.logOf(S, hb.id, selectedDay()) ?? { id: crypto.randomUUID(), habit: hb.id, date: selectedDay(), done: [], slip: false, resist: 0, count: 0 };
 function edit(hb, fn) { const l = dayLog(hb); fn(l); put("logs", l); save(); return l; }
 
@@ -121,9 +130,19 @@ const timeLabel = (hb) => {
 const dot = (cls, on) => h("span", { class: "dot " + (cls || "") }, on && ic(cls === "slip" ? "x" : "check"));
 const main = (name, sub) => h("span", { class: "main" }, h("b", {}, name), sub && h("small", { class: "muted" }, sub));
 
-function dayRow(hb) {
+function openHabit(hb) { habitOrigin = tab; selectedHabit = hb.id; habitDate = today(); render(); scrollTo(0, 0); }
+function closeHabit() { selectedHabit = ""; habitDate = ""; tab = habitOrigin; render(); }
+function dayRow(hb, detail = false) {
   const t = selectedDay(), l = JO.logOf(S, hb.id, t), st = JO.dayStatus(hb, l), r = JO.runs(S, hb, t), tl = timeLabel(hb);
+  if (!detail) {
+    const sub = [hb.measures?.length ? `${hb.measures.filter(step => (l?.values?.[step.id] || 0) >= step.target).length}/${hb.measures.length} қадам` : hb.target > 0 ? `${l?.count || 0} / ${hb.target} ${hb.unit || ""}` : hb.kind === "bad" ? (l?.slip ? "Сүрінді" : "Бақылауда") : st === "done" ? "Орындалды" : "Орындау керек", r.cur ? `${r.cur} күн қатарынан` : ""].filter(Boolean).join(" · ");
+    return h("div", { class: "habit" }, tl && h("div", { class: "when" }, tl),
+      h("button", { class: "line", onclick: () => openHabit(hb), "aria-label": `${hb.name}: ашу` }, dot(st === "done" && hb.kind === "good" ? "on" : "", st === "done" && hb.kind === "good"), main(hb.name, sub), ic("chevron")));
+  }
   let body;
+  if (hb.kind === "good" && hb.measures?.length) return h("div", {class:"measured-habit"}, ...hb.measures.map(step => measureRow(hb,step,t)),
+    ...hb.steps.map((step,i) => h("button", {class:"step", "aria-pressed":l?.done?.includes(i) || false, onclick:() => toggleStep(hb,i)}, dot(l?.done?.includes(i) ? "on" : "",l?.done?.includes(i)),step)),
+    hb.target > 0 && h("button", {onclick:() => ask("Жалпы нәтиже", [{name:"count",label:`${hb.target} ${hb.unit || ""}`,type:"number",min:0,value:l?.count || 0}],v => edit(hb,log => {log.count=Number(v.count);} ))}, `${l?.count || 0}/${hb.target} ${hb.unit || ""}`));
   if (hb.kind === "good" && hb.target > 0) {
     const value = l?.count || 0, d = new Set(l?.done);
     body = [h("div", { class: "line" }, dot(st === "done" ? "on" : "", st === "done"), main(hb.name, `${value} / ${hb.target} ${hb.unit || ""}`)),
@@ -163,7 +182,7 @@ function dayTask(t) {
 }
 
 function home() {
-  const t = today(), d = new Date(), goods = S.habits.filter((x) => x.kind === "good" && JO.scheduled(x, t)), tasks = S.tasks.filter((x) => JO.todayTask(x, t));
+  const t = today(), d = new Date(t + "T12:00:00"), goods = S.habits.filter((x) => x.kind === "good" && JO.scheduled(x, t)), tasks = S.tasks.filter((x) => JO.todayTask(x, t));
   const done = goods.filter((x) => JO.dayStatus(x, JO.logOf(S, x.id, t)) === "done").length + tasks.filter((x) => x.done).length, total = goods.length + tasks.length;
   const rows = [...S.habits.filter((x) => JO.scheduled(x, t)).map((x) => ({ time: x.time, name: x.name, el: dayRow(x) })), ...tasks.map((x) => ({ time: late(x) ? "" : x.time, name: x.title, late: late(x), el: dayTask(x) }))]
     .sort((a, b) => (a.time || "99").localeCompare(b.time || "99") || !a.late - !b.late || a.name.localeCompare(b.name));
@@ -186,7 +205,7 @@ function habitForm(hb) {
     { name: "target", label: "Күндік сандық меже (0 — белгімен бақылау)", type: "number", optional: true, min: 0, value: hb?.target || "" },
     { name: "current", label: "Бүгінгі нәтиже", type: "number", optional: true, min: 0, value: hb?.id ? JO.logOf(S, hb.id, today())?.count || "" : "" },
     { name: "unit", label: "Өлшем бірлігі: минут, бет, км, рет…", optional: true, value: hb?.unit },
-    { name: "steps", label: "Ішкі пункттер: әр жолға біреу (тек жақсы әдетке)", type: "textarea", value: hb?.steps?.join("\n") },
+    { name: "steps", label: "Қарапайым қадамдар: әр жолға біреу. Таймер мен санақты әдет ішіндегі «Қадам қосу» арқылы қосыңыз", type: "textarea", value: hb?.steps?.join("\n") },
     { name: "days", label: "Қай күндері қайталанады?", type: "weekdays", value: hb?.days },
     { name: "goal", label: "Қай мақсатқа көмектеседі?", options: [["", "Мақсатсыз"], ...S.goals.map((g) => [g.id, g.title])], value: hb?.goal || "" },
     { name: "time", label: "Басталу уақыты", type: "time", optional: true, value: hb?.time },
@@ -194,13 +213,14 @@ function habitForm(hb) {
     { name: "w", label: "Салмағы · профильдегі ұпайға әсері", options: WEIGHTS, value: String(hb?.w ?? 1) },
   ], (v) => {
     const id = hb?.id ?? crypto.randomUUID();
-    put("habits", { id, target: Math.max(0, Number(v.target) || 0), unit: v.unit.trim(), name: v.name.trim(), kind: v.kind, steps: v.kind === "good" ? v.steps.split("\n").map((s) => s.trim()).filter(Boolean) : [],
+    put("habits", { ...hb, id, target: Math.max(0, Number(v.target) || 0), unit:v.unit.trim(), name:v.name.trim(), kind:v.kind, steps: v.kind === "good" ? v.steps.split("\n").map((s) => s.trim()).filter(Boolean) : [],
       days: [...new Set(v.days.split(/[,\s]+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6))], goal: v.goal || "", time: v.time || "", dur: Math.round(Number(v.dur)) || 0, w: Number(v.w), created: hb?.created ?? today() });
     const log = JO.logOf(S, id, today()) || { id: crypto.randomUUID(), habit: id, date: today(), done: [], slip: false, resist: 0, count: 0 };
     if (Number(v.current) !== log.count) { log.count = Math.max(0, Number(v.current) || 0); put("logs", log); }
     save();
   }, hb?.id && (() => {
     if (!confirm(`«${hb.name}» және оның тарихы өшіріледі. Жалғастыру ма?`)) return;
+    if(runningTimer?.habit === hb.id) stopTimer();
     S.logs.filter((l) => l.habit === hb.id).forEach((l) => rm("logs", l.id));
     rm("habits", hb.id); save();
   }));
@@ -211,7 +231,7 @@ function habitRow(hb) {
   const sub = hb.kind === "good" ? `Серия: ${r.cur} · ең ұзақ: ${r.best}` + (hb.steps.length ? ` · ${hb.steps.length} пункт` : "")
     : hb.kind === "bad" ? `Серия: ${r.cur} · ең ұзақ: ${r.best} · күрес күндері: ${JO.fightDays(S, hb)}`
     : `Осы айда: ${S.logs.filter((l) => l.habit === hb.id && l.date.startsWith(month)).reduce((t, l) => t + l.count, 0)}`;
-  return h("div", { class: "row" }, h("button", { class: "line", onclick: () => { selectedHabit = hb.id; habitDate = today(); tab = "tasks"; render(); } }, main(hb.name, [timeLabel(hb), sub, hb.target > 0 && `${hb.target} ${hb.unit || ""} / күн`].filter(Boolean).join(" · "))),
+  return h("div", { class: "row" }, h("button", { class: "line", onclick: () => { openHabit(hb); } }, main(hb.name, [timeLabel(hb), sub, hb.target > 0 && `${hb.target} ${hb.unit || ""} / күн`].filter(Boolean).join(" · "))),
     h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${hb.name}`, onclick: () => habitForm(hb) }, ic("edit")));
 }
 
@@ -224,7 +244,7 @@ function habitsPage() {
   return [h("div", { class: "page-heading" }, h("div", {}, h("h1", {}, "Әдеттер"), h("p", { class: "muted sub" }, "Кішкентай әрекет. Күн сайынғы ілгерілеу.")), h("button", { class: "primary", onclick: () => habitForm() }, ic("plus"), "Әдет қосу")),
     sec("Күнделік", h("div", { class: "date-toolbar" }, h("button", { "aria-label": "Алдыңғы күн", onclick: () => { habitDate = JO.addDays(date, -1); render(); } }, "←"), h("input", { type: "date", value: date, max: t, "aria-label": "Әдеттер күні", onchange: (e) => { if (e.target.value && e.target.value <= t) { habitDate = e.target.value; render(); } } }), h("button", { disabled: date >= t, "aria-label": "Келесі күн", onclick: () => { habitDate = JO.addDays(date, 1); render(); } }, "→"), h("button", { class: "ghost", onclick: () => { habitDate = t; render(); } }, "Бүгін")),
       h("p", { class: "num" }, `${done}/${good.length} жақсы әдет орындалды`), good.length > 0 && bar(Math.round(done / good.length * 100)),
-      ...active.map(dayRow), !active.length && empty("Бұл күнге жоспарланған әдет жоқ.")),
+      ...active.map(hb => dayRow(hb)), !active.length && empty("Бұл күнге жоспарланған әдет жоқ.")),
     sec("Менің әдеттерім", h("p", { class: "muted calendar-hint" }, "Соңғы 28 күн · күнді басып, жазбаны өзгертіңіз"),
       ...S.habits.filter(hb => !selectedHabit || hb.id === selectedHabit).map((hb) => {
         const rate = JO.rate(S, hb, t), run = JO.runs(S, hb, t);
@@ -249,7 +269,7 @@ function taskForm(t) {
     { name: "dur", label: "Ұзақтығы, минут", type: "number", optional: true, min: 0, step: 1, value: t?.dur || "" },
     { name: "w", label: "Салмағы · профильдегі ұпайға әсері", options: WEIGHTS, value: String(t?.w ?? 1) },
   ], (v) => {
-    put("tasks", { id: t?.id ?? crypto.randomUUID(), title: v.title.trim(), goal: v.goal || "", due: v.due || "", time: v.time || "", dur: Math.round(Number(v.dur)) || 0, w: Number(v.w), done: t?.done ?? false, doneAt: t?.doneAt ?? "" });
+    put("tasks", { ...t, id: t?.id ?? crypto.randomUUID(), title: v.title.trim(), goal: v.goal || "", due: v.due || "", time: v.time || "", dur: Math.round(Number(v.dur)) || 0, w: Number(v.w), done: t?.done ?? false, doneAt: t?.doneAt ?? "" });
     save();
   }, t?.id && (() => { if (!confirm(`«${t.title}» өшіру ме?`)) return; rm("tasks", t.id); save(); }));
 }
@@ -257,6 +277,7 @@ function taskForm(t) {
 function taskLine(t) {
   const sub = [t.due && (late(t) ? `Мерзімі өтті: ${dshort(t.due)}` : dshort(t.due)), timeLabel(t), goalName(t)].filter(Boolean).join(" · ");
   return h("div", { class: "row" }, h("button", { class: "line", "aria-pressed": t.done, onclick: () => toggleTask(t) }, dot(t.done ? "on" : "", t.done), main(t.title, sub)),
+    late(t) && h("button", {class:"ghost",onclick:() => ask("Қайта жоспарлау",[{name:"due",label:"Жаңа күн",type:"date",value:today()}],v=>{put("tasks",{...t,due:v.due});save();})},"Күнін ауыстыру"),
     h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${t.title}`, onclick: () => taskForm(t) }, ic("edit")));
 }
 
@@ -291,18 +312,27 @@ function habitPage(hb) {
 function tasksPage() {
   if (selectedHabit) {
     const hb = S.habits.find(x => x.id === selectedHabit);
-    if (hb) return [h("button", { class: "ghost", onclick: () => { selectedHabit = ""; render(); } }, "← Қоржынға"),
+    if (hb) return [h("button", { class: "ghost", onclick: closeHabit }, "← Артқа"),
       h("div", { class: "page-heading" }, h("h1", {}, hb.name), h("button", { onclick: () => habitForm(hb) }, ic("edit"), "Өңдеу")),
-      sec("Күндік нәтиже", h("input", { type: "date", value: habitDate || today(), min: hb.created, max: today(), "aria-label": "Жазба күні", onchange: e => { if (e.target.value >= hb.created && e.target.value <= today()) { habitDate = e.target.value; render(); } } }), dayRow(hb)),
+      sec("Күндік нәтиже", h("input", { type: "date", value: habitDate || today(), min: hb.created, max: today(), "aria-label": "Жазба күні", onchange: e => { if (e.target.value >= hb.created && e.target.value <= today()) { habitDate = e.target.value; render(); } } }), dayRow(hb, true)),
+      sec("Нәтижелер", h("div", { class: "metric-grid" }, ...[["Қазіргі қатар", JO.runs(S, hb, today()).cur], ["Ең ұзақ қатар", JO.runs(S, hb, today()).best], [hb.measures?.length ? "Қадам орындалды" : "30 күн жиыны", hb.measures?.length ? hb.measures.filter(step => (JO.logOf(S,hb.id,selectedDay())?.values?.[step.id] || 0) >= step.target).length + "/" + hb.measures.length : S.logs.filter(l => l.habit === hb.id && l.date >= JO.addDays(today(), -29) && l.date <= today()).reduce((n,l) => n + l.count, 0)]].map(([label,value]) => h("div", {}, h("b", { class: "num" }, value), h("small", { class: "muted" }, label))))),
+      hb.kind === "good" && sec("Қадамдар", h("p", {class:"muted"}, "Әр қадамға таймер немесе санақ таңдаңыз. Межеден артық нәтиже де сақталады."), h("button", {class:"primary",onclick:() => measureForm(hb)}, ic("plus"), "Қадам қосу")),
+      sec("Күндік жазба", h("p", {class:"muted"}, JO.logOf(S,hb.id,selectedDay())?.note || "Жазба жоқ"),
+        hb.kind === "bad" && h("p", {class:"muted"}, "Сүріну себебі: " + (JO.logOf(S,hb.id,selectedDay())?.reason || "Көрсетілмеген")),
+        h("button", {onclick:() => noteForm(hb)}, "Жазба қосу / өзгерту")),
+      sec("Фокус", h("p",{class:"muted"},`Осы күні: ${clockText(JO.logOf(S,hb.id,selectedDay())?.focusSeconds || 0)}`), h("button", {onclick:() => startTimer(hb,null,selectedDay())}, "Фокус таймерін бастау")),
+      sec("Әдетті басқару", h("p", {class:"muted"}, hb.state === "archived" ? "Архивте" : hb.state === "paused" ? "Кідіртілген" : "Белсенді"),
+        h("div", {class:"quantity-actions"}, h("button", {onclick:() => changeHabitState(hb,hb.state ? "active" : "paused")}, hb.state ? "Жалғастыру" : "Кідірту"),
+        hb.state !== "archived" && h("button", {onclick:() => changeHabitState(hb,"archived")}, "Архивтеу"))),
       ...habitsPage().slice(2)];
     selectedHabit = "";
   }
-  const open = S.tasks.filter(t => !t.done).sort((a,b) => (a.due || "9").localeCompare(b.due || "9"));
-  const done = S.tasks.filter(t => t.done).sort((a,b) => b.doneAt.localeCompare(a.doneAt));
+  const open = S.tasks.filter(t => !t.done && basketMatches(t)).sort((a,b) => (a.due || "9").localeCompare(b.due || "9"));
+  const done = S.tasks.filter(t => t.done && basketMatches(t)).sort((a,b) => b.doneAt.localeCompare(a.doneAt));
   return [h("h1", {}, "Қоржын"), h("p", { class: "muted sub" }, "Барлық тапсырмалар мен әдеттер бір жерде"),
-    h("div", { class: "segmented" }, ...[["tasks", "Тапсырмалар", S.tasks.length], ["habits", "Әдеттер", S.habits.length]].map(([id,label,count]) => h("button", { "aria-pressed": basketTab === id, onclick: () => { basketTab = id; render(); } }, `${label} · ${count}`))),
+    basketControls(), h("div", { class: "segmented" }, ...[["tasks", "Тапсырмалар", S.tasks.length], ["habits", "Әдеттер", S.habits.length]].map(([id,label,count]) => h("button", { "aria-pressed": basketTab === id, onclick: () => { basketTab = id; render(); } }, `${label} · ${count}`))),
     ...(basketTab === "tasks" ? [sec("Тапсырмалар", h("button", { class: "primary", onclick: () => taskForm() }, ic("plus"), "Тапсырма қосу"), ...open.map(taskLine), !open.length && empty("Ашық тапсырма жоқ.")),
-      done.length > 0 && sec("Орындалғандар", ...done.map(taskLine))] : [sec("Әдеттер", h("button", { class: "primary", onclick: () => habitForm() }, ic("plus"), "Әдет қосу"), ...S.habits.map(habitRow), !S.habits.length && empty("Алғашқы әдетіңізді қосыңыз."))])];
+      done.length > 0 && sec("Орындалғандар", ...done.map(taskLine))] : [sec("Әдеттер", h("button", { class: "primary", onclick: () => habitForm() }, ic("plus"), "Әдет қосу"), ...S.habits.filter(basketMatches).map(habitRow), !S.habits.length && empty("Алғашқы әдетіңізді қосыңыз."))])];
 }
 
 /* ---------- Мақсат (SMART) және аналитика ---------- */
@@ -314,7 +344,7 @@ function goalForm(g) {
     { name: "current", label: "Қазіргі нәтиже", type: "number", optional: true, value: g?.current || "", min: 0 },
     { name: "unit", label: "Өлшем бірлігі (кітап, км, сағат…)", optional: true, value: g?.unit },
     { name: "deadline", label: "Мерзімі", type: "date", value: g?.deadline },
-  ], (v) => { put("goals", { id: g?.id ?? crypto.randomUUID(), title: v.title.trim(), why: v.why.trim(), target: Math.max(0, Number(v.target) || 0), current: Math.max(0, Number(v.current) || 0), unit: v.unit.trim(), deadline: v.deadline }); save(); },
+  ], (v) => { put("goals", { ...g, history:[...(g?.history || []), {date:today(),current:Math.max(0,Number(v.current)||0)}], id: g?.id ?? crypto.randomUUID(), title: v.title.trim(), why: v.why.trim(), target: Math.max(0, Number(v.target) || 0), current: Math.max(0, Number(v.current) || 0), unit: v.unit.trim(), deadline: v.deadline }); save(); },
   g && (() => {
     if (!confirm(`«${g.title}» өшіру ме? Тапсырмалар қалады, мақсатпен байланысы үзіледі.`)) return;
     S.tasks.filter((t) => t.goal === g.id).forEach((t) => { t.goal = ""; put("tasks", t); });
@@ -336,7 +366,7 @@ function goalsPage() {
         h("p", { class: "num" }, `Әдеттер мен қадамдар: ${overview.done}/${overview.total} · ${overview.pct}%`), bar(overview.pct), metric.target > 0 && h("small", { class: "muted" }, `Сандық меже: ${Math.min(100, Math.round(metric.current / metric.target * 100))}%`),
         linked.length > 0 && h("small", { class: "muted" }, "Көмектесетін әдеттер: " + linked.map((hb) => hb.name).join(", ")),
         h("details", { class: "goal-contents" }, h("summary", {}, `Ішкі әдеттер (${linked.length}) және қадамдар (${p.total})`),
-          ...linked.map(habitRow), ...S.tasks.filter(task => task.goal === g.id).map(taskLine),
+          goalExtras(g), ...linked.map(habitRow), ...S.tasks.filter(task => task.goal === g.id).map(taskLine),
           h("div", { class: "quantity-actions" }, h("button", { onclick: () => habitForm({ goal: g.id }) }, ic("repeat"), "Әдет қосу"),
           h("button", { onclick: () => taskForm({ goal: g.id, due: today() }) }, ic("plus"), "Қадам қосу")))),
         h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${g.title}`, onclick: () => goalForm(g) }, ic("edit")));
@@ -347,13 +377,21 @@ function goalsPage() {
 
 /* ---------- Профиль ---------- */
 const CLOUD = { local: "Бұлт өшік: Hub-қа кіріп, осы бетті қайта аш", ok: "Бұлтпен синхрондалды", wait: "Бұлтқа жіберуге күтіп тұр", err: "Бұлт қатесі" };
+function exportBackup() {
+  const blob = new Blob([JSON.stringify({ version: 1, preferences, exportedAt: new Date().toISOString(), habits: S.habits, logs: S.logs, tasks: S.tasks, goals: S.goals }, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob), a = h("a", { href: url, download: `jospar-${today()}.json` });
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 function profilePage() {
   const t = today(), ms = JO.monthStats(S, t), rated = S.habits.filter(x => x.kind !== "neutral"), stat = (k,v) => h("div", { class: "row" }, h("span", {}, k), h("b", { class: "num" }, v));
   // «ok» ескіруі мүмкін: кейін жазба қосылса не желі жоқ болса, кезекте күтіп тұр. Кіргенбіз, бірақ желі жоқ — «local» емес
   const state = (Sync.state === "local" && S.synced) || (Sync.state === "ok" && S.pending.length) ? "wait" : Sync.state;
   const row = (k, v) => h("div", { class: "row" }, h("span", {}, k), h("b", { class: "num" }, v)), st = JO.profileStats(S, today());
+  const activity = Array.from({length:90},(_,i) => { const date=JO.addDays(today(),i-89); return {date,p:JO.dayPoints(S,date,today())}; }), activityMax = Math.max(0,...activity.map(x => x.p));
   return [
     h("h1", {}, "Профиль"), h("p", { class: "muted sub" }, "Аналитика, нәтижелер және деректер"),
+    sec("Менің профилім", h("div", {class:"profile-identity"}, h("span", {class:"avatar", "aria-hidden":"true"}, preferences.avatar), h("div",{},h("b",{},preferences.name || "Есіміңізді қосыңыз"),h("p",{class:"muted"},`${preferences.timeZone} · Апта: ${preferences.weekStart === 0 ? "жексенбі" : "дүйсенбі"}`))), h("button",{onclick:profileForm},"Профильді өзгерту")),
+    comparisonPanel(),
     sec("Осы ай", stat("Орындалған тапсырма", ms.tasksDone), stat("Жақсы әдеттердің орындалуы", ms.goodPct == null ? "—" : `${ms.goodPct}%`), stat("Күрес күндері", ms.fights), stat("Сүрінген күндер", ms.slips)),
     rated.length > 0 && sec("Әдеттер · соңғы 30 күн", ...rated.map((x) => {
       const r = JO.rate(S, x, t), s = JO.runs(S, x, t), p = r.total ? Math.round(r.done / r.total * 100) : null;
@@ -361,8 +399,10 @@ function profilePage() {
     })),
     sec("Бұлт", h("p", { class: "muted" }, CLOUD[state] + (state === "wait" ? `: ${S.pending.length}` : "") + (state === "err" ? `: ${Sync.error}` : "")),
       h("div", { class: "end", style: "margin-top:0;justify-content:flex-start" }, state === "local" ? h("a", { class: "btn", href: "../" }, "Hub-қа кіру") : h("button", { onclick: () => Sync.now() }, "Қазір синхрондау"))),
-    sec("Белсенділік · соңғы 13 апта", h("div", { class: "heat", role: "img", "aria-label": "Күн сайынғы ұпай картасы" }, st.days.map((x) => h("i", { "data-l": st.max ? Math.ceil(x.p / st.max * 4) : 0, title: `${dshort(x.date)}: ${x.p}` }))),
-      row("Осы апта · ұпай", st.week), row("Осы ай · ұпай", st.month), row("Белсенді күндер қатары", st.cur), row("Ең ұзақ қатар", st.best)),
+    sec("Белсенділік · соңғы 90 күн", h("div", { class: "heat", role: "img", "aria-label": "Күн сайынғы ұпай картасы" }, activity.map((x) => h("i", { "data-l": activityMax ? Math.ceil(x.p / activityMax * 4) : 0, title: `${dshort(x.date)}: ${x.p}` }))),
+      row("Осы апта · ұпай", JO.periodComparison(S,today(),preferences.weekStart).week), row("Осы ай · ұпай", st.month), row("Белсенді күндер қатары", st.cur), row("Ең ұзақ қатар", st.best)),
+    sec("Деректерді сақтау", h("p", { class: "muted" }, "Әдеттер, мақсаттар және барлық белгілерді файлға сақтаңыз."), h("div",{class:"quantity-actions"},h("button", { onclick: exportBackup }, "Сақтық көшірмені жүктеу"),h("button",{onclick:importBackup},"Көшірмеден қалпына келтіру"))),
+    sec("Басқару", h("button", {disabled:!undoState,onclick:undoLast},"Соңғы әрекетті қайтару")),
     sec("Жазбалар", row("Әдеттер", S.habits.length), row("Тапсырмалар", S.tasks.length), row("Мақсаттар", S.goals.length)),
   ];
 }
@@ -381,12 +421,142 @@ const NAV = [["home", "Жоспаргер", "home"], ["tasks", "Қоржын", "
 const go = (t) => { selectedHabit = ""; habitDate = ""; tab = t; render(); scrollTo(0, 0); };
 
 function render() {
-  document.getElementById("view").replaceChildren(...PAGES[tab]().filter(Boolean));
+  if (Sync.busy === false && !S.pending.length) checkpoint = JSON.stringify(Object.fromEntries(LISTS.map(k => [k,S[k]])));
+  document.getElementById("view").replaceChildren(...(selectedHabit ? tasksPage() : PAGES[tab]()).filter(Boolean));
   document.getElementById("quick-add").onclick = plusMenu;
+  renderTimerDock();
   document.getElementById("nav").replaceChildren(...NAV.map(([id, label, icon]) => id === "+"
     ? h("button", { class: "plus", "aria-label": "Қосу", onclick: plusMenu }, ic("plus"))
     : h("button", { "aria-current": id === tab ? "page" : null, onclick: () => go(id) }, ic(icon), label)));
 }
+/* Өлшенетін қадамдар, құрылғы параметрлері және деректерді басқару. */
+let runningTimer = null, basketQuery = "", basketFilter = "all";
+try { const saved = JSON.parse(localStorage.getItem("jospar.timer") || "null"); if(saved && typeof saved.habit === "string" && typeof saved.date === "string" && Number.isFinite(saved.startedAt)) runningTimer = saved; } catch {}
+const numberText = n => Number(n.toFixed(3)).toLocaleString("kk-KZ");
+const clockText = n => `${Math.floor(n/60)}:${String(Math.floor(n%60)).padStart(2,"0")}`;
+const timerDelta = timer => Math.max(0,Math.floor((Date.now()-timer.startedAt)/1000));
+function editAt(hb,date,fn) {
+  const log = JO.logOf(S,hb.id,date) || {id:crypto.randomUUID(),habit:hb.id,date,done:[],slip:false,resist:0,count:0};
+  fn(log);put("logs",log);save();
+}
+function writeMeasure(hb,step,date,value) {
+  editAt(hb,date,log => { log.values = {...log.values,[step.id]:Math.max(0,Number(value.toFixed(6)))}; });
+}
+function measureRow(hb,step,date) {
+  const value=JO.logOf(S,hb.id,date)?.values?.[step.id] || 0, active = runningTimer?.habit === hb.id && runningTimer?.step === step.id && runningTimer?.date === date;
+  return h("article",{class:"measure-card"},h("div",{class:"row"},main(step.name,step.mode === "timer" ? "Таймер · меже орындалған соң да жалғасады" : "Санақ · межеден артық қосуға болады"),h("button",{class:"ghost sm","aria-label":`Қадамды өңдеу: ${step.name}`,onclick:() => measureForm(hb,step)},ic("edit"))),
+    h("p",{class:"measure-value num",...(active ? {"data-timer-value":""} : {})},step.mode === "timer" ? `${clockText(value + (active ? timerDelta(runningTimer):0))} / ${clockText(step.target)}` : `${numberText(value)} / ${numberText(step.target)} ${step.unit}`),
+    bar(Math.min(100,Math.round(value/step.target*100))),
+    h("div",{class:"quantity-actions"},step.mode === "timer" ? h("button",{class:"primary",onclick:() => active ? stopTimer() : startTimer(hb,step,date)},active ? "Кідірту және сақтау" : "▶ Таймерді бастау") : [
+      h("button",{"aria-label":`${step.name}: азайту`,onclick:() => writeMeasure(hb,step,date,value-step.increment)},ic("minus")),
+      h("button",{class:"primary",onclick:() => writeMeasure(hb,step,date,value+step.increment)},ic("plus"),`${numberText(step.increment)} ${step.unit}${step.name.toLowerCase().includes("су") ? " · стакан" : ""}`)],
+      h("button",{disabled:active,onclick:() => ask("Нәтиже · "+step.name,[{name:"value",label:step.mode === "timer" ? "Нәтиже, секунд" : `Нәтиже, ${step.unit}`,type:"number",value,min:0}],v => writeMeasure(hb,step,date,Number(v.value)))},"Нәтижені енгізу")));
+}
+function measureForm(hb,step) {
+  ask(step ? "Қадамды өзгерту" : "Өлшенетін қадам",[
+    {name:"name",label:"Қадам атауы",value:step?.name},
+    {name:"mode",label:"Өлшеу тәсілі",options:[["counter","Санақ"],["timer","Таймер"]],value:step?.mode || "counter"},
+    {name:"target",label:"Меже · таймерге секундпен (1 мин = 60)",type:"number",min:0.001,value:step?.target || 1},
+    {name:"unit",label:"Өлшем бірлігі (л, рет, км…). Таймер секундпен өлшенеді",optional:true,value:step?.unit || "рет"},
+    {name:"increment",label:"Бір басқанда қосылатын мөлшер / стакан көлемі",type:"number",min:0.001,value:step?.increment || 1}
+  ],v => { const updated={id:step?.id || crypto.randomUUID(),name:v.name.trim(),mode:v.mode,target:Number(v.target),unit:v.mode === "timer" ? "сек" : v.unit.trim(),increment:Number(v.increment)};
+    if(runningTimer?.habit === hb.id && runningTimer?.step === step?.id) stopTimer();
+    const current=S.habits.find(x=>x.id === hb.id) || hb;
+    put("habits",{...current,measures:step ? (current.measures || []).map(x=>x.id===step.id ? updated:x) : [...(current.measures || []),updated]});save();
+  },step && (() => {if(!confirm("Қадамды алып тастау керек пе?")) return; if(runningTimer?.step===step.id) stopTimer();const current=S.habits.find(x=>x.id===hb.id) || hb;put("habits",{...current,measures:(current.measures || []).filter(x=>x.id!==step.id)});save();}));
+}
+function startTimer(hb,step,date) {
+  if(runningTimer) { if(!confirm("Қазір жүріп тұрған таймерді сақтап, жаңасын бастау керек пе?")) return; stopTimer(); }
+  runningTimer={habit:hb.id,step:step?.id || "",date,startedAt:Date.now()};localStorage.setItem("jospar.timer",JSON.stringify(runningTimer));render();
+}
+function stopTimer() {
+  if(!runningTimer) return;
+  const timer=runningTimer,hb=S.habits.find(x=>x.id === timer.habit),delta=timerDelta(timer);
+  runningTimer=null;localStorage.removeItem("jospar.timer");
+  if(hb) editAt(hb,timer.date,log => {if(timer.step) log.values={...log.values,[timer.step]:(log.values?.[timer.step] || 0)+delta};else log.focusSeconds=(log.focusSeconds || 0)+delta;});else render();
+}
+function renderTimerDock() {
+  let dock=document.getElementById("timer-dock");if(!dock){dock=h("aside",{id:"timer-dock","aria-label":"Жүріп тұрған таймер"});document.body.append(dock);}
+  if(!runningTimer){dock.hidden=true;return;}dock.hidden=false;
+  const hb=S.habits.find(x=>x.id===runningTimer.habit),step=hb?.measures?.find(x=>x.id===runningTimer.step);
+  const base=runningTimer.step ? JO.logOf(S,runningTimer.habit,runningTimer.date)?.values?.[runningTimer.step] || 0 : 0;
+  dock.replaceChildren(h("button",{class:"ghost",onclick:() => {if(hb){openHabit(hb);habitDate=runningTimer.date;render();}}},main(step?.name || "Фокус",hb?.name || "Әдет")),h("b",{class:"num","data-timer-dock":""},clockText(base+timerDelta(runningTimer))),h("button",{onclick:stopTimer},"Кідірту"));
+}
+setInterval(() => {
+  if(!runningTimer) return;
+  const base=runningTimer.step ? JO.logOf(S,runningTimer.habit,runningTimer.date)?.values?.[runningTimer.step] || 0 : 0;
+  document.querySelectorAll("[data-timer-dock]").forEach(el=>{el.textContent=clockText(base+timerDelta(runningTimer));});
+  const hb=S.habits.find(x=>x.id===runningTimer.habit),step=hb?.measures?.find(x=>x.id===runningTimer.step);
+  document.querySelectorAll("[data-timer-value]").forEach(el=>{el.textContent=`${clockText(base+timerDelta(runningTimer))} / ${clockText(step?.target || 0)}`;});
+},1000);
+function noteForm(hb) {
+  const log=JO.logOf(S,hb.id,selectedDay());
+  ask("Күндік жазба",[{name:"note",label:"Бүгін қалай өтті?",type:"textarea",value:log?.note,optional:true},...(hb.kind === "bad" ? [{name:"reason",label:"Сүріну себебі немесе байқаған триггер",type:"textarea",optional:true,value:log?.reason}] : [])],v=>edit(hb,l=>{l.note=v.note.trim();if(hb.kind === "bad")l.reason=v.reason.trim();}));
+}
+function changeHabitState(hb,state) {
+  const breaks=[...(hb.breaks || []).map(b=>({...b}))];
+  if(state === "active") {const last=breaks.at(-1);if(last && !last.end)last.end=today();}
+  else if(!breaks.at(-1) || breaks.at(-1).end) breaks.push({start:today(),end:""});
+  put("habits",{...hb,state:state === "active" ? undefined:state,breaks});save();
+}
+function profileForm() {
+  ask("Профиль параметрлері",[
+    {name:"name",label:"Атыңыз",optional:true,value:preferences.name},
+    {name:"avatar",label:"Аватар белгісі (мысалы, 🌱)",optional:true,value:preferences.avatar},
+    {name:"timeZone",label:"Уақыт белдеуі (мысалы, Asia/Qostanay)",value:preferences.timeZone},
+    {name:"weekStart",label:"Аптаның бірінші күні",options:[["1","Дүйсенбі"],["0","Жексенбі"]],value:String(preferences.weekStart)}
+  ],v=>{try{new Intl.DateTimeFormat("en",{timeZone:v.timeZone.trim()}).format();}catch{alert("Уақыт белдеуі танылмады. Мысалы: Asia/Qostanay");return false;}
+    preferences={name:v.name.trim(),avatar:[...v.avatar.trim()].slice(0,8).join("") || "🌱",timeZone:v.timeZone.trim(),weekStart:Number(v.weekStart)};
+    localStorage.setItem("jospar.preferences",JSON.stringify(preferences));render();});
+}
+function comparisonPanel() {
+  const c=JO.periodComparison(S,today(),preferences.weekStart);
+  const row=(label,current,previous)=>h("div",{class:"row"},main(label,"Алдыңғы кезеңнің осынша күнімен салыстыру"),h("span",{class:"num"},`${current} / ${previous} ұпай · ${current-previous >= 0 ? "+":""}${current-previous}`));
+  return sec("Апта / ай салыстыруы",row("Осы апта / өткен апта",c.week,c.previousWeek),row("Осы ай / өткен ай",c.month,c.previousMonth),h("small",{class:"muted"},"Профиль параметрлері осы құрылғыда сақталады."));
+}
+function goalExtras(g) {
+  const tasks=S.tasks.filter(x=>x.goal===g.id),next=tasks.filter(x=>!x.done).sort((a,b)=>(a.due || "9").localeCompare(b.due || "9"))[0];
+  const history=[...tasks.filter(x=>x.done).map(x=>({date:x.doneAt,label:`✓ ${x.title}`})),...(g.history || []).map(x=>({date:x.date,label:`Нәтиже: ${x.current} ${g.unit || ""}`}))].sort((a,b)=>b.date.localeCompare(a.date));
+  return h("div",{},h("p",{},next ? `Келесі қадам: ${next.title}` : "Ашық қадам жоқ"),
+    h("button",{onclick:()=>taskForm({goal:g.id,due:"",milestone:true})},"Аралық меже қосу"),
+    ...tasks.filter(x=>x.milestone).map(x=>h("p",{class:"muted"},`${x.done ? "✓" : "○"} Аралық меже: ${x.title}`)),
+    h("details",{},h("summary",{},"Орындалу тарихы және динамика"),...history.slice(0,30).map(e=>h("p",{class:"muted"},`${e.date} · ${e.label}`)),...S.habits.filter(hb=>hb.goal===g.id).map(hb=>{
+      const previous=JO.rate(S,hb,JO.addDays(today(),-7),7),current=JO.rate(S,hb,today(),7);
+      return h("p",{class:"muted"},`${hb.name}: осы 7 күн ${current ? `${current.done}/${current.total}`:"—"} · алдыңғы 7 күн ${previous ? `${previous.done}/${previous.total}`:"—"}`);
+    }),!history.length && empty("Тарих әлі жоқ.")));
+}
+function undoLast() {
+  if(!undoState) return;
+  if(runningTimer) {alert("Қайтару алдында таймерді кідіртіңіз.");return;}
+  const previous=undoState;undoState=null;
+  for(const k of LISTS) {const ids=new Set(previous[k].map(x=>x.id));for(const e of [...S[k]])if(!ids.has(e.id))rm(k,e.id);for(const e of previous[k])put(k,e);}
+  persist();checkpoint=JSON.stringify(Object.fromEntries(LISTS.map(k=>[k,S[k]])));render();Sync.schedule();
+}
+function importBackup() {
+  const input=h("input",{type:"file",accept:"application/json,.json"});
+  input.addEventListener("change",async()=>{const file=input.files?.[0];if(!file)return;
+    try{if(file.size>15*1024*1024)throw new Error("Файл 15 МБ-тан үлкен.");const decoded=JO.restoreEntries(JSON.parse(await file.text()));
+      if(runningTimer)throw new Error("Қалпына келтіру алдында таймерді кідіртіңіз.");
+      if(!confirm("Көшірмедегі жазбалар қосылады. Бірдей нөмірі бар жазбалар жаңарады, басқа жазбалар сақталады. Жалғастыру керек пе?"))return;
+      for(const k of LISTS)for(const entry of decoded[k]) {
+        if(k === "logs"){const existing=S.logs.find(l=>l.habit===entry.habit && l.date===entry.date);if(existing && existing.id!==entry.id)rm("logs",existing.id);}
+        put(k,entry);
+      }save();toast("Сақтық көшірме қалпына келтірілді","check");
+    }catch(e){alert(e.message || "Көшірмені оқу мүмкін емес.");}});input.click();
+}
+function basketControls() {
+  return h("div",{class:"basket-tools"},h("input",{id:"basket-search",type:"search",placeholder:"Атауы бойынша іздеу","aria-label":"Қоржыннан іздеу",value:basketQuery,oninput:e=>{basketQuery=e.target.value;render();const field=document.getElementById("basket-search");field?.focus();}}),
+    h("select",{"aria-label":"Қоржын сүзгісі",onchange:e=>{basketFilter=e.target.value;render();}},...[['all','Барлығы'],['active','Белсенді'],['late','Мерзімі өткен'],['important','Маңызды · 4–5'],['paused','Кідіртілген'],['archived','Архив']].map(([value,label])=>h("option",{value,selected:basketFilter===value},label))));
+}
+function basketMatches(e) {
+  if(!(e.title || e.name || "").toLocaleLowerCase().includes(basketQuery.toLocaleLowerCase()))return false;
+  if(basketFilter === "late")return Boolean(e.due && !e.done && e.due<today());
+  if(basketFilter === "important")return e.w>=4;
+  if(basketFilter === "paused" || basketFilter === "archived")return e.state===basketFilter;
+  if(basketFilter === "active")return !e.done && !e.state;
+  return true;
+}
+
 addEventListener("online", render);
 addEventListener("offline", render);
 render();

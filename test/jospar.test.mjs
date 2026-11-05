@@ -215,3 +215,48 @@ test("мақсаттың прогресіне өз қадамдары мен ж�
   assert.deepEqual(JO.goalOverview(S, { id: "G", deadline: "2026-12-31" }, "2026-11-04"), { done: 2, total: 3, pct: 67 });
   assert.deepEqual(JO.goalOverview(S, { id: "empty", deadline: "2026-12-31" }, "2026-11-04"), { done: 0, total: 0, pct: 0 });
 });
+
+test("кез келген әдетте таймер, санақ және көлем қадамдары бірге өлшенеді, артығы сақталады", () => {
+  const hb = {...good, steps:[], measures:[
+    {id:"seconds",name:"Таймер қадамы",mode:"timer",target:60,unit:"сек",increment:1},
+    {id:"reps",name:"Санақ қадамы",mode:"counter",target:10,unit:"рет",increment:1},
+    {id:"volume",name:"Көлем қадамы",mode:"counter",target:2,unit:"л",increment:0.25}
+  ]};
+  const entry=log(hb.id,T,{values:{seconds:75,reps:12,volume:2.25}});
+  assert.equal(JO.dayStatus(hb,entry),"done");
+  assert.equal(JO.dayStatus(hb,{...entry,values:{...entry.values,volume:1.75}}),"todo");
+  assert.equal(JO.dayStatus(hb,undefined),"todo");
+  assert.deepEqual(JO.fromRow(JO.toRow("habits",hb)).measures,hb.measures);
+  assert.deepEqual(JO.fromRow(JO.toRow("logs",entry)).values,entry.values);
+  assert.equal(JO.dayStatus({...hb,steps:["Қарапайым қадам"]},entry),"todo");
+  assert.equal(JO.dayStatus({...hb,steps:["Қарапайым қадам"]},{...entry,done:[0]}),"done");
+});
+
+test("кідіртілген күндер серияны бұзбайды, жалғастырғанда тарих сақталады", () => {
+  const hb={...good,steps:[],breaks:[{start:"2026-10-23",end:"2026-10-26"}]};
+  const state={habits:[hb],logs:[log(hb.id,"2026-10-20",{done:[0]}),log(hb.id,"2026-10-21",{done:[0]}),log(hb.id,"2026-10-22",{done:[0]})],tasks:[]};
+  assert.equal(JO.scheduled(hb,"2026-10-24"),false);
+  assert.equal(JO.scheduled(hb,T),true);
+  assert.deepEqual(JO.runs(state,hb,T),{cur:3,best:3});
+  assert.deepEqual(JO.rate(state,hb,T),{done:3,total:3});
+  assert.deepEqual(JO.fromRow(JO.toRow("habits",hb)).breaks,hb.breaks);
+});
+
+test("күндік жазба, себеп және фокус бұлт айналымында сақталады", () => {
+  const entry=log("g",T,{note:"Жазба",reason:"Себеп",focusSeconds:75,values:{m:2.25}});
+  assert.deepEqual(JO.fromRow(JO.toRow("logs",entry)),entry);
+});
+
+test("аптаның басталу күні салыстыруға әсер етеді", () => {
+  const state={habits:[],logs:[],tasks:[task({done:true,doneAt:"2026-11-01",w:3}),task({done:true,doneAt:"2026-11-02",w:2}),task({done:true,doneAt:"2026-10-26",w:4})]};
+  const mon=JO.periodComparison(state,"2026-11-02",1),sun=JO.periodComparison(state,"2026-11-02",0);
+  assert.equal(mon.week,2);assert.equal(mon.previousWeek,4);assert.equal(sun.week,5);assert.equal(sun.previousWeek,4);
+});
+
+test("көшірме толық тексеріледі: қате байланыс пен қайталанған жазба қабылданбайды", () => {
+  const backup={version:1,habits:[good],logs:[log("g",T,{values:{a:75}})],tasks:[],goals:[]};
+  assert.equal(JO.restoreEntries(backup).logs[0].values.a,75);
+  assert.throws(()=>JO.restoreEntries({...backup,version:9}));
+  assert.throws(()=>JO.restoreEntries({...backup,habits:[]}));
+  assert.throws(()=>JO.restoreEntries({...backup,logs:[...backup.logs,{...backup.logs[0],id:"other"}]}));
+});
