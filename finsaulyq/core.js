@@ -6,11 +6,12 @@ const dstr = (n) => new Date(n * MS).toISOString().slice(0, 10);
 const addDays = (s, n) => dstr(dnum(s) + n);
 const daysBetween = (a, b) => dnum(b) - dnum(a);
 
-// Цикл: { every: күн, last: соңғы сатып алу күні, price }
-// every = 0 — цикл-күн әлі белгісіз (2 сатып алудан кейін өздігінен есептеледі): ескерту де, болжам да жоқ
-const cycleDaysLeft = (c, today) => (c.every > 0 ? c.every - daysBetween(c.last, today) : Infinity);
+// Цикл/Төлемгер: { every: күн, first: алғашқы күн, last: соңғы төлем күні, price }
+// every = 0 — циклсіз бақыланатын төлем. Алғашқы цикл күні first арқылы, кейінгісі last арқылы есептеледі.
+const cycleAnchor = (c) => c.last || c.first || "";
+const cycleDaysLeft = (c, today) => (c.every > 0 && cycleAnchor(c) ? c.last ? c.every - daysBetween(c.last, today) : daysBetween(today, c.first) : Infinity);
 const stockPct = (c, today) => (c.every > 0 ? Math.max(0, Math.min(100, Math.round(cycleDaysLeft(c, today) / c.every * 100))) : 100);
-const nextBuy = (c) => (c.every > 0 ? addDays(c.last, c.every) : "");
+const nextBuy = (c) => (c.every > 0 && cycleAnchor(c) ? c.last ? addDays(c.last, c.every) : c.first : "");
 
 // Бренд салыстыру: ₸/күн, үздігі және ең қымбатқа қарағандағы жылдық үнем
 function brandMatch(brands) {
@@ -58,7 +59,7 @@ function forecast(S, today, count = 3) {
   const goals = goalsView(S).reduce((t, g) => t + (g.saved >= g.target ? 0 : goalMonthly(g, today)), 0);
   return Array.from({ length: count }, (_, i) => {
     const from = Math.max(Date.UTC(y, m - 1 + i, 1) / MS, dnum(today)), to = Date.UTC(y, m + i, 0) / MS;
-    const cycles = S.cycles.filter((c) => c.status !== "archived" && c.every > 0).reduce((t, c) => t + c.price * buysIn(c, from, to, today), 0);
+    const cycles = S.cycles.filter((c) => c.status !== "archived" && c.every > 0).reduce((t, c) => t + cyclePrice(c) * buysIn(c, from, to, today), 0);
     const fixed = S.settings.fixed, installments = (S.installments ?? []).reduce((t, x) => t + instIn(x, i, today), 0);
     return { month: dstr(Date.UTC(y, m - 1 + i, 1) / MS).slice(0, 7), fixed, cycles, goals, installments, total: fixed + cycles + goals + installments };
   });
@@ -107,7 +108,7 @@ function fromRow(r) {
   if (k === "tx") return n(d.amount) && (d.kind === "income" || d.kind === "expense")
     ? { id: r.id, kind: d.kind, amount: Number(d.amount), category: normCat(d.category), note: String(d.note ?? ""), date: /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : localDate(r.created_at), ...(typeof d.account === "string" && d.account ? { account: d.account } : {}), ...(typeof d.store === "string" && d.store ? { store: d.store } : {}), ...(typeof d.sub === "string" && d.sub ? { sub: d.sub } : {}) } : null;
   if (k === "settings") return { key: "settings", item: { capital: Number(d.capital) || 0, income: Number(d.income) || 0, fixed: Number(d.fixed) || 0, city: typeof d.city === "string" && d.city.trim() ? d.city.trim() : "Астана" }, id: r.id };
-  const ok = { cycles: n(d.price) && n(d.every) && d.every >= 0 && typeof d.last === "string", goals: n(d.target) && n(d.saved) && n(d.months) && typeof d.start === "string",
+  const ok = { cycles: n(d.price) && n(d.every) && d.every >= 0 && typeof (d.last || d.first) === "string", goals: n(d.target) && n(d.saved) && n(d.months) && typeof d.start === "string",
     installments: typeof d.name === "string" && n(d.total) && d.total > 0 && n(d.months) && d.months >= 1 && n(d.paid) && /^\d{4}-\d{2}-\d{2}$/.test(d.start),
     wishes: typeof d.name === "string" && d.name.trim() && n(d.price) && d.price > 0,
     stock: n(d.qty), matches: Array.isArray(d.brands) && d.brands.length > 1, contribs: n(d.amount) && typeof d.goalId === "string",
@@ -147,21 +148,48 @@ function mergePull(S, rows) {
 
 // ---- Цикл + Item ----
 // Item: { id, cycleId, name, cost, amount, store, discount, note, receipt, txId, time, city }
-// Цикл-күн = сатып алулар арасындағы күндердің орташасы (бір сатып алу болса — алғашқы болжам сақталады)
+const mean = (xs) => xs.length ? xs.reduce((t, x) => t + x, 0) / xs.length : 0;
+const rounded = (n) => Math.round(n * 100) / 100;
+
+// Төлем сомасы: соңғы 4 төлем — негізгі ұсыныс, барлық тарих — салыстыру үшін.
+function payerStats(c, items) {
+  const its = items.filter((i) => i.cycleId === c.id).sort((a, b) => a.time.localeCompare(b.time));
+  const amounts = its.map((i) => Number(i.cost)).filter((x) => Number.isFinite(x) && x >= 0);
+  const recent = amounts.slice(-4);
+  const gaps = its.slice(1).map((x, i) => daysBetween(its[i].time, x.time)).filter((g) => g > 0);
+  const recentGaps = gaps.slice(-3);
+  return {
+    count: its.length,
+    avgAll: rounded(mean(amounts)),
+    avgRecent: rounded(mean(recent)),
+    suggestedEvery: recentGaps.length ? Math.max(1, Math.round(mean(recentGaps))) : 0,
+    last: its.at(-1)?.time || c.last || c.first || "",
+  };
+}
+
+// Цикл-күн = сатып алулар арасындағы соңғы 3 аралықтың ұсынысы.
 function recalcCycle(c, items) {
   const its = items.filter((i) => i.cycleId === c.id).sort((a, b) => a.time.localeCompare(b.time));
   if (!its.length) return c;
-  const gaps = its.slice(1).map((x, i) => daysBetween(its[i].time, x.time)).filter((g) => g > 0);
-  c.last = its[its.length - 1].time; c.price = its[its.length - 1].cost;
-  if (gaps.length) c.every = Math.max(1, Math.round(gaps.reduce((t, g) => t + g, 0) / gaps.length));
+  const stats = payerStats(c, items);
+  c.first ||= its[0].time;
+  c.last = stats.last;
+  c.price = its[its.length - 1].cost;
+  c.avgAll = stats.avgAll;
+  c.avgRecent = stats.avgRecent;
+  c.suggestedEvery = stats.suggestedEvery;
+  // Ескі циклдер бұрынғыдай өздігінен есептеледі. Жаңа Төлемгердің бекітілген циклі өзгермейді.
+  if (!c.intervalLocked && stats.suggestedEvery) c.every = stats.suggestedEvery;
   return c;
 }
-const perDay = (c) => (c.every > 0 ? c.price / c.every : 0); // баға тиімділігі, ₸/күн
+const cyclePrice = (c) => Number(c.avgRecent || c.price || 0);
+const perDay = (c) => (c.every > 0 ? cyclePrice(c) / c.every : 0); // баға тиімділігі, ₸/күн
 // Ескі цикл (status жоқ) → бір бастапқы item; id цикл id-інен алынады, сондықтан екі құрылғыда да бірдей
 const itemIdOf = (cid) => (cid[0] === "f" ? "e" : "f") + cid.slice(1);
 function migrate(S) {
   let n = 0;
   for (const c of S.cycles) {
+    c.type ||= "cycle";
     if (c.status) continue;
     c.status = "active"; c.alert = true; n++;
     S.items.push({ id: itemIdOf(c.id), cycleId: c.id, name: c.name, cost: c.price, amount: 1, store: "", discount: false, note: "", time: c.last, city: S.settings.city });
@@ -169,18 +197,36 @@ function migrate(S) {
   return n;
 }
 const lc = (s) => String(s).toLowerCase().replace(/\s+/g, " ").trim();
-function matchCycle(name, cycles) {
-  const a = lc(name);
-  if (a.length < 3) return null;
-  return cycles.find((c) => c.status !== "archived" && (lc(c.name) === a || (lc(c.name).length >= 3 && (a.includes(lc(c.name)) || lc(c.name).includes(a))))) || null;
+function matchCycle(name, cycles, store = "") {
+  const a = lc(name), b = lc(store);
+  if (a.length < 3 && b.length < 3) return null;
+  const live = cycles.filter((c) => c.status !== "archived").filter((c) => lc(c.name).length >= 3);
+  const byName = a.length >= 3 && live.find((c) => {
+    const n = lc(c.name);
+    return n === a || a.includes(n) || n.includes(a);
+  });
+  if (byName) return byName;
+  return b.length >= 3 && live.find((c) => {
+    if (c.status === "archived") return false;
+    const n = lc(c.name);
+    if (n.length < 3) return false;
+    return n === b || b.includes(n) || n.includes(b);
+  }) || null;
 }
 // Чек позициялары → цикл тауарлары мен санат бойынша жиындар
-function groupReceipt(pos, cycles, fallbackCat = "Басқа") {
-  const rows = pos.map((p) => { const c = matchCycle(p.name, cycles); return { ...p, cycleId: c?.id || "", category: normCat(c ? c.cat : p.category || fallbackCat) }; });
+function groupReceipt(pos, cycles, fallbackCat = "Басқа", store = "") {
+  const rows = pos.map((p) => { const c = matchCycle(p.name, cycles, store); return { ...p, cycleId: c?.id || "", category: normCat(c ? c.cat : p.category || fallbackCat), sub: c?.sub || p.sub || "" }; });
   const byCat = {};
   for (const r of rows) byCat[r.category] = (byCat[r.category] || 0) + r.price;
   return { rows, byCat };
 }
 
-const FS = { instMonthly, instLeft, instDone, instPay, instDue, instIn, recalcCycle, perDay, migrate, itemIdOf, matchCycle, groupReceipt, addDays, daysBetween, cycleDaysLeft, stockPct, nextBuy, brandMatch, goalSaved, goalsView, goalMonthly, forecast, normCat, monthTotals, balance, wallet, APP_OF, fromRow, toRow, mergePull };
+// Қазіргі циклдің жалғыз күйі: төлем уақытына дейін — келесі төлем, мерзімі келсе — төленбеді.
+function payerState(c, today) {
+  if (c.every <= 0 || !cycleAnchor(c)) return { kind: "tracked", status: "tracked", next: "" };
+  const next = nextBuy(c);
+  return { kind: "cycle", status: next <= today ? "unpaid" : "upcoming", next };
+}
+
+const FS = { instMonthly, instLeft, instDone, instPay, instDue, instIn, recalcCycle, payerStats, payerState, cyclePrice, perDay, migrate, itemIdOf, matchCycle, groupReceipt, addDays, daysBetween, cycleDaysLeft, stockPct, nextBuy, brandMatch, goalSaved, goalsView, goalMonthly, forecast, normCat, monthTotals, balance, wallet, APP_OF, fromRow, toRow, mergePull };
 if (typeof module !== "undefined") module.exports = FS;

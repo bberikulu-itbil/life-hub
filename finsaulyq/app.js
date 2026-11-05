@@ -87,7 +87,9 @@ function rm(k, id) { S[k] = S[k].filter((x) => x.id !== id); queue(k, id, "del")
 // Ескі циклдер (status жоқ) бір бастапқы item алады; sync.js те серверден оқығаннан кейін шақырады
 function migrate() {
   const old = S.cycles.filter((c) => !c.status);
-  if (!old.length) return;
+  let changed = false;
+  for (const c of S.cycles) if (!c.type) { c.type = "cycle"; changed = true; queue("cycles", c.id, "put"); }
+  if (!old.length) { if (changed) persist(); return; }
   FS.migrate(S);
   for (const c of old) { queue("cycles", c.id, "put"); queue("items", FS.itemIdOf(c.id), "put"); }
   persist();
@@ -130,7 +132,7 @@ const bar = (pct, low) => h("div", { class: "bar" + (low ? " low" : ""), role: "
 const removeTx = (id) => { dropItems(S.items.filter((i) => i.txId === id)); rm("tx", id); save(); };
 const del = (key, id, what) => h("button", { class: "ghost sm", "aria-label": `Өшіру: ${what}`, onclick: () => {
   const goal = key === "goals";
-  if (!confirm(`«${what}» өшіру ме?` + (goal ? " Жиналған жарналар қолжетімді қалдыққа қайтады." : key === "cycles" ? " Сатып алу тарихы да өшеді." : key === "tx" ? " Байланысқан тауар жазбалары да өшеді." : ""))) return;
+  if (!confirm(`«${what}» өшіру ме?` + (goal ? " Жиналған жарналар қолжетімді қалдыққа қайтады." : key === "cycles" ? " Төлем тарихы да өшеді." : key === "tx" ? " Байланысқан тауар жазбалары да өшеді." : ""))) return;
   if (goal) S.contribs.filter((c) => c.goalId === id).forEach((c) => rm("contribs", c.id));
   if (key === "tx") return removeTx(id);
   if (key === "cycles") S.items.filter((i) => i.cycleId === id).forEach((i) => rm("items", i.id));
@@ -209,23 +211,33 @@ function receiptFlow() {
 }
 
 const ICON_OPTS = [["box", "Қорап"], ["drop", "Сұйық"], ["bag", "Азық"], ["heart", "Күтім"], ["home", "Үй"]];
-// pre берілсе (санпернеден) цикл ғана жасалады, item-ді сол санпернеден сақтау жалғасады; әйтпесе бастапқы item де қосылады
-const addCycle = (pre, then) => ask("Жаңа тауар (цикл)", [
-  { name: "name", label: "Тауар не қызмет" },
-  { name: "icon", label: "Белгіше", options: ICON_OPTS, value: "box" },
-  { name: "cat", label: "Санат", value: "Тұрмыс", suggest: catList() },
-  { name: "unit", label: "Өлшем бірлігі", value: "дана" },
-  { name: "price", label: "Бір реттік баға, ₸", type: "number", min: 0.01, value: pre?.price },
-  { name: "every", label: "Қанша күнге жетеді (білмесең бос қалдыр: 2 сатып алудан кейін өздігінен есептеледі)", type: "number", min: 1, step: 1, optional: true },
-  { name: "buffer", label: "Неше күн бұрын ескерту", type: "number", value: 3, step: 1 },
-  { name: "alert", label: "Ескерту", options: [["1", "Қосулы"], ["0", "Өшірулі"]], value: "1" },
-  ...(pre ? [] : [{ name: "last", label: "Соңғы сатып алған күні", type: "date", value: today() }]),
-], (v) => {
-  const c = { id: crypto.randomUUID(), name: v.name.trim(), icon: v.icon, price: num(v.price), unit: v.unit.trim() || "дана", every: num(v.every) || 0, buffer: num(v.buffer), cat: FS.normCat(v.cat), last: v.last || today(), status: "active", alert: v.alert === "1" };
-  put("cycles", c);
-  if (!pre) put("items", { id: FS.itemIdOf(c.id), cycleId: c.id, name: c.name, cost: c.price, amount: 1, store: "", discount: false, note: "", time: c.last, city: S.settings.city });
-  save(); then?.(c);
-});
+// Төлемгер: циклді немесе циклсіз жиі шығын. Алғашқы сома мен күн тарихтағы алғашқы төлем ретінде жазылады.
+const addCycle = (pre = {}, then) => {
+  const editing = !!pre.id;
+  const initialDate = pre.first || pre.last || today();
+  const initialAmount = pre.avgRecent || pre.avgAll || pre.price || "";
+  return ask(editing ? "Төлемгерді өзгерту" : "Жаңа Төлемгер", [
+    { name: "name", label: "Тауар, қызмет немесе жазылым", value: pre.name ?? "" },
+    { name: "type", label: "Түрі", options: [["cycle", "Циклді төлем"], ["tracked", "Бақыланатын төлем"]], value: pre.type || "cycle" },
+    { name: "icon", label: "Белгіше", options: ICON_OPTS, value: pre.icon || "box" },
+    { name: "cat", label: "Негізгі санат", value: pre.cat || "Тұрмыс", suggest: catList() },
+    { name: "sub", label: "Ішкі санат", optional: true, value: pre.sub || "", suggest: pre.cat ? subsOf(pre.cat) : [] },
+    { name: "unit", label: "Өлшем бірлігі", value: pre.unit || "рет" },
+    { name: "price", label: "Орташа сома, ₸", type: "number", min: 0.01, value: initialAmount },
+    { name: "every", label: "Цикл аралығы, күн (8, 25, 40…)", type: "number", min: 1, step: 1, optional: true, value: pre.every || "" },
+    { name: "buffer", label: "Неше күн бұрын ескерту", type: "number", min: 0, value: pre.buffer ?? 3, step: 1 },
+    { name: "alert", label: "Ескерту", options: [["1", "Қосулы"], ["0", "Өшірулі"]], value: pre.alert === false ? "0" : "1" },
+    ...(!editing ? [{ name: "first", label: "Алғашқы төлем күні", type: "date", value: initialDate }] : []),
+  ], (v) => {
+    const type = v.type === "tracked" ? "tracked" : "cycle";
+    const every = type === "cycle" ? Math.max(0, Math.round(num(v.every))) : 0;
+    const id = pre.id || crypto.randomUUID();
+    const first = pre.first || pre.last || v.first || today();
+    const c = { ...pre, id, name: v.name.trim(), type, icon: v.icon, price: num(v.price), unit: v.unit.trim() || "рет", every, buffer: num(v.buffer), cat: FS.normCat(v.cat), sub: v.sub.trim(), first, last: editing ? (pre.last || "") : "", status: pre.status || "active", alert: v.alert === "1", intervalLocked: true };
+    put("cycles", c);
+    save(); then?.(c);
+  });
+};
 
 const incForm = (i) => ask(i ? "Кіріс көзін өзгерту" : "Жаңа кіріс көзі", [
   { name: "name", label: "Көзі (жалақы, репетиторлық…)", value: i?.name },
@@ -253,16 +265,19 @@ const addMatch = () => ask("Брендтерді салыстыру", [
   { name: "bn", label: "2-бренд" }, { name: "bp", label: "2-бренд бағасы, ₸", type: "number", min: 0.01 }, { name: "bd", label: "2-бренд қанша күнге жетеді", type: "number", min: 1, step: 1 },
 ], (v) => { put("matches", { id: crypto.randomUUID(), name: v.name.trim(), brands: [{ name: v.an.trim(), price: num(v.ap), days: num(v.ad) }, { name: v.bn.trim(), price: num(v.bp), days: num(v.bd) }] }); save(); });
 
-const buyAgain = (c) => openAdd({ kind: "expense", amount: String(c.price), cycleId: c.id, step: 3 });
+const buyAgain = (c) => openAdd({ kind: "expense", amount: String(FS.cyclePrice(c)), cycleId: c.id, step: 3 });
 
 /* ---------- бөлшектер ---------- */
 function cycleRow(c, full) {
-  const T = today(), left = FS.cycleDaysLeft(c, T), pct = FS.stockPct(c, T), low = c.alert !== false && left <= (c.buffer ?? 3), gone = c.status === "archived";
-  const status = gone ? "Архивте" : !c.every ? "Цикл-күн әлі белгісіз" : left < 0 ? `${-left} күн кешікті` : `${left} күн қалды`;
+  const T = today(), state = FS.payerState(c, T), stats = FS.payerStats(c, S.items), left = FS.cycleDaysLeft(c, T), low = c.alert !== false && state.status === "unpaid", gone = c.status === "archived";
+  const status = gone ? "Архивте" : c.type === "tracked" || !c.every ? "Циклсіз бақылау" : state.status === "unpaid" ? `Төленбеді · ${state.next}` : `Келесі төлем: ${state.next}`;
+  const avg = stats.avgRecent || stats.avgAll || c.price || 0;
+  const avgAll = stats.avgAll || c.avgAll || c.price || 0;
+  const cycle = c.every > 0 ? `${c.every} күн` : "цикл жоқ";
   return h("div", { class: "row" + (gone ? " gone" : "") },
     h("span", { class: "cic" }, ic(c.icon || "box")),
-    h("div", { class: "main" }, h("b", {}, c.name), h("small", { class: "num " + (low ? "warn" : "muted") }, c.every ? `${status} · ${pct}% · ${tg(c.price)} · ${FS.perDay(c).toFixed(1)} ₸/күн` : `${status} · ${tg(c.price)}`), !gone && c.every > 0 && bar(pct, low)),
-    !gone && h("button", { onclick: () => buyAgain(c) }, ic("check"), "Сатып алынды"),
+    h("div", { class: "main" }, h("b", {}, c.name), h("small", { class: "num " + (low ? "warn" : "muted") }, `${status} · негізгі орташа ${tg(avg)} · ${cycle}`), h("small", { class: "muted" }, `Барлық тарих орташа: ${tg(avgAll)}${stats.suggestedEvery ? ` · Ұсыныс: ${stats.suggestedEvery} күн` : ""}`), !gone && c.every > 0 && bar(Math.max(0, Math.min(100, Math.round(left / c.every * 100))), low)),
+    !gone && h("button", { onclick: () => buyAgain(c) }, ic("check"), "Төлем енгізу"),
     h("button", { class: "ghost sm", "aria-label": `Тарих: ${c.name}`, onclick: () => cycleDetail(c) }, ic("eye")),
     full && del("cycles", c.id, c.name));
 }
@@ -339,11 +354,11 @@ function plan() {
     S.goals.length ? sec("Жинақтар", null, FS.goalsView(S).map((g) => goalRow(g))) : null,
     sec("Шоттар", null, S.accounts.length || w.loose !== null ? h("div", { class: "cards" }, [...w.accounts.map((a) => [a.name, a.balance]), ...(w.loose !== null ? [["Шотсыз", w.loose]] : [])].map(([n, b]) => h("div", { class: "card2" },
       h("span", { class: "nm" }, h("i", { style: `background:${catColor(n)}` }), n), h("b", { class: "num " + (b < 0 ? "warn" : "") }, mon(b)), h("small", {}, " ")))) : empty("Шот жоқ. «Профиль» бөлімінде қос.")),
-    sec("Келесі сатып алулар", null, next.length ? next.map((c) => h("div", { class: "row" },
+    sec("Келесі төлемдер", null, next.length ? next.map((c) => h("div", { class: "row" },
       h("div", { class: "main" }, h("b", {}, c.name), h("small", { class: "muted num" }, FS.nextBuy(c) < T ? "Мерзімі өтті" : FS.nextBuy(c))),
-      h("span", { class: "num" }, tg(c.price)))) : empty("Цикл жоқ.")),
+      h("span", { class: "num" }, tg(FS.cyclePrice(c))))) : empty("Циклді төлем жоқ.")),
     sec("Алдағы 3 айдың болжамы", null,
-      h("table", { class: "num" }, h("thead", {}, h("tr", {}, ["Ай", "Циклдер", "Мақсат", "Бөліп-төлем", "Барлығы"].map((t) => h("th", {}, t)))),
+      h("table", { class: "num" }, h("thead", {}, h("tr", {}, ["Ай", "Циклді төлемдер", "Мақсат", "Бөліп-төлем", "Барлығы"].map((t) => h("th", {}, t)))),
         h("tbody", {}, f.map((r) => h("tr", {}, h("td", {}, MONTHS[Number(r.month.slice(5)) - 1]), h("td", {}, fmt(r.cycles)), h("td", {}, fmt(r.goals)), h("td", {}, fmt(r.installments)), h("td", {}, h("b", {}, fmt(r.total))))))),
       h("p", { class: "muted" }, `Барлығы ішінде тұрақты шығын бар: ${tg(S.settings.fixed)} / ай. Айлық кіріс: ${tg(S.settings.income)}.`)),
   ];
@@ -391,12 +406,14 @@ function stock() {
       sec("Жинақ", add(addGoal), S.goals.length ? FS.goalsView(S).map((g) => goalRow(g, true)) : empty("Жинақ жоқ. Мысалы: саяхат, 1 000 000 ₸.")),
       sec("Wish List", add(addWish), S.wishes.length ? S.wishes.map(wishRow) : empty("Арманыңды жаз, кейін жинаққа немесе бөліп-төлемге айналдырасың."))];
   }
-  const upcoming = [...liveCycles().filter((c) => c.every > 0 && FS.nextBuy(c) <= soon).map((c) => ({ date: FS.nextBuy(c), name: c.name, sum: c.price, ok: () => buyAgain(c), label: "Сатып алынды" })),
+  const upcoming = [...liveCycles().filter((c) => c.every > 0 && FS.nextBuy(c) <= soon).map((c) => ({ date: FS.nextBuy(c), name: c.name, sum: FS.cyclePrice(c), ok: () => buyAgain(c), label: "Төлем енгізу" })),
     ...S.installments.filter((x) => !FS.instDone(x) && FS.instDue(x) <= soon).map((x) => ({ date: FS.instDue(x), name: x.name, sum: FS.instPay(x), ok: () => payInst(x), label: "Төледім" }))].sort((a, b) => a.date.localeCompare(b.date));
+  const payerTiles = liveCycles().map((c) => h("button", { class: "catb", "aria-label": `Төлемді тіркеу: ${c.name}`, onclick: () => buyAgain(c) },
+    tile(c.name, ic(c.icon || "box")), h("span", {}, c.name), h("small", { class: "muted num" }, tg(FS.cyclePrice(c)))));
   return [head("Есеп"), seg,
     sec("Алда күтілетін (14 күн)", null, upcoming.length ? upcoming.map((u) => h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, u.name), h("small", { class: "num " + (u.date < T ? "warn" : "muted") }, `${u.date < T ? "Мерзімі өтті" : u.date} · ${tg(u.sum)}`)), h("button", { onclick: u.ok }, ic("check"), u.label))) : empty("Жақын 14 күнде төлем жоқ.")),
-    liveCycles().length ? sec("Тауарлар", null, h("div", { class: "catgrid fav" }, liveCycles().map((c) => h("button", { class: "catb", "aria-label": `Тіркеу: ${c.name}`, onclick: () => buyAgain(c) }, tile(c.name, ic(c.icon || "box")), h("span", {}, c.name), h("small", { class: "muted num" }, tg(c.price)))))) : null,
-    sec("Циклдар", add(() => addCycle()), liveCycles().length ? liveCycles().map((c) => cycleRow(c, true)) : empty("Цикл жоқ. Мысалы: тіс пастасы, 45 күн.")),
+    liveCycles().length ? sec("Төлемгерлер", null, h("div", { class: "catgrid fav" }, payerTiles)) : null,
+    sec("Төлемгерлер", add(() => addCycle()), liveCycles().length ? liveCycles().map((c) => cycleRow(c, true)) : empty("Төлемгер жоқ. Мысалы: шаш қию, Netflix, кофе.")),
     S.cycles.some((c) => c.status === "archived") ? sec("Архив", null, S.cycles.filter((c) => c.status === "archived").map((c) => cycleRow(c, true))) : null,
     sec("Өнімдер қоры", add(addStock), S.stock.length ? S.stock.map((s) => h("div", { class: "row" },
       h("div", { class: "main" }, h("b", {}, s.name), h("small", { class: "muted num" }, `${fmt(s.qty)} ${s.unit} · ${tg(s.price)}`)),
@@ -490,10 +507,10 @@ function openAdd(init = {}) {
   const ok = () => num(st.amount) > 0;
   const next = () => { if (!ok()) return; if (/[+−×÷]/.test(st.expr)) { st.expr = st.amount; draw(); } else { st.step = 2; draw(); } };
   const shown = () => st.expr.replace(/\d+(\.\d*)?/g, (m) => grp(m));
-  const MODES = [["tx", "Транзакция", "wallet"], ["item", "Тауар (цикл)", "box"]], KICON = { expense: "minus", income: "plus", transfer: "swap" };
+  const MODES = [["tx", "Транзакция", "wallet"], ["item", "Төлемгер", "box"]], KICON = { expense: "minus", income: "plus", transfer: "swap" };
   const view1 = () => [
     h("div", { class: "phead" }, h("div", { class: "seg modes" }, ...MODES.map(([m, t, i]) => h("button", { type: "button", "aria-label": t, title: t, "aria-pressed": String(st.mode === m), onclick: () => { st.mode = m; st.kind = "expense"; st.cycleId = ""; draw(); } }, ic(i)))),
-      h("div", { class: "ptitle" }, h("b", {}, st.mode === "item" ? "Тауар" : { expense: "Төледім", income: "Түсті", transfer: "Аударым" }[st.kind]), h("span", { class: "amtchip num" }, `₸${grp(st.amount)}`)),
+      h("div", { class: "ptitle" }, h("b", {}, st.mode === "item" ? "Төлемгер" : { expense: "Төледім", income: "Түсті", transfer: "Аударым" }[st.kind]), h("span", { class: "amtchip num" }, `₸${grp(st.amount)}`)),
       h("button", { type: "button", class: "ghost round", "aria-label": "Чек сканерлеу", onclick: () => { dlg.close(); receiptFlow(); } }, ic("camera"))),
     h("div", { class: "ppanel" },
       h("div", { class: "amt num", "aria-live": "polite" }, (shown() || "0") + " ₸"),
@@ -521,9 +538,9 @@ function openAdd(init = {}) {
     const ownGo = () => own.value.trim() && pick({ cat: FS.normCat(own.value), cycleId: "" });
     own.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); ownGo(); } });
     return [h("h3", {}, `${inc ? "Кіріс" : "Шығыс"} · ${tg(num(st.amount))}`),
-      h("p", { class: "muted" }, isItem ? "Қай тауар?" : inc ? "Қайдан түсті?" : "Не үшін жұмсадың?"),
+      h("p", { class: "muted" }, isItem ? "Қай Төлемгерге?" : inc ? "Қайдан түсті?" : "Не үшін жұмсадың?"),
       isItem ? h("div", { class: "catgrid" }, liveCycles().map((c) => catb(c.name, () => pick({ cycleId: c.id }), tile(c.name, ic(c.icon || "box")))),
-        catb("Жаңа тауар", () => addCycle({ price: num(st.amount) }, (c) => pick({ cycleId: c.id })), h("span", { class: "tile add", "aria-hidden": "true" }, ic("plus")))) : [
+        catb("Жаңа Төлемгер", () => addCycle({ price: num(st.amount) }, (c) => pick({ cycleId: c.id })), h("span", { class: "tile add", "aria-hidden": "true" }, ic("plus")))) : [
       h("datalist", { id: "dl-own" }, catList().map((v) => h("option", { value: v }))),
       h("div", { class: "own" }, own, h("button", { type: "button", onclick: ownGo }, "Таңдау")),
       h("div", { class: "catgrid" }, topCats(st.kind).map((c) => catb(c, () => pick({ cat: c, cycleId: "" }), tile(c))))],
@@ -533,7 +550,7 @@ function openAdd(init = {}) {
     const c = S.cycles.find((x) => x.id === st.cycleId), cat = c ? FS.normCat(c.cat || "Тұрмыс") : st.cat, inc = st.kind === "income";
     const f = h("form", { onsubmit: (e) => {
       e.preventDefault(); const v = Object.fromEntries(new FormData(f)), note = v.note.trim(), store = v.store.trim();
-      const tx = withAcc({ id: crypto.randomUUID(), kind: st.kind, amount: num(st.amount), category: cat, note: c ? [c.name, note].filter(Boolean).join(" · ") : note, date: v.date, ...(store ? { store } : {}), ...(v.sub ? { sub: v.sub } : {}) }, v);
+      const tx = withAcc({ id: crypto.randomUUID(), kind: st.kind, amount: num(st.amount), category: cat, note: c ? [c.name, note].filter(Boolean).join(" · ") : note, date: v.date, ...(store ? { store } : {}), ...(c?.sub ? { sub: c.sub } : v.sub ? { sub: v.sub } : {}) }, v);
       put("tx", tx);
       if (c) recordItem(c, { cost: tx.amount, qty: num(v.qty) || 1, store, discount: v.discount === "1", note, date: v.date, txId: tx.id });
       save(); dlg.close();
@@ -547,7 +564,7 @@ function openAdd(init = {}) {
       fld("Күні", h("input", { type: "date", name: "date", value: st.date || today(), required: true })),
       h("div", { class: "end" }, h("button", { type: "button", class: "ghost", onclick: () => { st.step = 2; draw(); } }, "Артқа"), h("button", { class: "primary" }, "Сақтау")));
     return [h("h3", { class: "paid" }, inc ? "Түсті " : "Төледім ", h("span", { class: "amtchip num" }, tg(num(st.amount)))),
-      h("p", { class: "kv" }, h("span", { class: "muted" }, c ? "Тауар" : "Санат"), h("span", { class: "pill" }, tile(c ? c.name : cat), c ? c.name : cat)),
+      h("p", { class: "kv" }, h("span", { class: "muted" }, c ? "Төлемгер" : "Санат"), h("span", { class: "pill" }, tile(c ? c.name : cat), c ? c.name : cat)),
       h("p", { class: "muted" }, "Төмендегілер міндетті емес."), f];
   };
   dlg.addEventListener("keydown", (e) => {
@@ -560,20 +577,26 @@ function openAdd(init = {}) {
   document.body.append(dlg); draw(); dlg.showModal();
 }
 
-// Циклдің тарихы: сатып алулар, цикл-күн, ₸/күн, архив, ескерту
+// Төлемгердің тарихы: нақты төлемдер, екі орташа сома және цикл ұсынысы
 function cycleDetail(c) {
-  const its = S.items.filter((i) => i.cycleId === c.id).sort((a, b) => b.time.localeCompare(a.time)), gone = c.status === "archived";
+  const its = S.items.filter((i) => i.cycleId === c.id).sort((a, b) => b.time.localeCompare(a.time)), gone = c.status === "archived", stats = FS.payerStats(c, S.items), state = FS.payerState(c, today());
   const dlg = h("dialog", {}), again = () => { dlg.close(); cycleDetail(c); };
   const hist = its.length ? its.map((i, k) => { const gap = k ? FS.daysBetween(i.time, its[k - 1].time) : 0;
     return h("div", { class: "row" }, h("div", { class: "main" }, h("b", { class: "num" }, `${i.time} · ${tg(i.cost)}`),
-      h("small", { class: "muted" }, [i.store, i.discount && "жеңілдікпен", gap > 0 && `${(i.cost / gap).toFixed(1)} ₸/күн`, i.city].filter(Boolean).join(" · ") || " ")),
+      h("small", { class: "muted" }, [i.store, i.discount && "жеңілдікпен", i.receipt && "чекпен", gap > 0 && `${gap} күн аралығы`, i.city].filter(Boolean).join(" · ") || " ")),
       h("button", { class: "ghost sm", "aria-label": `Өшіру: ${i.time}`, onclick: () => { if (!confirm("Бұл сатып алуды тарихтан өшіру ме? Транзакция қалады.")) return; dropItems([i]); save(); again(); } }, ic("trash"))); }) : empty("Тарих жоқ.");
+  const stateText = c.type === "tracked" || !c.every ? "Циклсіз бақыланады" : state.status === "unpaid" ? `Төленбеді · келесі күн: ${state.next}` : `Келесі төлем: ${state.next}`;
   dlg.append(h("h3", {}, c.name),
-    h("p", { class: "num muted" }, c.every ? `Цикл-күн: ${c.every} · Баға: ${tg(c.price)} · ${FS.perDay(c).toFixed(1)} ₸/күн` : `Цикл-күн әлі белгісіз (2 сатып алудан кейін есептеледі) · Баға: ${tg(c.price)}`), ...hist,
+    h("p", { class: "num muted" }, `${stateText} · бекітілген аралық: ${c.every ? `${c.every} күн` : "жоқ"}`),
+    h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, "Негізгі орташа"), h("small", { class: "muted" }, "Соңғы 4 төлем")), h("span", { class: "num" }, tg(stats.avgRecent || c.price))),
+    h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, "Барлық тарих орташа"), h("small", { class: "muted" }, `${stats.count} төлем`)), h("span", { class: "num" }, tg(stats.avgAll || c.price))),
+    stats.suggestedEvery ? h("p", { class: "muted" }, `Ұсыныс: шамамен әр ${stats.suggestedEvery} күн сайын`) : null,
+    ...hist,
     h("div", { class: "end" },
       h("button", { onclick: () => { c.alert = c.alert === false; put("cycles", c); save(); again(); } }, `Ескерту: ${c.alert === false ? "өшірулі" : "қосулы"}`),
+      !gone && h("button", { onclick: () => { dlg.close(); addCycle(c, () => cycleDetail(c)); } }, "Өзгерту"),
       h("button", { onclick: () => { c.status = gone ? "active" : "archived"; put("cycles", c); save(); dlg.close(); } }, gone ? "Архивтен қайтару" : "Архивке"),
-      !gone && h("button", { class: "primary", onclick: () => { dlg.close(); buyAgain(c); } }, "Сатып алынды"),
+      !gone && h("button", { class: "primary", onclick: () => { dlg.close(); buyAgain(c); } }, "Төлем енгізу"),
       h("button", { class: "ghost", onclick: () => dlg.close() }, "Жабу")));
   dlg.addEventListener("close", () => dlg.remove());
   document.body.append(dlg); dlg.showModal();
@@ -584,8 +607,8 @@ function receiptReview(r) {
   const pos = [...(r.items || [])], sum = pos.reduce((t, p) => t + p.price, 0);
   if (!pos.length || sum > r.total + 1) return txForm(null, { kind: "expense", amount: r.total, category: r.category, note: r.store, store: r.store, date: r.date }); // позиция оқылмады — жалпы сома
   if (r.total - sum > 1) pos.push({ name: "Танылмаған қалдық", price: Math.round((r.total - sum) * 100) / 100, category: "Басқа" });
-  const { rows } = FS.groupReceipt(pos, S.cycles, r.category), cats = [...new Set([...catList(), ...rows.map((x) => x.category)])];
-  const opts = [...cats.map((c) => ["k:" + c, c]), ...liveCycles().map((c) => ["c:" + c.id, "Цикл: " + c.name])];
+  const { rows } = FS.groupReceipt(pos, S.cycles, r.category, r.store), cats = [...new Set([...catList(), ...rows.map((x) => x.category)])];
+  const opts = [...cats.map((c) => ["k:" + c, c]), ...liveCycles().map((c) => ["c:" + c.id, "Төлемгер: " + c.name])];
   const f = h("form", { method: "dialog", onsubmit: (e) => {
     e.preventDefault(); const v = new FormData(f), rid = crypto.randomUUID(), store = v.get("store").trim(), date = v.get("date"), txs = {}, cyc = [];
     rows.forEach((x, i) => {
@@ -676,7 +699,7 @@ const valid = (x) => {
   const n = Number.isFinite, s = (v) => typeof v === "string", a = (k, f) => Array.isArray(x[k] ?? []) && (x[k] ?? []).every((i) => i && s(i.id) && f(i));
   return x && typeof x === "object" && (!x.settings || [x.settings.capital, x.settings.income, x.settings.fixed].every((v) => v == null || n(v))) &&
     a("tx", (t) => s(t.date) && n(t.amount) && s(t.category) && (t.kind === "income" || t.kind === "expense")) &&
-    a("cycles", (c) => s(c.last) && n(c.every) && c.every >= 0 && n(c.price)) &&
+    a("cycles", (c) => (s(c.last) || s(c.first)) && n(c.every) && c.every >= 0 && n(c.price) && (!c.type || c.type === "cycle" || c.type === "tracked")) &&
     a("items", (i) => s(i.cycleId) && n(i.cost) && s(i.time)) &&
     a("installments", (i) => s(i.name) && n(i.total) && i.total > 0 && n(i.months) && i.months >= 1 && n(i.paid) && s(i.start)) &&
     a("wishes", (w) => s(w.name) && n(w.price) && w.price > 0) &&

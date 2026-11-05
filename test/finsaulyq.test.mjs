@@ -211,6 +211,32 @@ test("цикл-күн белгісіз (every=0): ескерту/болжам ж
   assert.equal(c.every, 30);
 });
 
+test("Төлемгер: бекітілген күндік цикл өзгермейді, екі орташа және цикл ұсынысы есептеледі", () => {
+  const c = { id: "p", type: "cycle", intervalLocked: true, every: 40, price: 1000, first: "2026-01-01", last: "2026-01-01" };
+  const it = (time, cost) => ({ id: time, cycleId: "p", time, cost });
+  const items = [it("2026-01-01", 1000), it("2026-02-10", 1200), it("2026-03-01", 900), it("2026-04-10", 1100), it("2026-05-20", 1300)];
+  FS.recalcCycle(c, items);
+  assert.equal(c.every, 40);
+  assert.equal(c.avgAll, 1100);
+  assert.equal(c.avgRecent, 1125);
+  assert.equal(c.suggestedEvery, 33); // соңғы үш аралық: 19, 40, 40 күн
+  assert.equal(FS.nextBuy(c), "2026-06-29");
+  assert.deepEqual(FS.payerState(c, "2026-06-28"), { kind: "cycle", status: "upcoming", next: "2026-06-29" });
+  assert.deepEqual(FS.payerState(c, "2026-06-29"), { kind: "cycle", status: "unpaid", next: "2026-06-29" });
+  assert.deepEqual(FS.payerState({ type: "tracked", every: 0 }, "2026-06-29"), { kind: "tracked", status: "tracked", next: "" });
+  const planned = { id: "planned", type: "cycle", every: 25, first: "2026-06-15", last: "", price: 5000 };
+  assert.equal(FS.nextBuy(planned), "2026-06-15");
+  assert.equal(FS.payerState(planned, "2026-06-14").status, "upcoming");
+  assert.equal(FS.payerState(planned, "2026-06-15").status, "unpaid");
+});
+
+test("чек: дүкен атауы арқылы Төлемгерді автоматты байланыстырады, бір чек бірнеше Төлемгерге бөлінеді", () => {
+  const cycles = [{ id: "hair", name: "Шаш қию", cat: "Күтім" }, { id: "coffee", name: "Кофе", cat: "Тамақ" }];
+  const r = FS.groupReceipt([{ name: "Қызмет", price: 10000 }, { name: "Кофе латте", price: 1200 }], cycles, "Басқа", "Шаш қию және Кофе");
+  assert.deepEqual(r.rows.map((x) => x.cycleId), ["hair", "coffee"]);
+  assert.deepEqual(r.byCat, { Күтім: 10000, Тамақ: 1200 });
+});
+
 test("бөліп-төлем: ай сомасы, соңғы төлем қалдықты жабады, келесі күн", () => {
   const i = { total: 1000, months: 3, start: "2026-10-31", paid: 0 };
   assert.equal(FS.instMonthly(i), 333); assert.equal(FS.instPay(i), 333); assert.equal(FS.instDue(i), "2026-10-28");
