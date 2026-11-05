@@ -14,11 +14,19 @@ const KINDS = ["good", "bad", "neutral"];
 const scheduled = (h, date) => date >= h.created && !(h.breaks || []).some(b => date >= b.start && (!b.end || date < b.end)) && (!h.days?.length || h.days.includes(new Date(date + "T12:00:00Z").getUTCDay()));
 const goalMetric = (g) => ({ current: Math.max(0, Number(g.current) || 0), target: Math.max(0, Number(g.target) || 0) });
 const amount = (v) => typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0;
+const trackingOf = h => ["check","timer","counter","steps"].includes(h.tracking) ? h.tracking : h.steps?.length || h.measures?.length ? "steps" : h.target > 0 ? "counter" : "check";
 const stepCount = (h) => Math.max(1, h.steps.length); // пунктсіз жақсы әдет — бір «пункт»
 const logOf = (S, id, date) => S.logs.find((l) => l.habit === id && l.date === date);
 
 // Жақсы: барлық пункт белгіленсе орындалды. Жаман: сүрінбесе — автоматты орындалды. Бейтарап: бақылау ғана.
 function dayStatus(h, log) {
+  if(h.kind === "good" && h.tracking) {
+    const mode=trackingOf(h);
+    if(mode === "timer" || mode === "counter") return h.target > 0 && amount(log?.count) >= h.target ? "done" : "todo";
+    if(mode === "check") return log?.done?.includes(0) ? "done" : "todo";
+    const hasSteps=h.steps.length || h.measures?.length;
+    return hasSteps && h.steps.every((_,i)=>log?.done?.includes(i)) && (h.measures || []).every(step=>amount(log?.values?.[step.id])>=step.target) ? "done" : "todo";
+  }
   if (h.kind === "good") { const d = new Set(log?.done); const stepsDone = (!h.steps.length || h.steps.every((_, i) => d.has(i))) && (h.measures || []).every(step => amount(log?.values?.[step.id]) >= step.target); return (h.target > 0 ? amount(log?.count) >= h.target && stepsDone : (h.steps.length || h.measures?.length ? stepsDone : d.has(0))) ? "done" : "todo"; }
   if (h.kind === "bad") return log?.slip ? "slip" : "done";
   return "tally";
@@ -167,6 +175,8 @@ function fromRow(r) {
   const k = KEY_OF[r.app], d = r.data || {};
   if (k === "habits") return typeof d.name === "string" && d.name.trim() && KINDS.includes(d.kind) && DATE.test(d.created)
     ? { id: r.id, name: d.name, kind: d.kind, steps: Array.isArray(d.steps) ? d.steps.filter((s) => typeof s === "string") : [], time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, w: wt(d.w), created: d.created,
+      ...(["check","timer","counter","steps"].includes(d.tracking) ? {tracking:d.tracking} : {}),
+      ...(d.increment !== undefined ? {increment:amount(d.increment) || 1} : {}),
       ...(Array.isArray(d.measures) ? { measures: measuresOf(d.measures) } : {}),
       ...(Array.isArray(d.breaks) ? { breaks:d.breaks.filter(b => b && DATE.test(b.start) && (!b.end || DATE.test(b.end))).map(b => ({start:b.start,end:b.end || ""})) } : {}),
       ...(d.state === "paused" || d.state === "archived" ? {state:d.state} : {}),
@@ -205,5 +215,5 @@ function mergePull(S, rows) {
   return next;
 }
 
-const JO = { measuresOf, periodComparison, restoreEntries, weekday, dayPoints, profileStats, goalOverview, scheduled, goalMetric, addDays, daysBetween, stepCount, logOf, dayStatus, runs, rate, goalProgress, todayTask, monthStats, fightDays, RESIST, SLIP, pickMsg, APP_OF, fromRow, toRow, mergePull };
+const JO = { trackingOf, measuresOf, periodComparison, restoreEntries, weekday, dayPoints, profileStats, goalOverview, scheduled, goalMetric, addDays, daysBetween, stepCount, logOf, dayStatus, runs, rate, goalProgress, todayTask, monthStats, fightDays, RESIST, SLIP, pickMsg, APP_OF, fromRow, toRow, mergePull };
 if (typeof module !== "undefined") module.exports = JO;

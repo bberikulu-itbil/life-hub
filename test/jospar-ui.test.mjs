@@ -9,6 +9,7 @@ function app() {
   class Element {
     constructor(tag){this.tag=tag;this.attrs={};this.children=[];this.events={};this.value="";this.hidden=false;}
     setAttribute(k,v){this.attrs[k]=v;if(k==="value")this.value=v;}
+    removeAttribute(k){delete this.attrs[k];}
     addEventListener(k,fn){this.events[k]=fn;}
     append(...children){this.children.push(...children);}
     replaceChildren(...children){this.children=children;}
@@ -71,4 +72,28 @@ test("measured-step form adds generic volume with custom increment; archived hab
   a.run(`changeHabitState(S.habits[0],'archived')`);
   assert.equal(a.run(`JO.scheduled(S.habits[0],today())`),false);
   a.run(`changeHabitState(S.habits[0],'active')`);assert.equal(a.run(`JO.scheduled(S.habits[0],today())`),true);
+});
+
+
+test("direct timer and counter are mutually exclusive with steps; primary timer records seconds",()=>{
+  const a=app();a.run(seed);a.run(`S.habits[0].tracking='timer';S.habits[0].target=60;openHabit(S.habits[0]);`);
+  const text=node=>typeof node==='string' ? node : (node.children || []).map(text).join(' ');
+  assert.ok(!text(a.ids.view).includes('Қадам қосу'));
+  a.run(`startTimer(S.habits[0],habitMeasure(S.habits[0]),today());`);a.advance(75000);a.run(`stopTimer()`);
+  assert.equal(a.run(`S.logs[0].count`),75);assert.equal(a.run(`JO.dayStatus(S.habits[0],S.logs[0])`),'done');
+  a.run(`S.habits[0].tracking='counter';S.habits[0].target=2;S.habits[0].increment=0.25;writeMeasure(S.habits[0],habitMeasure(S.habits[0]),today(),2.25);`);
+  assert.equal(a.run(`S.logs[0].count`),2.25);
+  a.run(`S.habits[0].tracking='steps';render()`);assert.ok(text(a.ids.view).includes('Қадам қосу'));
+});
+
+test("habit form shows fields for selected mode and permits empty steps before adding measured ones",()=>{
+  const a=app();a.run(seed);a.run(`habitForm(S.habits[0])`);
+  const form=a.walk(a.body).filter(e=>e.tag==='form').at(-1),fields=a.walk(form);
+  const mode=fields.find(e=>e.attrs.name==='tracking');
+  const labelOf=name=>fields.find(e=>e.children?.some(c=>c.attrs?.name===name));
+  assert.equal(labelOf('target').hidden,true);assert.equal(labelOf('steps').hidden,false);
+  assert.ok(!fields.find(e=>e.attrs.name==='steps').attrs.required);
+  mode.value='timer';mode.events.change();
+  assert.equal(labelOf('target').hidden,false);assert.equal(labelOf('steps').hidden,true);assert.equal(labelOf('unit').hidden,true);
+  mode.value='counter';mode.events.change();assert.equal(labelOf('increment').hidden,false);
 });

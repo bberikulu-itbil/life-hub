@@ -260,3 +260,14 @@ test("көшірме толық тексеріледі: қате байланы�
   assert.throws(()=>JO.restoreEntries({...backup,habits:[]}));
   assert.throws(()=>JO.restoreEntries({...backup,logs:[...backup.logs,{...backup.logs[0],id:"other"}]}));
 });
+
+
+test("әдеттің тікелей түрлері жасырын қадамдарға тәуелді емес",()=>{
+  const hb={...good,target:60,tracking:"timer",measures:[{id:"old",target:100}]};
+  assert.equal(JO.dayStatus(hb,log("g",T,{count:75})),"done");
+  assert.equal(JO.dayStatus({...hb,tracking:"counter",target:10},log("g",T,{count:12})),"done");
+  assert.equal(JO.dayStatus({...hb,tracking:"check"},log("g",T,{done:[0]})),"done");
+  assert.equal(JO.dayStatus({...hb,tracking:"steps"},log("g",T,{count:75})),"todo");
+  assert.equal(JO.fromRow(JO.toRow("habits",{...hb,increment:0.25})).tracking,"timer");
+  assert.equal(JO.fromRow(JO.toRow("habits",{...hb,increment:0.25})).increment,0.25);
+});

@@ -1,7 +1,7 @@
 /* Jospar — Liquid Glass. Түстер brand/tokens.css-тен (data-app="jospar"). */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{touch-action:manipulation;background:var(--bg)}
-body{margin:0;color:var(--ink);font:16px/1.5 var(--font-sans);-webkit-font-smoothing:antialiased;padding:0 16px calc(96px + env(safe-area-inset-bottom))}
+body{margin:0;color:var(--ink);font:17px/1.5 var(--font-sans);-webkit-font-smoothing:antialiased;padding:0 16px calc(96px + env(safe-area-inset-bottom))}
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:radial-gradient(38% 32% at 12% 8%,var(--blob1),transparent 70%),radial-gradient(34% 30% at 92% 22%,var(--blob2),transparent 70%),radial-gradient(44% 38% at 55% 98%,var(--blob3),transparent 70%)}
 [hidden]{display:none!important}
@@ -61,7 +61,7 @@ div.line{cursor:default}
 dialog button.menu{width:100%;justify-content:flex-start;margin-top:8px;min-height:52px}
 .count{min-width:2ch;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
 
-#nav{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(12px + env(safe-area-inset-bottom));width:min(420px,calc(100% - 24px));
+#nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(560px,100%);
   display:flex;justify-content:space-around;align-items:flex-end;padding:6px;border-radius:var(--r-nav);z-index:5}
 #nav button{flex:1;min-width:0;flex-direction:column;gap:0;border:0;background:transparent;font-size:.68rem;padding:.35rem 0;color:var(--mute)}
 #nav button[aria-current=page]{color:var(--acc)}
@@ -92,16 +92,16 @@ dialog h3{margin:0 0 .4rem}
 
 /* Таза карточкалар және телефонға бейімделген навигация */
 body{padding-bottom:calc(100px + env(safe-area-inset-bottom))}
-.app-header{max-width:760px;margin:auto;padding:20px 0 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+.app-header{max-width:760px;margin:auto;padding:calc(12px + env(safe-area-inset-top,0px)) 0 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
 .app-brand{display:flex;align-items:center;gap:9px;font-size:1.2rem;font-weight:750;text-decoration:none;color:var(--ink)}
 main{max-width:760px;padding-top:24px}
 h1{font-size:1.85rem;letter-spacing:-.04em;line-height:1.2;margin:0 0 8px}
-.sub{font-size:.9rem;line-height:1.6;margin-bottom:22px}
+.sub{font-size:16px;line-height:1.6;margin-bottom:22px}
 .page-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
 .page-heading .sub{margin:0}.page-heading>button{flex-shrink:0}
 .sec{padding:22px;margin-bottom:20px;box-shadow:inset 0 1px 0 var(--hi),0 5px 20px var(--sh)}
 .sec>header{margin-bottom:16px}.sec h2{font-size:1.05rem}
-.main b,.main small{overflow:visible;overflow-wrap:anywhere}.main small{margin-top:4px;line-height:1.6}
+.main b,.main small{overflow:visible;overflow-wrap:anywhere}.main small{margin-top:4px;line-height:1.6;font-size:14px}
 .habit-card{padding:18px 0;border-top:1px solid var(--line)}
 .habit-card:last-child{padding-bottom:0}.habit-card .row{padding-top:0}
 .habit-card>p{margin:8px 0;font-size:.85rem}
@@ -117,18 +117,20 @@ h1{font-size:1.85rem;letter-spacing:-.04em;line-height:1.2;margin:0 0 8px}
 button:disabled{opacity:.35;cursor:default}
 .goal-card{position:relative;padding:20px;margin:12px 0;background:var(--glass-2);border:1px solid var(--line);border-radius:18px;display:flex;align-items:flex-start;gap:8px}
 .goal-title{font-size:1.1rem;line-height:1.5}.goal-card p{font-size:.9rem;margin:12px 0}.goal-card .bar{height:10px;margin:12px 0 16px}.goal-card .main>.ghost{margin-top:12px;border:1px solid var(--line);padding:8px 12px}
-#nav{width:min(520px,calc(100% - 24px));align-items:center;gap:4px;padding:8px;border-radius:24px}
-#nav>button{min-height:52px;gap:4px;font-size:.65rem;border-radius:16px;line-height:1.3}
+#nav{width:min(560px,100%);align-items:center;gap:4px;padding:8px 8px max(8px,env(safe-area-inset-bottom,0px));border-radius:24px 24px 0 0;background:var(--glass-2)}
+#nav>button{min-height:54px;gap:5px;font-size:12px;border-radius:16px;line-height:1.3}
 #nav>button[aria-current=page]{background:color-mix(in srgb,var(--acc) 12%,transparent);font-weight:650}
 dialog{max-height:85dvh;overflow-y:auto;width:min(480px,calc(100% - 24px));padding:24px}
 dialog h3{font-size:1.3rem;margin-bottom:18px}.end{flex-wrap:wrap}
 .weekdays{border:0;padding:0;margin:16px 0;color:var(--mute);font-size:.85rem}.weekdays legend{margin-bottom:8px}.weekdays>div{display:flex;gap:4px}.weekdays button{padding:6px;flex:1;min-width:0}.weekdays button[aria-pressed="true"]{background:var(--acc);color:var(--acc-ink)}
-@media(max-width:480px){body{padding-left:12px;padding-right:12px}.app-header{padding-top:14px}main{padding-top:20px}.sec{padding:16px}.page-heading{align-items:flex-start;flex-direction:column;gap:12px}h1{font-size:1.65rem}.goal-card{padding:14px}.date-toolbar{gap:4px}.date-toolbar>button{padding:8px}.habit .when{width:44px}.acts{margin-left:0}.habit-calendar{gap:4px}.calendar-day{border-radius:9px}}
+@media(max-width:480px){body{padding-left:12px;padding-right:12px}.app-header{padding-top:calc(12px + env(safe-area-inset-top,0px))}main{padding-top:20px}.sec{padding:16px}.page-heading{align-items:flex-start;flex-direction:column;gap:12px}h1{font-size:1.65rem}.goal-card{padding:14px}.date-toolbar{gap:4px}.date-toolbar>button{padding:8px}.habit .when{width:44px}.acts{margin-left:0}.habit-calendar{gap:4px}.calendar-day{border-radius:9px}}
 
 .segmented{display:flex;gap:4px;padding:5px;background:var(--line);border-radius:18px;margin-bottom:20px}.segmented button{flex:1;border:0;background:transparent}.segmented button[aria-pressed="true"]{background:var(--glass-2);font-weight:650;box-shadow:0 2px 8px var(--sh)}
 .quantity-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.goal-contents{margin-top:16px;border-top:1px solid var(--line);padding-top:12px}.goal-contents summary{min-height:44px;cursor:pointer;line-height:1.6;padding:8px 0;font-weight:600}.goal-contents .row{align-items:flex-start}.goal-contents .row .line{font-size:.9rem}
 #nav button.plus{width:50px;height:50px;min-height:50px;margin:0 4px;transform:none}#nav button.plus:active{transform:scale(.95)}
 
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%}input,select,textarea{font-size:16px}.metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.metric-grid>div{padding:12px 6px;text-align:center;border-radius:14px;background:var(--line)}.metric-grid b{display:block;font-size:1.4rem}.metric-grid small{display:block;font-size:.75rem;margin-top:4px}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}input,select,textarea{font-size:16px}.metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.metric-grid>div{padding:12px 6px;text-align:center;border-radius:14px;background:var(--line)}.metric-grid b{display:block;font-size:1.4rem}.metric-grid small{display:block;font-size:13px;margin-top:4px}
 
-.measure-card{padding:16px;margin:12px 0;background:var(--glass-2);border:1px solid var(--line);border-radius:18px}.measure-value{font-size:1.35rem;font-weight:700;margin:8px 0}.measured-habit .steps{margin-left:0}.profile-identity{display:flex;gap:14px;align-items:center;margin-bottom:12px}.avatar{font-size:2.4rem;line-height:1}.basket-tools{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px;margin:12px 0}.basket-tools select{min-width:0}#timer-dock{position:fixed;bottom:calc(94px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(520px,calc(100% - 24px));padding:10px;display:flex;gap:10px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:18px;z-index:6;box-shadow:0 4px 18px var(--sh)}#timer-dock>.ghost{flex:1;min-width:0;justify-content:flex-start}body:has(#timer-dock:not([hidden])){padding-bottom:calc(190px + env(safe-area-inset-bottom))}@media(max-width:400px){.basket-tools{grid-template-columns:1fr}.measure-card{padding:12px}.quantity-actions button{font-size:.9rem}}
+.measure-card{padding:16px;margin:12px 0;background:var(--glass-2);border:1px solid var(--line);border-radius:18px}.measure-value{font-size:1.35rem;font-weight:700;margin:8px 0}.measured-habit .steps{margin-left:0}.profile-identity{display:flex;gap:14px;align-items:center;margin-bottom:12px}.avatar{font-size:2.4rem;line-height:1}.basket-tools{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px;margin:12px 0}.basket-tools select{min-width:0}#timer-dock{position:fixed;bottom:calc(78px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);width:min(520px,calc(100% - 24px));padding:10px;display:flex;gap:10px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:18px;z-index:6;box-shadow:0 4px 18px var(--sh)}#timer-dock>.ghost{flex:1;min-width:0;justify-content:flex-start}body:has(#timer-dock:not([hidden])){padding-bottom:calc(190px + env(safe-area-inset-bottom))}@media(max-width:400px){.basket-tools{grid-template-columns:1fr}.measure-card{padding:12px}.quantity-actions button{font-size:.9rem}}
+
+#nav button .ic svg{width:24px;height:24px}.main b{font-size:17px}label,legend{font-size:14px}.calendar-hint{font-size:14px}.calendar-day small{font-size:11px}.goal-card p,.habit-card>p{font-size:15px}dialog{scroll-padding-bottom:16px}@media(min-width:600px){#nav{bottom:8px;border-radius:24px}}@media(max-width:359px){#nav{gap:0}#nav>button{font-size:11px}#nav button.plus{width:46px;height:46px;min-height:46px;margin:0 2px}}
