@@ -24,7 +24,7 @@ const ICONS = {
   heart: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
 };
 
-let S = structuredClone(DEF), tab = "home", habitDate = "", basketTab = "tasks", selectedHabit = "", habitOrigin = "home";
+let S = structuredClone(DEF), tab = "home", habitDate = "", basketTab = "tasks", selectedHabit = "", habitOrigin = "home", selectedTask = "", taskOrigin = "home";
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch { /* бұзылған жазба — бос күйден бастаймыз */ }
 if (!S.synced) S.pending = []; // алғашқы синхронда барлығы қайта кезекке қойылады
 
@@ -143,7 +143,7 @@ const timeLabel = (hb) => {
 const dot = (cls, on) => h("span", { class: "dot " + (cls || "") }, on && ic(cls === "slip" ? "x" : "check"));
 const main = (name, sub) => h("span", { class: "main" }, h("b", {}, name), sub && h("small", { class: "muted" }, sub));
 
-function openHabit(hb) { habitOrigin = tab; selectedHabit = hb.id; habitDate = today(); render(); scrollTo(0, 0); }
+function openHabit(hb) { selectedTask=""; habitOrigin = tab; selectedHabit = hb.id; habitDate = today(); render(); scrollTo(0, 0); }
 function closeHabit() { selectedHabit = ""; habitDate = ""; tab = habitOrigin; render(); }
 function dayRow(hb, detail = false) {
   const t = selectedDay(), l = JO.logOf(S, hb.id, t), st = JO.dayStatus(hb, l), r = JO.runs(S, hb, t), tl = timeLabel(hb);
@@ -188,15 +188,14 @@ function dayRow(hb, detail = false) {
 
 const dshort = (s) => `${Number(s.slice(8))} ${MO[Number(s.slice(5, 7)) - 1]}`;
 const goalName = (t) => S.goals.find((g) => g.id === t.goal)?.title;
-const toggleTask = (t) => { t.done = !t.done; t.doneAt = t.done ? today() : ""; put("tasks", t); save(); };
+const toggleTask = (t) => { put("tasks",JO.toggleTaskState(t,today())); save(); };
 const late = (t) => !t.done && t.due !== "" && t.due < today();
 const bar = (p) => h("div", { class: "bar", "aria-label": "Орындалу прогресі", role: "progressbar", "aria-valuenow": p, "aria-valuemin": 0, "aria-valuemax": 100 }, h("i", { style: `width:${p}%` }));
 
 // Басты беттегі тапсырма жолы: мерзімі өткені уақыт блогына емес, «Күні бойы» тізімінің басына түседі
 function dayTask(t) {
-  const tl = late(t) ? null : timeLabel(t);
-  return h("div", { class: "habit" }, tl && h("div", { class: "when" }, tl), h("div", { class: "body" },
-    h("button", { class: "line", "aria-pressed": t.done, onclick: () => toggleTask(t) }, dot(t.done ? "on" : "", t.done), main(t.title, [late(t) && `Мерзімі өтті: ${dshort(t.due)}`, goalName(t)].filter(Boolean).join(" · ")))));
+  const tl=timeLabel(t);
+  return h("div",{class:"habit"},tl && h("div",{class:"when"},tl),h("div",{class:"body"},taskLine(t)));
 }
 
 function home() {
@@ -296,10 +295,34 @@ function taskForm(t) {
 }
 
 function taskLine(t) {
-  const sub = [t.due && (late(t) ? `Мерзімі өтті: ${dshort(t.due)}` : dshort(t.due)), timeLabel(t), goalName(t)].filter(Boolean).join(" · ");
-  return h("div", { class: "row" }, h("button", { class: "line", "aria-pressed": t.done, onclick: () => toggleTask(t) }, dot(t.done ? "on" : "", t.done), main(t.title, sub)),
-    late(t) && h("button", {class:"ghost",onclick:() => ask("Қайта жоспарлау",[{name:"due",label:"Жаңа күн",type:"date",value:today()}],v=>{put("tasks",{...t,due:v.due});save();})},"Күнін ауыстыру"),
-    h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${t.title}`, onclick: () => taskForm(t) }, ic("edit")));
+  const p=JO.taskStepProgress(t);
+  const sub=[t.due && (late(t) ? `Мерзімі өтті: ${dshort(t.due)}` : dshort(t.due)),timeLabel(t),goalName(t),p.total && `${p.done}/${p.total} қадам`].filter(Boolean).join(" · ");
+  return h("div",{class:"row task-row"},
+    h("button",{class:"ghost sm","aria-label":`${t.done ? "Қайта ашу" : "Орындау"}: ${t.title}`,"aria-pressed":t.done,onclick:()=>toggleTask(t)},dot(t.done ? "on":"",t.done)),
+    h("button",{class:"line",onclick:()=>openTask(t),"aria-label":`${t.title}: ашу`},main(t.title,sub),ic("chevron")),
+    late(t) && h("button",{class:"ghost",onclick:()=>ask("Қайта жоспарлау",[{name:"due",label:"Жаңа күн",type:"date",value:today()}],v=>{put("tasks",{...t,due:v.due});save();})},"Күнін ауыстыру"));
+}
+function openTask(t) {taskOrigin=tab;selectedHabit="";selectedTask=t.id;render();scrollTo(0,0);}
+function updateSubtasks(id,fn) {
+  const t=S.tasks.find(t=>t.id===id);if(!t)return;
+  const subtasks=(t.subtasks || []).map(s=>({...s}));
+  put("tasks",JO.taskWithSubtasks(t,fn(subtasks),today()));save();
+}
+function subtaskForm(t,step) {
+  ask(step ? "Қосалқы қадамды өзгерту":"Қосалқы қадам",[{name:"title",label:"Не істеу керек?",value:step?.title}],v=>updateSubtasks(t.id,list=>step ? list.map(s=>s.id===step.id ? {...s,title:v.title.trim()}:s) : [...list,{id:crypto.randomUUID(),title:v.title.trim(),done:false}]),
+    step && (()=>{if(confirm("Осы қадамды өшіру керек пе?"))updateSubtasks(t.id,list=>list.filter(s=>s.id!==step.id));}));
+}
+function taskDetail() {
+  const t=S.tasks.find(t=>t.id===selectedTask);if(!t){selectedTask="";return PAGES[tab]();}
+  const p=JO.taskStepProgress(t);
+  return [h("button",{class:"ghost",onclick:()=>{selectedTask="";tab=taskOrigin;render();}},"← Артқа"),
+    h("div",{class:"page-heading"},h("h1",{},t.title),h("button",{onclick:()=>taskForm(t)},ic("edit"),"Өңдеу")),
+    sec("Тапсырма",h("p",{class:"muted"},[t.due ? `Мерзімі: ${dshort(t.due)}`:"Мерзімсіз",timeLabel(t),goalName(t)].filter(Boolean).join(" · ")),
+      h("button",{class:t.done ? "":"primary","aria-pressed":t.done,onclick:()=>toggleTask(t)},ic("check"),t.done ? "Қайта ашу":"Толық орындау")),
+    sec("Қосалқы қадамдар",h("p",{class:"muted"},p.total ? `${p.done}/${p.total} қадам орындалды. Барлық қадам біткенде тапсырма автоматты аяқталады.`:"Тапсырманы шағын қадамдарға бөліңіз."),
+      p.total > 0 && bar(Math.round(p.done/p.total*100)),
+      ...(t.subtasks || []).map(step=>h("div",{class:"row"},h("button",{class:"line","aria-pressed":step.done,onclick:()=>updateSubtasks(t.id,list=>list.map(s=>s.id===step.id ? {...s,done:!s.done}:s))},dot(step.done ? "on":"",step.done),main(step.title)),h("button",{class:"ghost sm","aria-label":`Қадамды өңдеу: ${step.title}`,onclick:()=>subtaskForm(t,step)},ic("edit")))),
+      h("button",{class:"primary",onclick:()=>subtaskForm(t)},ic("plus"),"Қадам қосу"))];
 }
 
 /* ---------- Әдет беті: тапсырмалар · жоспар · белсенділік ---------- */
@@ -439,11 +462,11 @@ function plusMenu() {
 
 const PAGES = { habits: habitsPage, home, tasks: tasksPage, goals: goalsPage, profile: profilePage };
 const NAV = [["home", "Жоспаргер", "home"], ["tasks", "Қоржын", "tasks"], ["+"], ["goals", "Мақсат", "target"], ["profile", "Профиль", "user"]];
-const go = (t) => { selectedHabit = ""; habitDate = ""; tab = t; render(); scrollTo(0, 0); };
+const go = (t) => { selectedTask = ""; selectedHabit = ""; habitDate = ""; tab = t; render(); scrollTo(0, 0); };
 
 function render() {
   if (Sync.busy === false && !S.pending.length) checkpoint = JSON.stringify(Object.fromEntries(LISTS.map(k => [k,S[k]])));
-  document.getElementById("view").replaceChildren(...(selectedHabit ? tasksPage() : PAGES[tab]()).filter(Boolean));
+  document.getElementById("view").replaceChildren(...(selectedTask ? taskDetail() : selectedHabit ? tasksPage() : PAGES[tab]()).filter(Boolean));
   document.getElementById("quick-add").onclick = plusMenu;
   renderTimerDock();
   document.getElementById("nav").replaceChildren(...NAV.map(([id, label, icon]) => id === "+"

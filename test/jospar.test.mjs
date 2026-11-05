@@ -271,3 +271,17 @@ test("әдеттің тікелей түрлері жасырын қадамда
   assert.equal(JO.fromRow(JO.toRow("habits",{...hb,increment:0.25})).tracking,"timer");
   assert.equal(JO.fromRow(JO.toRow("habits",{...hb,increment:0.25})).increment,0.25);
 });
+
+test("қосалқы тапсырмалар: соңғы қадам ата-ананы аяқтайды, қайта ашу прогресті қайтарады",()=>{
+  const t=task({subtasks:[{id:"one",title:"Бірінші",done:true},{id:"two",title:"Екінші",done:false}]});
+  assert.deepEqual(JO.taskStepProgress(t),{done:1,total:2});
+  const finished=JO.taskWithSubtasks(t,t.subtasks.map(s=>({...s,done:true})),T);
+  assert.equal(finished.done,true);assert.equal(finished.doneAt,T);
+  const reopened=JO.taskWithSubtasks(finished,finished.subtasks.map(s=>({...s,done:s.id!=="one"})),T);
+  assert.equal(reopened.done,false);assert.equal(reopened.doneAt,"");
+  assert.deepEqual(JO.fromRow(JO.toRow("tasks",finished)).subtasks,finished.subtasks);
+  assert.equal(JO.toggleTaskState(finished,T).subtasks.every(s=>!s.done),true);
+  const added=JO.taskWithSubtasks(finished,[...finished.subtasks,{id:"three",title:"Үшінші",done:false}],T);
+  assert.equal(added.done,false);
+  assert.equal(JO.taskWithSubtasks(t,t.subtasks.filter(s=>s.id!=="two"),T).done,true);
+});

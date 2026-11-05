@@ -63,6 +63,16 @@ function rate(S, h, today, days = 30) {
   return { done, total };
 }
 
+// Қосалқы тапсырмалар негізгі тапсырмамен бірге сақталады.
+const taskStepProgress = t => ({done:(t.subtasks || []).filter(s => s.done).length,total:t.subtasks?.length || 0});
+function taskWithSubtasks(t, subtasks, date) {
+  const done = subtasks.length ? subtasks.every(s => s.done) : t.done;
+  return {...t,subtasks,done,doneAt:done ? t.done && t.doneAt ? t.doneAt : date : ""};
+}
+function toggleTaskState(t,date) {
+  const done=!t.done;
+  return {...t,done,doneAt:done ? date : "",...(t.subtasks?.length ? {subtasks:t.subtasks.map(s=>({...s,done}))} : {})};
+}
 // Мақсат: байланған тапсырмалар бойынша прогресс
 const goalProgress = (S, g) => { const t = S.tasks.filter((x) => x.goal === g.id); return { done: t.filter((x) => x.done).length, total: t.length }; };
 
@@ -182,7 +192,8 @@ function fromRow(r) {
       ...(d.state === "paused" || d.state === "archived" ? {state:d.state} : {}),
       ...(Array.isArray(d.days) ? { days: [...new Set(d.days.filter((n) => Number.isInteger(n) && n >= 0 && n <= 6))] } : {}), ...(typeof d.goal === "string" ? { goal: d.goal } : {}), ...(d.target !== undefined ? { target: amount(d.target), unit: typeof d.unit === "string" ? d.unit : "" } : {}) } : null;
   if (k === "tasks") return text(d.title)
-    ? { id: r.id, title: d.title, goal: typeof d.goal === "string" ? d.goal : "", due: DATE.test(d.due) ? d.due : "", time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, w: wt(d.w), ...(d.milestone === true ? {milestone:true} : {}), done: r.done === true, doneAt: r.done === true && DATE.test(d.doneAt) ? d.doneAt : "" } : null;
+    ? { id: r.id, title: d.title, goal: typeof d.goal === "string" ? d.goal : "", due: DATE.test(d.due) ? d.due : "", time: TIME.test(d.time) ? d.time : "", dur: nn(d.dur) ? d.dur : 0, w: wt(d.w), ...(Array.isArray(d.subtasks) ? {subtasks:d.subtasks.filter(s=>s && typeof s.id === "string" && s.id && text(s.title)).filter((s,i,a)=>a.findIndex(x=>x.id===s.id)===i).map(s=>({id:s.id,title:s.title.trim(),done:s.done === true}))} : {}),
+      ...(d.milestone === true ? {milestone:true} : {}), done: r.done === true, doneAt: r.done === true && DATE.test(d.doneAt) ? d.doneAt : "" } : null;
   if (k === "goals") return text(d.title) && DATE.test(d.deadline) ? { id: r.id, title: d.title, why: typeof d.why === "string" ? d.why : "", deadline: d.deadline, ...(Array.isArray(d.history) ? {history:d.history.filter(e => e && DATE.test(e.date) && Number.isFinite(e.current)).map(e => ({date:e.date,current:amount(e.current)}))} : {}), ...(d.target !== undefined || d.current !== undefined ? goalMetric(d) : {}), ...(typeof d.unit === "string" ? { unit: d.unit } : {}) } : null;
   if (k === "logs") return typeof d.habit === "string" && DATE.test(d.date)
     ? { id: r.id, habit: d.habit, date: d.date, done: Array.isArray(d.done) ? d.done.filter(nn) : [], slip: d.slip === true, resist: nn(d.resist) ? d.resist : 0, count: amount(d.count),
@@ -215,5 +226,5 @@ function mergePull(S, rows) {
   return next;
 }
 
-const JO = { trackingOf, measuresOf, periodComparison, restoreEntries, weekday, dayPoints, profileStats, goalOverview, scheduled, goalMetric, addDays, daysBetween, stepCount, logOf, dayStatus, runs, rate, goalProgress, todayTask, monthStats, fightDays, RESIST, SLIP, pickMsg, APP_OF, fromRow, toRow, mergePull };
+const JO = { taskStepProgress, taskWithSubtasks, toggleTaskState, trackingOf, measuresOf, periodComparison, restoreEntries, weekday, dayPoints, profileStats, goalOverview, scheduled, goalMetric, addDays, daysBetween, stepCount, logOf, dayStatus, runs, rate, goalProgress, todayTask, monthStats, fightDays, RESIST, SLIP, pickMsg, APP_OF, fromRow, toRow, mergePull };
 if (typeof module !== "undefined") module.exports = JO;

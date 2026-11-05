@@ -97,3 +97,16 @@ test("habit form shows fields for selected mode and permits empty steps before a
   assert.equal(labelOf('target').hidden,false);assert.equal(labelOf('steps').hidden,true);assert.equal(labelOf('unit').hidden,true);
   mode.value='counter';mode.events.change();assert.equal(labelOf('increment').hidden,false);
 });
+
+test("task detail adds, edits and completes subtasks; undo restores parent and children",()=>{
+  const a=app();a.run(`S.tasks=[{id:'task',title:'Негізгі тапсырма',due:today(),time:'',dur:0,w:1,goal:'',done:false,doneAt:''}];checkpoint=JSON.stringify(Object.fromEntries(LISTS.map(k=>[k,S[k]])));openTask(S.tasks[0]);subtaskForm(S.tasks[0]);`);
+  const form=a.walk(a.body).filter(e=>e.tag==='form').at(-1);
+  a.walk(form).find(e=>e.attrs.name==='title').value='Бірінші қадам';
+  form.events.submit({preventDefault(){}});
+  assert.equal(a.run(`S.tasks[0].subtasks[0].title`),'Бірінші қадам');
+  a.run(`updateSubtasks('task',list=>list.map(s=>({...s,done:true})));`);
+  assert.equal(a.run(`S.tasks[0].done`),true);
+  a.run(`undoLast()`);assert.equal(a.run(`S.tasks[0].done`),false);assert.equal(a.run(`S.tasks[0].subtasks[0].done`),false);
+  a.run(`toggleTask(S.tasks[0])`);assert.equal(a.run(`S.tasks[0].subtasks[0].done`),true);
+  a.run(`go('home');openTask(S.tasks[0]);go('goals')`);assert.equal(a.run(`selectedTask`),'');
+});
