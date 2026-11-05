@@ -24,7 +24,7 @@ function app() {
   const storage=new Map();let now=Date.parse("2026-11-05T04:00:00Z");
   class Clock extends Date {constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
   const ctx=vm.createContext({Date:Clock,Intl,crypto:webcrypto,structuredClone,Blob,URL,
-    document:{body,createElement:t=>new Element(t),getElementById:id=>ids[id] || walk(body).find(e=>e.attrs.id===id),querySelectorAll:()=>[],addEventListener(){}},
+    document:{body,documentElement:new Element("html"),createElement:t=>new Element(t),getElementById:id=>ids[id] || walk(body).find(e=>e.attrs.id===id),querySelectorAll:()=>[],addEventListener(){}},
     localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
     navigator:{},Sync:{state:"local",busy:false,start(){},schedule(){}},addEventListener(){},scrollTo(){},setInterval(){},setTimeout(){},clearTimeout(){},alert(){},confirm:()=>true,
     FormData:class{constructor(form){this.entries=walk(form).filter(e=>e.attrs.name).map(e=>[e.attrs.name,e.value]);}[Symbol.iterator](){return this.entries[Symbol.iterator]();}}
@@ -109,4 +109,31 @@ test("task detail adds, edits and completes subtasks; undo restores parent and c
   a.run(`undoLast()`);assert.equal(a.run(`S.tasks[0].done`),false);assert.equal(a.run(`S.tasks[0].subtasks[0].done`),false);
   a.run(`toggleTask(S.tasks[0])`);assert.equal(a.run(`S.tasks[0].subtasks[0].done`),true);
   a.run(`go('home');openTask(S.tasks[0]);go('goals')`);assert.equal(a.run(`selectedTask`),'');
+});
+
+
+test("streak flame reflects current streak and resets on a slip",()=>{
+  const a=app();a.run(`S.habits=[{id:'bad',name:'Таңдау',kind:'bad',steps:[],created:JO.addDays(today(),-9),w:1}];`);
+  assert.equal(a.run(`streakBadge(S.habits[0]).attrs['aria-label']`),'9 күн қатарынан');
+  a.run(`openHabit(S.habits[0]);slip(S.habits[0]);`);
+  assert.equal(a.run(`streakBadge(S.habits[0]).attrs['aria-label']`),'0 күн қатарынан');
+});
+
+test("reading size is persistent and tabs expose correct selected states",()=>{
+  const a=app();a.run(seed);a.run(`go('profile');profileTab='settings';render();`);
+  const controls=a.walk(a.ids.view).find(e=>e.attrs['aria-label']==='Мәтін өлшемі');
+  assert.equal(controls.children[1].attrs['aria-pressed'],'true');
+  assert.equal(controls.children[0].attrs['aria-pressed'],'false');
+  controls.children[2].click();
+  assert.equal(JSON.parse(a.storage.get('jospar.preferences')).textSize,'extra');
+  assert.equal(a.run(`document.documentElement.attrs['data-text-size']`),'extra');
+  a.run(`profileTab='overview';render();`);
+  assert.ok(a.walk(a.ids.view).some(e=>e.attrs['aria-label']==='Профиль бөлімі'));
+});
+
+test("task rows leave full width for title; rescheduling is available inside detail",()=>{
+  const a=app();a.run(`S.tasks=[{id:'late',title:'Ұзын атауы бар тапсырма',due:JO.addDays(today(),-1),done:false,doneAt:'',time:'',goal:'',w:1}];go('tasks');`);
+  const text=n=>typeof n==='string' ? n:(n.children || []).map(text).join(' ');
+  assert.ok(!text(a.ids.view).includes('Күнін ауыстыру'));
+  a.run(`openTask(S.tasks[0])`);assert.ok(text(a.ids.view).includes('Күнін ауыстыру'));
 });
