@@ -151,7 +151,6 @@ button:disabled{opacity:.45;cursor:default}
 .back{padding-left:0;color:var(--acc)}
 /* Журнал: күндер бойынша плиткалар */
 .hbtns{display:flex;gap:6px}.round{border-radius:50%;width:38px;height:38px;padding:0;display:inline-flex;align-items:center;justify-content:center}
-.jbal{display:flex;flex-direction:column;gap:2px;margin:.2rem 0 .6rem}.jbal .big{font-size:1.5rem}
 .jday{margin:.7rem 0}.jh{display:flex;justify-content:space-between;margin-bottom:6px}
 .jgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .jt{position:relative;overflow:hidden;aspect-ratio:1;border:0;border-radius:16px;color:#fff;padding:8px;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-start;text-align:left;font:inherit;min-width:0}
@@ -206,15 +205,7 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .wcard>.ghost.sm{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.85);border-radius:50%}
 .wcard.gone{opacity:.65}
 .row .main[role=button]{cursor:pointer}
-/* Журнал: шот чиптері, аралық, жасыру батырмасы */
-.jtitle{display:flex;flex-direction:column;min-width:0}.jtitle h1{margin:0}.head .hbtns button:disabled{opacity:.35}
-.achips,.rchips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:.3rem -16px .5rem;padding:2px 16px}.achips::-webkit-scrollbar,.rchips::-webkit-scrollbar{display:none}
-.achip{flex:none;display:flex;flex-direction:column;align-items:flex-start;gap:0;border:1px solid var(--gb);background:var(--glass);border-radius:16px;padding:.45rem .8rem;min-width:96px;color:inherit;font:inherit;text-align:left}
-.achip small{color:var(--mute);font-size:.72rem}.achip b{font-size:.95rem}.achip[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}.achip[aria-pressed=true] small{color:rgba(255,255,255,.85)}
-.rchip{flex:none;border:0;border-radius:999px;background:var(--glass-2);color:var(--mute);padding:.45rem .9rem;font:inherit;font-size:.85rem}.rchip[aria-pressed=true]{background:var(--acc);color:#fff}
-.jbtop{display:flex;justify-content:space-between;align-items:center}.jbal{margin:.2rem 0 .5rem}
-.acts{display:inline-flex;gap:2px}
-.fbar{bottom:calc(92px + env(safe-area-inset-bottom))}
+
 /* Есеп: Төлемгер карточкалары, бөліп-төлем/жинақ, Wish List */
 .end.wrap{flex-wrap:wrap}.end.wrap button{flex:1 1 40%}.end .warn{color:var(--bad,#e5534b)}
 .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pcard{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:18px;background:var(--glass-2);min-width:0}.pcard.gone{opacity:.65}
@@ -227,12 +218,18 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .wchip{font-size:.7rem;font-weight:600;border-radius:999px;padding:2px 8px;background:var(--glass);color:var(--mute)}.wchip.need{background:#e5534b;color:#fff}.wchip.want{background:#8b5cf6;color:#fff}.wchip.p0{background:#16a34a;color:#fff}.wchip.p1{background:#ef9b37;color:#fff}
 .wimg{width:100%;max-height:200px;object-fit:cover;border-radius:14px}
 
-/* Журнал: шот карталары */
-.achips{gap:10px}.achip{position:relative;width:132px;min-height:84px;justify-content:space-between;gap:2px;border:0;border-radius:20px;padding:.6rem .8rem;background:linear-gradient(150deg,var(--cc),color-mix(in srgb,var(--cc) 70%,#000));color:#fff;opacity:.7;box-shadow:0 6px 16px var(--sh)}
-.achip .ic svg{width:20px;height:20px;opacity:.9}.achip small,.achip[aria-pressed=true] small{color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.achip b{font-size:1rem}
-.achip[aria-pressed=true]{opacity:1;background:linear-gradient(150deg,var(--cc),color-mix(in srgb,var(--cc) 70%,#000));box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--cc),0 8px 20px var(--sh)}
-.achips{padding:8px 16px 10px;margin-top:0}
+
 .kx{flex-wrap:wrap;justify-content:flex-end}.kx .main{flex:1 1 100%}
 .catdlg .crow{gap:2px}.catdlg .inl{min-height:40px;font-size:.92rem;color:var(--mute)}.catdlg .inl input,.catdlg .inl select{padding:.3rem 0;min-height:0;font-size:1rem;color:var(--ink)}.catdlg .inl input[type=checkbox]{flex:none;width:22px;height:22px;min-height:0}
 .catdlg .seg2 button{padding:.45rem .5rem;font-size:.85rem;min-height:0}
 .catdlg .seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px}.catdlg .seg2 button{width:100%}
+
+/* Журнал: шот карталары (карусель) */
+.jtitle{display:flex;flex-direction:column;min-width:0}.jtitle h1{margin:0}.jtitle small{font-size:.85rem}.head .hbtns{gap:6px}.head .hbtns .round{width:38px;height:38px}.head .hbtns button:disabled{opacity:.35}
+.rchips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:.2rem -16px .5rem;padding:2px 16px}.rchips::-webkit-scrollbar{display:none}
+.rchip{flex:none;border:0;border-radius:999px;background:var(--glass-2);color:var(--mute);padding:.45rem .9rem;font:inherit;font-size:.85rem}.rchip[aria-pressed=true]{background:var(--acc);color:#fff}
+.jcards{position:relative;display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;margin:.4rem -16px 0;padding:6px 16px 10px;scroll-padding:0 16px}.jcards::-webkit-scrollbar{display:none}
+.jcard{position:relative;align-items:flex-start;flex:none;scroll-snap-align:center;width:calc(100% - 48px);max-width:360px;min-height:132px;display:flex;flex-direction:column;justify-content:space-between;gap:2px;border:0;border-radius:26px;padding:16px 18px;text-align:left;font:inherit;color:#fff;overflow:hidden;background:linear-gradient(150deg,var(--cc),color-mix(in srgb,var(--cc) 62%,#000));box-shadow:0 10px 24px color-mix(in srgb,var(--cc) 35%,transparent);opacity:.75;transition:opacity .2s}
+.jcard[aria-pressed=true]{opacity:1}.jcard small{color:rgba(255,255,255,.8);font-size:.95rem}.jcard b{font-size:1.7rem;line-height:1.1}.jcs{display:flex;gap:14px;color:rgba(255,255,255,.85);font-size:.9rem}
+.jcw{position:absolute;right:14px;bottom:10px;opacity:.28}.jcw svg{width:64px;height:64px}
+.jdots{display:flex;justify-content:center;gap:6px;margin:0 0 .6rem}.jdots i{width:7px;height:7px;border-radius:50%;background:var(--line)}.jdots i.on{background:var(--mute)}

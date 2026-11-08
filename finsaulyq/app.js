@@ -368,7 +368,7 @@ function home() {
   const ids = new Set(S.accounts.map((a) => a.id)), wal = FS.wallet(S), accId = jv.acc && (jv.acc === "_" || ids.has(jv.acc)) ? jv.acc : "";
   const inAcc = (id) => !accId || (ids.has(id) ? id : "_") === accId, inRange = (d) => d >= from && d <= to;
   const txs = S.tx.filter((t) => inAcc(t.account) && inRange(t.date)), trs = S.transfers.filter((t) => (!accId || inAcc(t.from) || inAcc(t.to)) && inRange(t.date));
-  const m = txs.reduce((a, t) => { a[t.kind] += t.amount; return a; }, { income: 0, expense: 0 });
+  const stat = (id) => S.tx.filter((t) => (!id || (ids.has(t.account) ? t.account : "_") === id) && inRange(t.date)).reduce((a, t) => { a[t.kind] += t.amount; return a; }, { income: 0, expense: 0 });
   const days = {}, at = (d) => (days[d] ??= { tx: [], tr: [] });
   for (const t of txs) at(t.date).tx.push(t);
   for (const t of trs) at(t.date).tr.push(t);
@@ -376,23 +376,26 @@ function home() {
   const nm = (id) => S.accounts.find((a) => a.id === id)?.name ?? "Шотсыз";
   const [y2, m2] = ym.split("-");
   const title = custom ? `${dm(from)} – ${dm(to)}` : span === 1 ? `${MONTHS[Number(m2) - 1]} ${y2}` : `${MONTHS[Number(shiftMonth(ym, 1 - span).slice(5)) - 1]} – ${MONTHS[Number(m2) - 1]} ${y2}`;
-  const sub = custom ? "" : ms > 1 || span > 1 ? `${dm(from)} – ${dm(to)}` : "";
+  const sub = custom ? "" : `${dm(from)} – ${dm(to)}`;
   const pick = () => ask("Айды таңдау", [{ name: "m", label: "Ай", type: "month", value: ym }], (v) => { jMonth = v.m; setJv({ span: custom ? 1 : jv.span }); });
   const go = (k) => { jMonth = shiftMonth(ym, k * span); if (jMonth >= cur) jMonth = ""; render(); };
-  const chips = [["", "Барлығы", FS.balance(S)], ...wal.accounts.map((a) => [a.id, a.name, a.balance]), ...(wal.loose != null && ids.size ? [["_", "Шотсыз", wal.loose]] : [])];
-  const bal = accId === "_" ? wal.loose ?? 0 : accId ? wal.accounts.find((a) => a.id === accId).balance : FS.balance(S);
+  const chips = [["", "Барлығы", FS.balance(S)], ...(ids.size ? [...wal.accounts.map((a) => [a.id, a.name, a.balance]), ...(wal.loose != null ? [["_", "Шотсыз", wal.loose]] : [])] : [])];
   const mk = (t) => { const c = catInfo(t.category), sgn = t.kind === "income" ? "+" : "";
     return h("button", { class: "jt", style: `background:${c.color}`, "aria-label": `${t.category} ${tg(t.amount)}`, onclick: () => txForm(t) },
       h("span", { class: "wm", "aria-hidden": "true" }, ic(c.subs.find((x) => x.name === t.sub)?.icon || c.icon)), h("small", {}, t.sub || t.category), h("b", { class: "num" }, `${sgn}${mon(t.amount)}`)); };
   return [
     h("div", { class: "head" }, h("div", { class: "jtitle" }, h("h1", {}, title), sub && h("small", { class: "muted" }, sub)),
       h("div", { class: "hbtns" }, !custom && h("button", { class: "ghost round", "aria-label": "Бұрынғы кезең", onclick: () => go(-1) }, ic("chevl")), !custom && h("button", { class: "ghost round", "aria-label": "Кейінгі кезең", disabled: ym >= cur, onclick: () => go(1) }, ic("chev")),
-        h("button", { class: "ghost round", "aria-label": "Айды таңдау", onclick: pick }, ic("calendar")))),
-    ids.size ? h("div", { class: "achips", "aria-label": "Шот" }, chips.map(([id, name, b]) => h("button", { class: "achip", style: `--cc:${AC[id === "" ? 0 : id === "_" ? 1 : 2 + Math.max(0, S.accounts.findIndex((x) => x.id === id)) % (AC.length - 2)]}`, "aria-pressed": String(id === accId), "aria-label": `Шот: ${name}`, onclick: () => setJv({ acc: id }) }, ic("wallet"), h("small", {}, name), h("b", { class: "num" }, mon(b))))) : null,
-    h("div", { class: "jbal" }, h("div", { class: "jbtop" }, h("span", { class: "muted" }, accId ? nm(accId === "_" ? "" : accId) : "Қалдық"),
-        h("button", { class: "ghost round sm", "aria-label": hide ? "Сандарды көрсету" : "Сандарды жасыру", "aria-pressed": String(hide), onclick: () => { S.settings.hide = !hide; save(); } }, ic(hide ? "eye-off" : "eye"))),
-      h("b", { class: "big num" }, mon(bal)),
-      h("small", { class: "num" }, h("span", { class: "good" }, `+${mon(m.income)}`), " ", h("span", { class: "warn" }, `−${mon(m.expense)}`))),
+        h("button", { class: "ghost round", "aria-label": "Айды таңдау", onclick: pick }, ic("calendar")),
+        h("button", { class: "ghost round", "aria-label": hide ? "Сандарды көрсету" : "Сандарды жасыру", "aria-pressed": String(hide), onclick: () => { S.settings.hide = !hide; save(); } }, ic(hide ? "eye-off" : "eye")))),
+    h("div", { class: "jcards", "aria-label": "Шот", onpointerdown: (e) => { e.currentTarget._u = 1; }, onwheel: (e) => { e.currentTarget._u = 1; }, onscroll: (e) => { // қолмен сырғытқанда ортадағы карта таңдалады (бағдарламалық жылжытуды елемейді)
+        const el = e.currentTarget; if (!el._u) return; clearTimeout(el._t); el._t = setTimeout(() => { el._u = 0; const mid = el.scrollLeft + el.clientWidth / 2, c = [...el.children].reduce((p, x) => (Math.abs(x.offsetLeft + x.offsetWidth / 2 - mid) < Math.abs(p.offsetLeft + p.offsetWidth / 2 - mid) ? x : p));
+          if (c.dataset.id !== accId) setJv({ acc: c.dataset.id }); }, 140); } },
+      chips.map(([id, name, b], k) => { const st = stat(id === "_" ? "_" : id);
+        return h("button", { class: "jcard", "data-id": id, "data-sel": String(id === accId), style: `--cc:${AC[id === "" ? 0 : id === "_" ? 1 : 2 + Math.max(0, S.accounts.findIndex((x) => x.id === id)) % (AC.length - 2)]}`, "aria-pressed": String(id === accId), "aria-label": `Шот: ${name}`, onclick: () => setJv({ acc: id }) },
+          h("span", { class: "jcw", "aria-hidden": "true" }, ic("wallet")), h("small", {}, name), h("b", { class: "num" }, mon(b)),
+          h("span", { class: "jcs num" }, h("span", {}, `+${mon(st.income)}`), h("span", {}, `−${mon(st.expense)}`))); })),
+    chips.length > 1 ? h("div", { class: "jdots", "aria-hidden": "true" }, chips.map(([id]) => h("i", { class: id === accId ? "on" : "" }))) : null,
     h("div", { class: "rchips", "aria-label": "Аралық" }, [[1, "Ай"], [3, "3 ай"], [6, "6 ай"], [12, "Жыл"], [0, custom ? `${dm(from)} – ${dm(to)}` : "Аралық"]].map(([k, t]) =>
       h("button", { class: "rchip", "aria-pressed": String(k === (custom ? 0 : span)), onclick: () => (k === 0 ? pickRange() : setJv({ span: k })) }, t))),
     ...Object.keys(days).sort().reverse().map((d) => { const x = days[d], tot = x.tx.reduce((a, t) => a + (t.kind === "income" ? t.amount : -t.amount), 0);
@@ -988,6 +991,7 @@ const NAV = [["home", "Журнал", "home"], ["plan", "Summary", "bars"], ["+"
 
 function render() {
   document.getElementById("view").replaceChildren(...PAGES[tab]().filter(Boolean));
+  const jc = document.querySelector(".jcards [data-sel=true]"); if (jc) jc.parentElement.scrollLeft = jc.offsetLeft - (jc.parentElement.clientWidth - jc.offsetWidth) / 2; // таңдалған шот картасы ортада
   document.getElementById("nav").replaceChildren(...NAV.map(([id, label, icon]) => id === "+"
     ? h("button", { class: "plus primary", "aria-label": "Қосу", onclick: () => openAdd() }, ic("plus"))
     : h("button", { "aria-current": id === tab ? "page" : null, onclick: () => go(id) }, ic(icon), label)));
