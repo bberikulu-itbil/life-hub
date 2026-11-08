@@ -355,11 +355,23 @@ const setJv = (patch) => { jv = { ...jv, ...patch }; try { localStorage.setItem(
 const WD = ["Жексенбі", "Дүйсенбі", "Сейсенбі", "Сәрсенбі", "Бейсенбі", "Жұма", "Сенбі"];
 const shiftMonth = (key, k) => new Date(Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5)) - 1 + k, 1)).toISOString().slice(0, 7);
 const dm = (d) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1]}`;
-function pickRange() {
-  const to = today(), from = jv.from || shiftMonth(to.slice(0, 7), -1) + "-" + to.slice(8);
-  ask("Аралықты таңда", [{ name: "from", label: "Басы", type: "date", value: jv.from || from }, { name: "to", label: "Соңы", type: "date", value: jv.to || to }],
-    (v) => { if (v.from > v.to) return alert("Басы соңынан кейін болмауы керек."); setJv({ span: 0, from: v.from, to: v.to }); });
+// Күнтізбе батырмасы: не ай (1/3/6 ай, жыл), не өз аралығың
+function pickPeriod(ym, from, to, custom) {
+  const st = { mode: custom ? "range" : "month", m: ym, span: jv.span || 1, from, to }, dlg = h("dialog", { class: "sheet catdlg" });
+  const seg = (list, key, cur) => h("div", { class: "seg2" + (list.length > 2 ? " four" : "") }, list.map(([k, t]) => h("button", { type: "button", "aria-pressed": String(cur === k), onclick: () => { st[key] = k; draw(); } }, t)));
+  const draw = () => dlg.replaceChildren(h("h2", { class: "ctitle" }, "Кезең"), seg([["month", "Ай"], ["range", "Аралық"]], "mode", st.mode),
+    st.mode === "month" ? h("div", { class: "sec crow" }, h("label", { class: "inl" }, "Ай", h("input", { type: "month", name: "m", value: st.m, "aria-label": "Ай", onchange: (e) => { st.m = e.target.value; } })), seg([[1, "1 ай"], [3, "3 ай"], [6, "6 ай"], [12, "Жыл"]], "span", st.span))
+      : h("div", { class: "sec crow" }, h("label", { class: "inl" }, "Басы", h("input", { type: "date", name: "from", value: st.from, "aria-label": "Басы", onchange: (e) => { st.from = e.target.value; } })), h("label", { class: "inl" }, "Соңы", h("input", { type: "date", name: "to", value: st.to, "aria-label": "Соңы", onchange: (e) => { st.to = e.target.value; } }))),
+    h("div", { class: "end" }, h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"), h("button", { type: "button", class: "primary", onclick: () => {
+      if (st.mode === "month") { if (!st.m) return; jMonth = st.m; dlg.close(); return setJv({ span: st.span, from: "", to: "" }); }
+      if (!st.from || !st.to || st.from > st.to) return alert("Басы соңынан кейін болмауы керек.");
+      dlg.close(); setJv({ span: 0, from: st.from, to: st.to }); } }, "Қолдану")));
+  dlg.addEventListener("close", () => dlg.remove()); document.body.append(dlg); draw(); dlg.showModal();
 }
+// Қазақстан банктері: ресми логотип емес — шамамен бренд түсі мен қысқа әріп. Файл берсең, нақты логотипке ауыстырамыз
+const KZ_CITIES = ["Астана", "Алматы", "Шымкент", "Қарағанды", "Ақтөбе", "Тараз", "Павлодар", "Өскемен", "Семей", "Қостанай", "Қызылорда", "Орал", "Атырау", "Петропавл", "Ақтау", "Көкшетау", "Түркістан", "Талдықорған", "Қонаев", "Теміртау", "Екібастұз", "Рудный", "Жезқазған", "Балқаш", "Арқалық", "Ақсу", "Жаңаөзен", "Сәтбаев", "Лисаков", "Степногорск", "Көкшетау", "Шу", "Ұштөбе"].filter((c, i, a) => a.indexOf(c) === i);
+const BANKS = [["cash", "Қолма-қол", "#16a34a", "coin"], ["kaspi", "Kaspi", "#f14635", "K"], ["halyk", "Halyk", "#2fa84f", "H"], ["jusan", "Jusan", "#ff7a1a", "J"], ["forte", "ForteBank", "#c8102e", "F"], ["freedom", "Freedom", "#00a3e0", "Fr"], ["bereke", "Bereke", "#00833e", "B"], ["eurasian", "Eurasian", "#1e4ea1", "E"], ["homecredit", "Home Credit", "#e30613", "HC"], ["cenc", "CenterCredit", "#0a8f6b", "CC"], ["alatau", "Alatau City", "#2a3f8f", "AC"], ["rbk", "RBK", "#7a1fa2", "R"], ["nurbank", "Nurbank", "#e2231a", "N"], ["other", "Басқа", "#5b6470", "wallet"]];
+const bankMark = (key) => { const b = BANKS.find((x) => x[0] === key) ?? ["", "", "#5b6470", "wallet"]; return h("span", { class: "bk", style: `background:${b[2]}`, "aria-hidden": "true" }, ICONS[b[3]] ? ic(b[3]) : b[3]); };
 const AC = ["#0d7a52", "#5b6470", "#3b82f6", "#8b5cf6", "#f97316", "#ec4899", "#06b6d4"]; // Журналдағы шот карталарының түсі
 function home() {
   const T = today(), hide = S.settings.hide, mon = (n) => hide ? "••••• ₸" : tg(n), ms = S.settings.monthStart || 1, cur = FS.periodKey(T, ms), ym = jMonth || cur;
@@ -377,7 +389,6 @@ function home() {
   const [y2, m2] = ym.split("-");
   const title = custom ? `${dm(from)} – ${dm(to)}` : span === 1 ? `${MONTHS[Number(m2) - 1]} ${y2}` : `${MONTHS[Number(shiftMonth(ym, 1 - span).slice(5)) - 1]} – ${MONTHS[Number(m2) - 1]} ${y2}`;
   const sub = custom ? "" : `${dm(from)} – ${dm(to)}`;
-  const pick = () => ask("Айды таңдау", [{ name: "m", label: "Ай", type: "month", value: ym }], (v) => { jMonth = v.m; setJv({ span: custom ? 1 : jv.span }); });
   const go = (k) => { jMonth = shiftMonth(ym, k * span); if (jMonth >= cur) jMonth = ""; render(); };
   const chips = [["", "Барлығы", FS.balance(S)], ...(ids.size ? [...wal.accounts.map((a) => [a.id, a.name, a.balance]), ...(wal.loose != null ? [["_", "Шотсыз", wal.loose]] : [])] : [])];
   const mk = (t) => { const c = catInfo(t.category), sgn = t.kind === "income" ? "+" : "";
@@ -386,18 +397,16 @@ function home() {
   return [
     h("div", { class: "head" }, h("div", { class: "jtitle" }, h("h1", {}, title), sub && h("small", { class: "muted" }, sub)),
       h("div", { class: "hbtns" }, !custom && h("button", { class: "ghost round", "aria-label": "Бұрынғы кезең", onclick: () => go(-1) }, ic("chevl")), !custom && h("button", { class: "ghost round", "aria-label": "Кейінгі кезең", disabled: ym >= cur, onclick: () => go(1) }, ic("chev")),
-        h("button", { class: "ghost round", "aria-label": "Айды таңдау", onclick: pick }, ic("calendar")),
+        h("button", { class: "ghost round", "aria-label": "Кезеңді таңдау", onclick: () => pickPeriod(ym, from, to, custom) }, ic("calendar")),
         h("button", { class: "ghost round", "aria-label": hide ? "Сандарды көрсету" : "Сандарды жасыру", "aria-pressed": String(hide), onclick: () => { S.settings.hide = !hide; save(); } }, ic(hide ? "eye-off" : "eye")))),
     h("div", { class: "jcards", "aria-label": "Шот", onpointerdown: (e) => { e.currentTarget._u = 1; }, onwheel: (e) => { e.currentTarget._u = 1; }, onscroll: (e) => { // қолмен сырғытқанда ортадағы карта таңдалады (бағдарламалық жылжытуды елемейді)
-        const el = e.currentTarget; if (!el._u) return; clearTimeout(el._t); el._t = setTimeout(() => { el._u = 0; const mid = el.scrollLeft + el.clientWidth / 2, c = [...el.children].reduce((p, x) => (Math.abs(x.offsetLeft + x.offsetWidth / 2 - mid) < Math.abs(p.offsetLeft + p.offsetWidth / 2 - mid) ? x : p));
-          if (c.dataset.id !== accId) setJv({ acc: c.dataset.id }); }, 140); } },
+        const el = e.currentTarget; if (!el._u) return; clearTimeout(el._t); el._t = setTimeout(() => { el._u = 0; if (!el.isConnected) return; const mid = el.scrollLeft + el.clientWidth / 2, c = [...el.children].reduce((p, x) => (Math.abs(x.offsetLeft + x.offsetWidth / 2 - mid) < Math.abs(p.offsetLeft + p.offsetWidth / 2 - mid) ? x : p));
+          if (c.dataset.id !== (jv.acc || "")) setJv({ acc: c.dataset.id }); }, 140); } },
       chips.map(([id, name, b], k) => { const st = stat(id === "_" ? "_" : id);
-        return h("button", { class: "jcard", "data-id": id, "data-sel": String(id === accId), style: `--cc:${AC[id === "" ? 0 : id === "_" ? 1 : 2 + Math.max(0, S.accounts.findIndex((x) => x.id === id)) % (AC.length - 2)]}`, "aria-pressed": String(id === accId), "aria-label": `Шот: ${name}`, onclick: () => setJv({ acc: id }) },
-          h("span", { class: "jcw", "aria-hidden": "true" }, ic("wallet")), h("small", {}, name), h("b", { class: "num" }, mon(b)),
+        return h("button", { class: "jcard", "data-id": id, "data-sel": String(id === accId), style: `--cc:${BANKS.find((x) => x[0] === S.accounts.find((y) => y.id === id)?.bank)?.[2] ?? AC[id === "" ? 0 : id === "_" ? 1 : 2 + Math.max(0, S.accounts.findIndex((x) => x.id === id)) % (AC.length - 2)]}`, "aria-pressed": String(id === accId), "aria-label": `Шот: ${name}`, onclick: () => setJv({ acc: id }) },
+          S.accounts.find((x) => x.id === id)?.bank ? h("span", { class: "jcb" }, bankMark(S.accounts.find((x) => x.id === id).bank)) : h("span", { class: "jcw", "aria-hidden": "true" }, ic("wallet")), h("small", {}, name), h("b", { class: "num" }, mon(b)),
           h("span", { class: "jcs num" }, h("span", {}, `+${mon(st.income)}`), h("span", {}, `−${mon(st.expense)}`))); })),
     chips.length > 1 ? h("div", { class: "jdots", "aria-hidden": "true" }, chips.map(([id]) => h("i", { class: id === accId ? "on" : "" }))) : null,
-    h("div", { class: "rchips", "aria-label": "Аралық" }, [[1, "Ай"], [3, "3 ай"], [6, "6 ай"], [12, "Жыл"], [0, custom ? `${dm(from)} – ${dm(to)}` : "Аралық"]].map(([k, t]) =>
-      h("button", { class: "rchip", "aria-pressed": String(k === (custom ? 0 : span)), onclick: () => (k === 0 ? pickRange() : setJv({ span: k })) }, t))),
     ...Object.keys(days).sort().reverse().map((d) => { const x = days[d], tot = x.tx.reduce((a, t) => a + (t.kind === "income" ? t.amount : -t.amount), 0);
       return h("section", { class: "jday" },
         h("div", { class: "jh" }, h("b", {}, `${Number(d.slice(8))} ${WD[new Date(d + "T00:00:00").getDay()]}`), h("span", { class: "num " + (tot < 0 ? "warn" : "good") }, x.tx.length ? `${tot > 0 ? "+" : "−"}${mon(Math.abs(tot))}` : "")),
@@ -561,7 +570,7 @@ function walletPage() {
   const cards = pockets.map((a) => {
     const m = metric(a.id), sign = m.net > 0 ? "+" : m.net < 0 ? "−" : "";
     return h("article", { class: "account-card" },
-      h("div", { class: "account-card-head" }, h("span", { class: "account-mark", style: `background:${catColor(a.name)}` }), h("b", {}, a.name), a.id && h("small", { class: "muted" }, "Шот"), a.id && h("span", { class: "acts" }, editBtn(a, a.balance), del2(a))),
+      h("div", { class: "account-card-head" }, bankMark(a.bank), h("b", {}, a.name), a.id && h("button", { class: "ghost sm acts", "aria-label": `Әрекеттер: ${a.name}`, onclick: () => acctMenu(a) }, ic("more"))),
       h("div", { class: "account-balance num " + (a.balance < 0 ? "warn" : "") }, mon(a.balance)),
       h("small", { class: "muted" }, range.label),
       h("div", { class: "account-net num " + (m.net < 0 ? "warn" : m.net > 0 ? "good" : "muted") }, `${sign}${mon(Math.abs(m.net))}`),
@@ -586,8 +595,7 @@ function walletPage() {
     h("section", { class: "wallet-total" }, h("div", { class: "wallet-total-top" }, h("span", { class: "muted" }, "Барлық қаражат"), h("span", { class: "chip" }, "Қазір")),
       h("div", { class: "wallet-total-value num" }, mon(total)), h("small", { class: "muted" }, "Мақсаттарға аударылған сома кірмейді")),
     h("section", { class: "sec wallet-filter-card" }, h("header", {}, h("h2", {}, "Кезең"), h("small", { class: "muted" }, range.detail)), rangeBar),
-    sec("Шоттар", add(() => ask("Жаңа шот", [{ name: "name", label: "Атауы (қолма-қол, карта…)" }, { name: "opening", label: "Қазіргі қалдық, ₸", type: "number", min: -1e12, value: 0 }],
-      (v) => { put("accounts", { id: crypto.randomUUID(), name: v.name.trim(), opening: num(v.opening) }); save(); })),
+    sec("Шоттар", add(() => acctForm()),
       pockets.length ? h("div", { class: "account-grid" }, cards) : empty("Шот жоқ. Қолма-қол, карта сияқты шоттарды қос: әр транзакция шотқа байланады.")),
     S.accounts.length ? h("div", { class: "end wallet-actions", style: "margin-top:0" }, h("button", { onclick: trForm }, ic("swap"), "Шоттар арасында аудару")) : null,
     S.transfers.length ? sec("Аударымдар", null, [...S.transfers].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10).map((t) => {
@@ -595,9 +603,14 @@ function walletPage() {
       return h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, `${nm(t.from)} → ${nm(t.to)}`), h("small", { class: "muted" }, t.date)), h("span", { class: "num" }, mon(t.amount)), del("transfers", t.id, `${nm(t.from)} → ${nm(t.to)}`));
     })) : null,
   ];
-  function editBtn(a, cur) { return h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${a.name}`, onclick: () => ask("Шотты өзгерту", [{ name: "name", label: "Атауы", value: a.name }, { name: "cur", label: "Қазіргі қалдық, ₸", type: "number", min: -1e12, value: cur }],
-    (v) => { put("accounts", { ...a, name: v.name.trim(), opening: a.opening + (num(v.cur) - cur) }); save(); }) }, ic("edit")); }
-  function del2(a) { return h("button", { class: "ghost sm", "aria-label": `Өшіру: ${a.name}`, onclick: () => delAcc(a) }, ic("trash")); }
+  function acctForm(a) { const cur = a?.balance ?? 0, bankOpts = [["", "—"], ...BANKS.map((b) => [b[0], b[1]])];
+    return ask(a ? "Шотты өзгерту" : "Жаңа шот", [{ name: "name", label: "Атауы (бос болса — банк аты)", optional: true, value: a?.name ?? "" }, { name: "bank", label: "Банк не түрі", options: bankOpts, value: a?.bank ?? "" },
+      a ? { name: "cur", label: "Қазіргі қалдық, ₸", type: "number", min: -1e12, value: cur } : { name: "opening", label: "Қазіргі қалдық, ₸", type: "number", min: -1e12, value: 0 }],
+    (v) => { const name = v.name.trim() || BANKS.find((b) => b[0] === v.bank)?.[1] || "Шот";
+      put("accounts", a ? { ...a, name, bank: v.bank, opening: a.opening + (num(v.cur) - cur) } : { id: crypto.randomUUID(), name, bank: v.bank, opening: num(v.opening) }); save(); }); }
+  function acctMenu(a) { const dlg = h("dialog", {}), go = (f) => () => { dlg.close(); f(); };
+    dlg.append(h("h3", {}, a.name), h("div", { class: "end wrap" }, h("button", { onclick: go(() => acctForm(a)) }, "Өзгерту"), h("button", { class: "warn", onclick: go(() => delAcc(a)) }, "Өшіру"), h("button", { class: "ghost", onclick: () => dlg.close() }, "Жабу")));
+    dlg.addEventListener("close", () => dlg.remove()); document.body.append(dlg); dlg.showModal(); }
 }
 
 function walletRangeInfo(T) {
@@ -962,7 +975,7 @@ function settings() {
     h("div", { class: "row" }, h("span", {}, "Негізгі орташа"), h("span", { class: "num" }, `Соңғы ${st.payerRecentCount} төлем`)),
     h("div", { class: "row" }, h("span", {}, "Әдепкі ескерту"), h("span", { class: "num" }, `${st.payerReminderDays} күн бұрын`)),
     h("div", { class: "row" }, h("span", {}, "Чекпен автоматты байланыстыру"), h("span", {}, st.payerAutoLink === false ? "Өшірулі" : "Қосулы")));
-  const citySec = sec("Қала және енгізу", h("button", { class: "ghost", onclick: () => ask("Қала", [{ name: "city", label: "Қала (тауар жазбаларына жазылады)", value: st.city }], (v) => { S.settings.city = v.city.trim() || "Астана"; put("settings"); save(); }) }, "Өзгерту"),
+  const citySec = sec("Қала және енгізу", h("button", { class: "ghost", onclick: () => ask("Қала", [{ name: "city", label: "Қала (Төлемгер жазбаларына жазылады, салыстыру үшін)", options: (KZ_CITIES.includes(st.city) ? KZ_CITIES : [st.city, ...KZ_CITIES]).map((c) => [c, c]), value: st.city }], (v) => { S.settings.city = v.city || "Астана"; put("settings"); save(); }) }, "Өзгерту"),
       h("div", { class: "row" }, h("span", {}, "Қала"), h("span", {}, st.city)),
       h("div", { class: "row" }, h("span", {}, "Ашылғанда санперне"), h("button", { onclick: () => { S.settings.pad = st.pad === false; save(); } }, st.pad === false ? "Өшірулі" : "Қосулы")));
   const cloudSec = [S.email ? accountSec() : null, sec("Бұлт", null, h("p", { class: "muted" }, cloud),
