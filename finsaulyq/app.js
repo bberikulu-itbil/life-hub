@@ -7,6 +7,34 @@ const CATS = ["Тамақ", "Көлік", "Тұрмыс", "Кітап", "Күт�
 const MONTHS = ["Қаңтар", "Ақпан", "Наурыз", "Сәуір", "Мамыр", "Маусым", "Шілде", "Тамыз", "Қыркүйек", "Қазан", "Қараша", "Желтоқсан"];
 const COLORS = ["var(--acc)", "var(--star)", "var(--warn)", "var(--acc-2)", "var(--good)", "var(--mute)"];
 const ICONS = {
+  gamepad: '<line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="2"/>',
+  dumbbell: '<path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/>',
+  paw: '<circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="4" cy="8" r="2"/><path d="M8 18c0-3 2-5 4-5s4 2 4 5c0 2-2 3-4 2.5S8 20 8 18z"/>',
+  fuel: '<path d="M4 22V4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v18"/><path d="M3 22h12"/><path d="M14 10h2a2 2 0 0 1 2 2v4a2 2 0 0 0 4 0V8l-3-3"/><rect x="6" y="6" width="6" height="4"/>',
+  shirt: '<path d="M20.4 6.4L16 3a4 4 0 0 1-8 0L3.6 6.4a1 1 0 0 0-.3 1.3l1.6 2.6a1 1 0 0 0 1.2.4L7 10.3V20a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-9.7l.9.4a1 1 0 0 0 1.2-.4l1.6-2.6a1 1 0 0 0-.3-1.3z"/>',
+  key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2"/>',
+  bed: '<path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8M2 17h20M6 10V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4"/>',
+  tv: '<rect x="2" y="7" width="20" height="13" rx="2"/><polyline points="8 2 12 6 16 2"/>',
+  headphones: '<path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>',
+  bike: '<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zM12 17.5V14l-3-3 4-3 2 3h2"/>',
+  tree: '<polygon points="12 3 5 13 9 13 6 19 18 19 15 13 19 13"/><line x1="12" y1="19" x2="12" y2="22"/>',
+  cake: '<path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1M2 21h20M7 8v3M12 8v3M17 8v3M7 4h.01M12 4h.01M17 4h.01"/>',
+  umbrella: '<path d="M23 12a11.05 11.05 0 0 0-22 0zm-5 7a3 3 0 0 1-6 0v-7"/>',
+  bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  cloud: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>',
+  truck: '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+  percent: '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+  coin: '<circle cx="12" cy="12" r="10"/><path d="M15 9.5a3 3 0 0 0-3-1.5c-1.7 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2a3 3 0 0 1-3-1.5M12 6v2M12 16v2"/>',
+  palette: '<circle cx="13.5" cy="6.5" r="1"/><circle cx="17.5" cy="10.5" r="1"/><circle cx="8.5" cy="7.5" r="1"/><circle cx="6.5" cy="12.5" r="1"/><path d="M12 2a10 10 0 0 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A4.7 4.7 0 0 0 22 11c0-5-4.5-9-10-9z"/>',
+  pen: '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/>',
+  flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.4 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  ticket: '<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z"/><path d="M13 5v2M13 17v2M13 11v2"/>',
+  laptop: '<rect x="4" y="5" width="16" height="11" rx="1"/><path d="M2 20h20"/>',
+  baby: '<circle cx="12" cy="10" r="7"/><path d="M9 10h.01M15 10h.01M10 13c1 1 3 1 4 0M12 3c0-1.5 1.5-2 2.5-1.5"/><path d="M5 21c1-3 3.5-4 7-4s6 1 7 4"/>',
+  sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/>',
   home: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   box: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
@@ -312,12 +340,20 @@ function donut(m) {
 
 /* ---------- беттер ---------- */
 let jMonth = "";
+// Журнал сүзгісі: бір шот (acc: "" = барлығы, "_" = шотсыз) және 1 не 3 ай; құрылғыда сақталады
+let jv = (() => { try { const v = JSON.parse(localStorage.getItem("fs-jv")); return { acc: typeof v?.acc === "string" ? v.acc : "", span: v?.span === 3 ? 3 : 1 }; } catch { return { acc: "", span: 1 }; } })();
+const setJv = (patch) => { jv = { ...jv, ...patch }; try { localStorage.setItem("fs-jv", JSON.stringify(jv)); } catch {} render(); };
 const WD = ["Жексенбі", "Дүйсенбі", "Сейсенбі", "Сәрсенбі", "Бейсенбі", "Жұма", "Сенбі"];
 function home() {
-  const T = today(), hide = S.settings.hide, mon = (n) => hide ? "*** ₸" : tg(n), ym = jMonth || T.slice(0, 7), m = FS.monthTotals(S.tx, ym + "-15");
+  const T = today(), hide = S.settings.hide, mon = (n) => hide ? "*** ₸" : tg(n), ym = jMonth || T.slice(0, 7);
+  const ids = new Set(S.accounts.map((a) => a.id)), wal = FS.wallet(S), accId = jv.acc && (jv.acc === "_" || ids.has(jv.acc)) ? jv.acc : "";
+  const inAcc = (id) => !accId || (ids.has(id) ? id : "_") === accId;
+  const [yy, mm] = ym.split("-").map(Number), months = Array.from({ length: jv.span }, (_, k) => new Date(Date.UTC(yy, mm - 1 - k, 1)).toISOString().slice(0, 7));
+  const txs = S.tx.filter((t) => inAcc(t.account)), trs = S.transfers.filter((t) => !accId || inAcc(t.from) || inAcc(t.to));
+  const m = months.reduce((a, k) => { const r = FS.monthTotals(txs, k + "-15"); return { income: a.income + r.income, expense: a.expense + r.expense }; }, { income: 0, expense: 0 });
   const days = {}, at = (d) => (days[d] ??= { tx: [], tr: [] });
-  for (const t of S.tx) if (t.date.slice(0, 7) === ym) at(t.date).tx.push(t);
-  for (const t of S.transfers) if (t.date.slice(0, 7) === ym) at(t.date).tr.push(t);
+  for (const t of txs) if (months.includes(t.date.slice(0, 7))) at(t.date).tx.push(t);
+  for (const t of trs) if (months.includes(t.date.slice(0, 7))) at(t.date).tr.push(t);
   if (ym === T.slice(0, 7)) at(T); // бүгінгі күнде әрқашан «+» бар
   const nm = (id) => S.accounts.find((a) => a.id === id)?.name ?? "Шотсыз";
   const pick = () => ask("Айды таңдау", [{ name: "m", label: "Ай", type: "month", value: ym }], (v) => { jMonth = v.m; render(); });
@@ -325,10 +361,13 @@ function home() {
     return h("button", { class: "jt", style: `background:${c.color}`, "aria-label": `${t.category} ${tg(t.amount)}`, onclick: () => txForm(t) },
       h("span", { class: "wm", "aria-hidden": "true" }, ic(c.icon)), h("small", {}, t.sub || t.category), h("b", { class: "num" }, `${sgn}${mon(t.amount)}`)); };
   return [
-    h("div", { class: "head" }, h("h1", {}, `${MONTHS[Number(ym.slice(5)) - 1]} ${ym.slice(0, 4)}`),
+    h("div", { class: "head" }, h("h1", {}, jv.span === 3 ? `${MONTHS[Number(months[2].slice(5)) - 1]} – ${MONTHS[mm - 1]} ${yy}` : `${MONTHS[mm - 1]} ${yy}`),
       h("div", { class: "hbtns" }, h("button", { class: "ghost round", "aria-label": "Айды таңдау", onclick: pick }, ic("calendar")),
         h("button", { class: "ghost round", "aria-label": hide ? "Балансты көрсету" : "Балансты жасыру", onclick: () => { S.settings.hide = !hide; save(); } }, ic(hide ? "eye-off" : "eye")))),
-    h("div", { class: "jbal" }, h("span", { class: "muted" }, "Қалдық"), h("b", { class: "big num" }, mon(FS.balance(S))),
+    h("div", { class: "jfilter" },
+      ids.size || wal.loose != null ? h("select", { "aria-label": "Шот", onchange: (e) => setJv({ acc: e.target.value }) }, [["", "Барлық шот"], ...S.accounts.map((a) => [a.id, a.name]), ...(wal.loose != null && ids.size ? [["_", "Шотсыз"]] : [])].map(([v, t]) => h("option", { value: v, selected: v === accId }, t))) : null,
+      h("div", { class: "seg2" }, [[1, "1 ай"], [3, "3 ай"]].map(([k, t]) => h("button", { "aria-pressed": String(jv.span === k), onclick: () => setJv({ span: k }) }, t)))),
+    h("div", { class: "jbal" }, h("span", { class: "muted" }, accId ? (accId === "_" ? "Шотсыз" : S.accounts.find((a) => a.id === accId).name) : "Қалдық"), h("b", { class: "big num" }, mon(accId === "_" ? wal.loose ?? 0 : accId ? wal.accounts.find((a) => a.id === accId).balance : FS.balance(S))),
       h("small", { class: "num" }, h("span", { class: "good" }, `+${mon(m.income)}`), " ", h("span", { class: "warn" }, `−${mon(m.expense)}`))),
     ...Object.keys(days).sort().reverse().map((d) => { const x = days[d], tot = x.tx.reduce((a, t) => a + (t.kind === "income" ? t.amount : -t.amount), 0);
       return h("section", { class: "jday" },
@@ -337,7 +376,7 @@ function home() {
           ...x.tr.map((t) => h("div", { class: "jt tr", "aria-label": `${nm(t.from)} → ${nm(t.to)} ${tg(t.amount)}` }, h("span", { class: "wm", "aria-hidden": "true" }, ic("swap")), h("small", {}, `${nm(t.from)} → ${nm(t.to)}`), h("b", { class: "num" }, mon(t.amount)))),
           h("button", { class: "jt jadd", "aria-label": `Қосу: ${d}`, onclick: () => openAdd({ date: d }) }, ic("plus"))));
     }),
-    Object.keys(days).length ? null : empty("Бұл айда жазба жоқ."),
+    Object.keys(days).length ? null : empty(jv.span === 3 ? "Бұл 3 айда жазба жоқ." : "Бұл айда жазба жоқ."),
   ];
 }
 
@@ -464,7 +503,8 @@ const catColor = (n) => PALETTE[[...FS.normCat(n)].reduce((a, ch) => a + ch.char
 // Санат көрінісі: сақталған жазба, болмаса әдепкі стиль; ішкі санат — { name, icon }
 const DEF_STYLE = { "Тамақ": ["utensils", "#ef9b37"], "Көлік": ["car", "#5b3cc4"], "Тұрмыс": ["home", "#8ecb3e"], "Кітап": ["book", "#ec4899"], "Күтім": ["heart", "#62d6c0"], "Жалақы": ["wallet", "#8ecb3e"], "Басқа": ["tag", "#d9d9d9"] };
 const COLORS_PICK = ["#e5534b", "#ef9b37", "#e3be40", "#8ecb3e", "#62d6c0", "#3b82f6", "#5b3cc4", "#ec4899", "#a21cf3", "#5b6470", "#d9d9d9"];
-const ICON_KEYS = ["utensils", "coffee", "bag", "cart", "car", "bus", "plane", "home", "book", "grad", "heart", "pill", "smile", "film", "music", "gift", "phone", "monitor", "wifi", "zap", "drop", "scissors", "briefcase", "star", "moon", "sun", "tag", "card", "trend", "shield", "tool", "pin", "box", "wallet", "camera", "target"];
+const ICON_KEYS = ["utensils", "coffee", "bag", "cart", "car", "bus", "plane", "home", "book", "grad", "heart", "pill", "smile", "film", "music", "gift", "phone", "monitor", "wifi", "zap", "drop", "scissors", "briefcase", "star", "moon", "sun", "tag", "card", "trend", "shield", "tool", "pin", "box", "wallet", "camera", "target",
+  "fuel", "truck", "bike", "shirt", "bed", "key", "tv", "laptop", "headphones", "gamepad", "dumbbell", "paw", "baby", "tree", "cake", "umbrella", "bell", "clock", "globe", "cloud", "percent", "coin", "palette", "pen", "flag", "flame", "ticket", "sparkles"];
 function catInfo(name) {
   const n = FS.normCat(name), rec = S.categories.find((c) => FS.normCat(c.name) === n), d = DEF_STYLE[n];
   return { name: n, rec, color: rec?.color || d?.[1] || catColor(n), icon: rec?.icon || d?.[0] || "tag", budget: rec?.budget || 0, subs: (rec?.subs ?? []).map((x) => (typeof x === "string" ? { name: x, icon: "" } : x)) };
@@ -473,8 +513,9 @@ function catInfo(name) {
 function allCats(kind) {
   const used = {}; for (const t of S.tx) if (t.kind === kind) used[FS.normCat(t.category)] = (used[FS.normCat(t.category)] || 0) + 1;
   const dflt = kind === "income" ? ["Жалақы", ...S.incomes.map((i) => i.name)] : CATS.filter((c) => c !== "Жалақы");
-  const names = [...S.categories.filter((c) => (c.kind || "expense") === kind).map((c) => c.name), ...Object.keys(used).sort((a, b) => used[b] - used[a]), ...dflt];
-  return [...new Set(names.map(FS.normCat))].map(catInfo);
+  const gone = new Set(S.categories.filter((c) => c.hidden).map((c) => FS.normCat(c.name))); // өшірілген санаттар қайта шықпайды
+  const names = [...S.categories.filter((c) => !c.hidden && (c.kind || "expense") === kind).map((c) => c.name), ...Object.keys(used).sort((a, b) => used[b] - used[a]), ...dflt];
+  return [...new Set(names.map(FS.normCat))].filter((n) => !gone.has(n)).map(catInfo);
 }
 const tile = (name, inner, big) => { const c = catInfo(name); return h("span", { class: "tile" + (big ? " big" : ""), style: `background:${c.color}`, "aria-hidden": "true" }, inner ?? (ICONS[c.icon] ? ic(c.icon) : [...name][0]?.toUpperCase())); };
 const grp = (s) => { const [a, b] = String(s || "0").split("."); return a.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + (b !== undefined ? "." + b : ""); };
@@ -635,35 +676,52 @@ const ensureCat = (name) => {
   const i = catInfo(name); if (i.rec) return i.rec;
   const rec = { id: crypto.randomUUID(), name: i.name, kind: catKind, color: i.color, icon: i.icon, subs: [], budget: 0 }; put("categories", rec); return rec;
 };
+const isDefaultCat = (n) => CATS.includes(n) || n in DEF_STYLE;
+const hideCat = (name, rec) => put("categories", { ...(rec ?? { id: crypto.randomUUID(), name, kind: catKind }), hidden: true, subs: [], budget: 0 }); // әдепкі атау қайта шықпасын деп белгі қалады
+// Санат атын ауыстыру: транзакциялар мен циклдер соңынан ере жаңарады
+function renameCat(c, newName) {
+  for (const t of S.tx) if (FS.normCat(t.category) === c.name) put("tx", { ...t, category: newName });
+  for (const x of S.cycles) if (FS.normCat(x.cat ?? "") === c.name) put("cycles", { ...x, cat: newName });
+  const rec = ensureCat(c.name); put("categories", { ...rec, name: newName });
+  if (isDefaultCat(c.name)) hideCat(c.name);
+}
+// Санатты өшіру: жазбалары «Басқа» санатына көшеді
+function deleteCat(c) {
+  for (const t of S.tx) if (FS.normCat(t.category) === c.name) { const { sub, ...rest } = t; put("tx", { ...rest, category: "Басқа" }); }
+  if (c.rec && !isDefaultCat(c.name)) rm("categories", c.rec.id); else hideCat(c.name, c.rec);
+}
 // opts: { cat } санатты өзгерту · { parent } ішкі санат қосу · { parent, sub } ішкі санатты өзгерту
 function catForm(opts = {}) {
   const info = opts.cat, parent0 = opts.parent ? catInfo(opts.parent) : null, sub0 = opts.sub;
   const st = { name: sub0?.name ?? info?.name ?? "", parent: parent0?.name ?? "", budget: info?.budget || "", color: info?.color ?? parent0?.color ?? COLORS_PICK[Math.floor(Math.random() * 9)], icon: sub0?.icon || info?.icon || "tag" };
   const dlg = h("dialog", { class: "sheet catdlg" });
-  const editing = !!(info || sub0), lock = editing; // атау өзгермейді: ескі транзакциялар атпен байланған
+  const editing = !!(info || sub0), usedBy = info ? S.tx.filter((t) => FS.normCat(t.category) === info.name).length : 0;
   const draw = () => {
     const par = st.parent ? catInfo(st.parent) : null, color = par && !info ? par.color : st.color;
     dlg.replaceChildren(
       h("h2", { class: "ctitle" }, sub0 ? "Ішкі санатты өзгерту" : info ? "Санатты өзгерту" : st.parent ? "Жаңа ішкі санат" : "Жаңа санат"),
       h("div", { class: "cprev", style: `background:${color}` }, ic(st.icon)),
       h("div", { class: "sec crow" },
-        h("label", { class: "inl" }, "Атауы", h("input", { value: st.name, placeholder: "Қысқа әрі нақты", readonly: lock, "aria-label": "Атауы", oninput: (e) => { st.name = e.target.value; } })),
+        h("label", { class: "inl" }, "Атауы", h("input", { value: st.name, placeholder: "Қысқа әрі нақты", "aria-label": "Атауы", oninput: (e) => { st.name = e.target.value; } })),
         !info && h("label", { class: "inl" }, "Орны", h("select", { "aria-label": "Орны", onchange: (e) => { st.parent = e.target.value; draw(); } }, [["", "Санаттар"], ...allCats(catKind).map((c) => [c.name, c.name])].map(([v, t]) => h("option", { value: v, selected: v === st.parent }, t))))),
       !st.parent && h("div", { class: "sec crow" }, h("label", { class: "inl" }, "Бюджет", h("input", { type: "number", min: 0, step: "any", inputmode: "decimal", value: st.budget, placeholder: "₸0", "aria-label": "Бюджет", oninput: (e) => { st.budget = e.target.value; } }))),
       !st.parent && h("div", { class: "sec swatches" }, ...COLORS_PICK.map((c) => h("button", { type: "button", class: "sw" + (c === st.color ? " on" : ""), style: `background:${c}`, "aria-label": `Түс ${c}`, onclick: () => { st.color = c; draw(); } })),
         h("label", { class: "sw rainbow", "aria-label": "Басқа түс" }, h("input", { type: "color", value: st.color, onchange: (e) => { st.color = e.target.value; draw(); } }))),
       h("div", { class: "sec swatches" }, ...ICON_KEYS.map((k) => h("button", { type: "button", class: "ib" + (k === st.icon ? " on" : ""), "aria-label": `Белгіше ${k}`, onclick: () => { st.icon = k; draw(); } }, ic(k)))),
-      h("div", { class: "end sticky" }, editing && (sub0 || info?.rec) && h("button", { type: "button", class: "ghost warn", style: "margin-right:auto", onclick: () => {
-          if (!confirm(`«${sub0?.name ?? info.name}» өшіру ме? Бұрынғы транзакциялар сол атпен қала береді.`)) return;
-          if (sub0) { const r = ensureCat(parent0.name); r.subs = r.subs.filter((x) => (x.name ?? x) !== sub0.name); put("categories", r); } else rm("categories", info.rec.id);
-          dlg.close(); if (!sub0) catView = null; save(); } }, "Өшіру"),
+      h("div", { class: "end sticky" }, editing && (sub0 || info.name !== "Басқа") && h("button", { type: "button", class: "ghost warn", style: "margin-right:auto", onclick: () => {
+          if (!confirm(sub0 ? `«${sub0.name}» ішкі санатын өшіру ме?` : `«${info.name}» санатын өшіру ме?` + (usedBy ? ` ${usedBy} жазба «Басқа» санатына көшеді.` : ""))) return;
+          if (sub0) { const r = ensureCat(parent0.name); r.subs = r.subs.filter((x) => (x.name ?? x) !== sub0.name); put("categories", r); } else { deleteCat(info); catView = null; }
+          dlg.close(); save(); } }, "Өшіру"),
         h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"),
         h("button", { type: "button", class: "primary", onclick: () => {
           const name = FS.normCat(st.name); if (!st.name.trim()) return alert("Атауын жаз.");
+          if (!st.parent && allCats(catKind).some((c) => c.name === name && c.name !== info?.name)) return alert("Мұндай санат бар.");
           if (st.parent) { const r = ensureCat(st.parent), subs = r.subs.map((x) => (typeof x === "string" ? { name: x, icon: "" } : x)).filter((x) => x.name !== (sub0?.name ?? "")); if (subs.some((x) => x.name.toLowerCase() === st.name.trim().toLowerCase())) return alert("Мұндай ішкі санат бар.");
-            r.subs = [...subs, { name: st.name.trim(), icon: st.icon }]; put("categories", r); }
-          else { if (!info && catInfo(name).rec) return alert("Мұндай санат бар."); const r = info?.rec ?? { id: crypto.randomUUID(), name, kind: catKind, subs: [] };
-            put("categories", { ...r, name: r.name, color: st.color, icon: st.icon, budget: num(st.budget) || 0, kind: r.kind || catKind }); }
+            r.subs = [...subs, { name: st.name.trim(), icon: st.icon }]; put("categories", r);
+            if (sub0 && sub0.name !== st.name.trim()) for (const t of S.tx) if (FS.normCat(t.category) === parent0.name && t.sub === sub0.name) put("tx", { ...t, sub: st.name.trim() }); }
+          else { if (info && name !== info.name) { renameCat(info, name); catView = name; }
+            const r = catInfo(name).rec ?? { id: crypto.randomUUID(), name, kind: catKind, subs: [] }; // өшірілген санатты қайта қосса — жаңғырады
+            put("categories", { ...r, name, hidden: false, color: st.color, icon: st.icon, budget: num(st.budget) || 0, kind: r.kind || catKind }); }
           dlg.close(); save(); } }, editing ? "Сақтау" : "Қосу")));
   };
   dlg.addEventListener("close", () => dlg.remove());

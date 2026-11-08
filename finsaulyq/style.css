@@ -162,3 +162,5 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .seg.tabs{margin:.4rem 0 .8rem}.seg.tabs button{padding:.6rem .2rem;font-weight:600}
 .row.wish{flex-wrap:wrap}.row.wish button:not(.ghost){font-size:.85rem}
 .catgrid.fav{grid-template-columns:repeat(2,1fr)}.catgrid.fav .catb{flex-direction:row;justify-content:flex-start;gap:8px;text-align:left;min-height:56px}
+.jfilter{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:.2rem 0 .4rem}.jfilter select{flex:1;min-width:0;border-radius:999px;padding:.55rem .9rem;border:0;background:var(--glass-2);color:inherit;font:inherit}
+.swatches .sw{flex:none;height:34px;aspect-ratio:1}
