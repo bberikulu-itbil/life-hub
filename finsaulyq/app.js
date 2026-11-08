@@ -780,6 +780,35 @@ const valid = (x) => {
 
 const CLOUD = { local: "Бұлт өшік: Hub-қа кіріп, осы бетті қайта аш", ok: "Бұлтпен синхрондалды", wait: "Бұлтқа жіберуге күтіп тұр", err: "Бұлт қатесі" };
 
+// Аккаунт: Hub-пен ортақ Supabase сессиясы. Кіру Hub-та, мұнда — шығу, email және құпиясөзді өзгерту
+const authDone = (error, ok) => alert(error ? error.message : ok);
+function changeEmail() {
+  ask("Email өзгерту", [{ name: "email", label: "Жаңа email", type: "email" }], async (v) => {
+    const { error } = await Sync.sb.auth.updateUser({ email: v.email.trim() });
+    authDone(error, "Растау сілтемесі жіберілді. Поштаңды (жаңа және ескі) тексеріп, сілтемені бас: сонда email ауысады.");
+  });
+}
+function changePass() {
+  ask("Құпиясөзді өзгерту", [{ name: "p1", label: "Жаңа құпиясөз (кемінде 8 таңба)", type: "password" }, { name: "p2", label: "Қайталап жаз", type: "password" }], async (v) => {
+    if (v.p1.length < 8) { alert("Құпиясөз кемінде 8 таңба болуы керек."); return changePass(); }
+    if (v.p1 !== v.p2) { alert("Құпиясөздер сәйкес емес."); return changePass(); }
+    const { error } = await Sync.sb.auth.updateUser({ password: v.p1 });
+    authDone(error, "Құпиясөз өзгертілді.");
+  });
+}
+// Шыққанда құрылғы тазаланады: келесі кірген адамның деректері араласпасын. Алдымен жіберілмеген өзгерістер бұлтқа кетеді
+async function signOut() {
+  if (!confirm("Шығу ма? Құрылғыдағы деректер тазаланады, бұлттағылары қалады. Hub пен басқа қосымшалардан да шығасың.")) return;
+  await Sync.now();
+  if (S.pending.length || Sync.state === "err") return alert("Кейбір өзгерістер бұлтқа жіберілмеген (желі жоқ немесе қате). Алдымен синхрондап ал, содан кейін шық.");
+  const { error } = await Sync.sb.auth.signOut({ scope: "local" });
+  if (error) return alert(error.message);
+  Object.keys(S).forEach((k) => delete S[k]); Object.assign(S, structuredClone(DEF));
+  Sync.state = "local"; persist(); tab = "home"; sub = null; render();
+}
+const accountSec = () => sec("Аккаунт", null,
+  h("div", { class: "row" }, h("span", {}, "Email"), h("span", { class: "num" }, S.email)),
+  h("div", { class: "end", style: "margin-top:0;justify-content:flex-start;flex-wrap:wrap" }, h("button", { onclick: changeEmail }, "Email өзгерту"), h("button", { onclick: changePass }, "Құпиясөзді өзгерту"), h("button", { class: "ghost warn", onclick: signOut }, "Шығу")));
 function settings() {
   const st = S.settings, file = h("input", { type: "file", accept: "application/json,.json", hidden: true });
   file.addEventListener("change", async () => {
@@ -824,7 +853,7 @@ function settings() {
   const citySec = sec("Қала және енгізу", h("button", { class: "ghost", onclick: () => ask("Қала", [{ name: "city", label: "Қала (тауар жазбаларына жазылады)", value: st.city }], (v) => { S.settings.city = v.city.trim() || "Астана"; put("settings"); save(); }) }, "Өзгерту"),
       h("div", { class: "row" }, h("span", {}, "Қала"), h("span", {}, st.city)),
       h("div", { class: "row" }, h("span", {}, "Ашылғанда санперне"), h("button", { onclick: () => { S.settings.pad = st.pad === false; save(); } }, st.pad === false ? "Өшірулі" : "Қосулы")));
-  const cloudSec = [sec("Бұлт", null, h("p", { class: "muted" }, cloud),
+  const cloudSec = [S.email ? accountSec() : null, sec("Бұлт", null, h("p", { class: "muted" }, cloud),
       h("div", { class: "end", style: "margin-top:0;justify-content:flex-start" }, state === "local" ? h("a", { class: "btn", href: "../" }, "Hub-қа кіру") : h("button", { onclick: () => Sync.now() }, "Қазір синхрондау")),
       h("p", { class: "muted" }, "Қосымша интернетсіз де жұмыс істейді: өзгерістер құрылғыда сақталып, желі мен кіру болғанда бұлтқа жіберіледі.")),
     sec("Байланыс", null, h("span", { class: "chip" }, navigator.onLine ? "Желіде" : "Офлайн режим"))];
@@ -838,7 +867,7 @@ function settings() {
       h("button", { onclick: () => file.click() }, ic("up"), "Файлдан қосу"), h("button", { onclick: exportJson }, ic("down"), "Көшірме жүктеу"), file),
     h("section", { class: "sec menu" }, mrow("Санаттар", "cats", "grid", "#f59e0b", String(allCats("expense").length)), mrow("Шоттар", "wallets", "wallet", "#3b82f6", tg(FS.balance(S)))),
     h("section", { class: "sec menu" }, mrow("Кіріс көздері", "income", "plus", "#84cc16", String(S.incomes.length || "")), mrow("Жинақтар", "savings", "target", "#10b981", String(S.goals.length || "")), mrow("Қаржылық параметрлер", "fin", "sliders", "#6b7280"), mrow("Төлемгер баптаулары", "payer", "calendar", "#0d7a52", `${st.payerRecentCount} төлем`)),
-    h("section", { class: "sec menu" }, mrow("Қала және енгізу", "city", "home", "#8b5cf6", st.city), mrow("Бұлт", "cloud", "swap", "#ec4899", cloud)),
+    h("section", { class: "sec menu" }, mrow("Қала және енгізу", "city", "home", "#8b5cf6", st.city), mrow(S.email ? "Бұлт және аккаунт" : "Бұлт", "cloud", "swap", "#ec4899", cloud)),
   ];
 }
 

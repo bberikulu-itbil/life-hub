@@ -23,7 +23,8 @@ Sync.now = async () => {
   Sync.busy = true;
   try {
     const { data: { session } } = await Sync.sb.auth.getSession();
-    if (!session) { Sync.state = "local"; return; }
+    if (!session) { Sync.state = "local"; if (S.email) { S.email = ""; persist(); } return; }
+    if (S.email !== session.user?.email) { S.email = session.user?.email ?? ""; persist(); }
     if (!S.synced) { // алғашқы рет: жергілікті деректер серверге қосылады (бар жазбалар өшпейді)
       const rows = await pullRows(), have = new Set(rows.map((r) => r.id));
       for (const k of LISTS) for (const e of S[k]) if (!have.has(e.id)) queue(k, e.id, "put");
