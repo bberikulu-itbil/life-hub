@@ -164,3 +164,12 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .catgrid.fav{grid-template-columns:repeat(2,1fr)}.catgrid.fav .catb{flex-direction:row;justify-content:flex-start;gap:8px;text-align:left;min-height:56px}
 .jfilter{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:.2rem 0 .4rem}.jfilter select{flex:1;min-width:0;border-radius:999px;padding:.55rem .9rem;border:0;background:var(--glass-2);color:inherit;font:inherit}
 .swatches .sw{flex:none;height:34px;aspect-ratio:1}
+/* Есеп: архив белгішесі, Wish List карточкалары */
+.sec header .hbtns{align-items:center}.round.sm{width:34px;height:34px}.round.on{background:var(--acc);color:#fff}
+.wgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.wcard{position:relative;display:flex;flex-direction:column;gap:4px;padding:8px;border-radius:18px;background:var(--glass-2);min-width:0}
+.wcard img,.wcard .wph{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;background:rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;color:var(--mute)}
+.wcard .wph svg{width:36px;height:36px}.wcard .wbtn{display:flex;flex-direction:column;gap:6px;margin-top:4px}.wcard .wbtn button{font-size:.8rem;padding:.5rem .4rem}
+.wcard>.ghost.sm{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.85);border-radius:50%}
+.wcard.gone{opacity:.65}
+.row .main[role=button]{cursor:pointer}
