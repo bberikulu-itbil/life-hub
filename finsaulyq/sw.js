@@ -1,5 +1,5 @@
-const C = 'finsaulyq-v20';
-const SHELL = ['./', 'index.html', 'style.css', 'core.js', 'sync.js', 'app.js', 'manifest.webmanifest', '../brand/tokens.css', '../brand/logos/finsaulyq.svg'];
+const C = 'finsaulyq-v21';
+const SHELL = ['./', 'index.html', 'style.css', 'core.js', 'sync.js', 'app.js', 'manifest.webmanifest', '../brand/tokens.css', '../brand/logos/finsaulyq.svg', 'banks/kaspi.svg', 'banks/halyk.svg', 'banks/cenc.svg', 'banks/freedom.svg'];
 const LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js'; // нұсқасы бекітілген: интернетсіз де іске қосылсын
 self.addEventListener('install', (e) => e.waitUntil(caches.open(C).then(async (c) => { await c.addAll(SHELL); await c.add(LIB).catch(() => {}); }).then(() => self.skipWaiting())));
 self.addEventListener('activate', (e) => e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith('finsaulyq-') && k !== C).map((k) => caches.delete(k)))).then(() => self.clients.claim())));

@@ -370,12 +370,14 @@ function pickPeriod(ym, from, to, custom) {
 }
 // Қазақстан банктері: ресми логотип емес — шамамен бренд түсі мен қысқа әріп. Файл берсең, нақты логотипке ауыстырамыз
 const KZ_CITIES = ["Астана", "Алматы", "Шымкент", "Қарағанды", "Ақтөбе", "Тараз", "Павлодар", "Өскемен", "Семей", "Қостанай", "Қызылорда", "Орал", "Атырау", "Петропавл", "Ақтау", "Көкшетау", "Түркістан", "Талдықорған", "Қонаев", "Теміртау", "Екібастұз", "Рудный", "Жезқазған", "Балқаш", "Арқалық", "Ақсу", "Жаңаөзен", "Сәтбаев", "Лисаков", "Степногорск", "Көкшетау", "Шу", "Ұштөбе"].filter((c, i, a) => a.indexOf(c) === i);
-const BANKS = [["cash", "Қолма-қол", "#16a34a", "coin"], ["kaspi", "Kaspi", "#f14635", "K"], ["halyk", "Halyk", "#2fa84f", "H"], ["jusan", "Jusan", "#ff7a1a", "J"], ["forte", "ForteBank", "#c8102e", "F"], ["freedom", "Freedom", "#00a3e0", "Fr"], ["bereke", "Bereke", "#00833e", "B"], ["eurasian", "Eurasian", "#1e4ea1", "E"], ["homecredit", "Home Credit", "#e30613", "HC"], ["cenc", "CenterCredit", "#0a8f6b", "CC"], ["alatau", "Alatau City", "#2a3f8f", "AC"], ["rbk", "RBK", "#7a1fa2", "R"], ["nurbank", "Nurbank", "#e2231a", "N"]]; 
+const BANKS = [["cash", "Қолма-қол", "#16a34a", "coin"], ["kaspi", "Kaspi", "#f14635", "K", "kaspi.svg"], ["halyk", "Halyk", "#00805f", "H", "halyk.svg"], ["jusan", "Jusan", "#ff7a1a", "J"], ["forte", "ForteBank", "#c8102e", "F"], ["freedom", "Freedom", "#3c9a2e", "Fr", "freedom.svg"], ["bereke", "Bereke", "#00833e", "B"], ["eurasian", "Eurasian", "#1e4ea1", "E"], ["homecredit", "Home Credit", "#e30613", "HC"], ["cenc", "CenterCredit", "#b8864a", "CC", "cenc.svg"], ["alatau", "Alatau City", "#2a3f8f", "AC"], ["rbk", "RBK", "#7a1fa2", "R"], ["nurbank", "Nurbank", "#e2231a", "N"]]; 
 const GEN = ["card", "wallet", "coin", "briefcase", "home", "trend", "shield", "target", "gift", "star"]; // жалпы белгішелер (шот белгісі "i:<кілт>")
 const bankMark = (a) => { const key = a?.bank || "";
   if (a?.logo) return h("span", { class: "bk lg", "aria-hidden": "true" }, h("img", { src: a.logo, alt: "" }));
   if (key.startsWith("i:")) return h("span", { class: "bk", style: "background:#475569", "aria-hidden": "true" }, ic(key.slice(2)));
-  const b = BANKS.find((x) => x[0] === key) ?? ["", "", "#5b6470", "wallet"]; return h("span", { class: "bk", style: `background:${b[2]}`, "aria-hidden": "true" }, ICONS[b[3]] ? ic(b[3]) : b[3]); };
+  const b = BANKS.find((x) => x[0] === key) ?? ["", "", "#5b6470", "wallet"];
+  if (b[4]) return h("span", { class: "bk lg" + (key === "kaspi" ? "" : " pad"), "aria-hidden": "true" }, h("img", { src: "banks/" + b[4], alt: "" }));
+  return h("span", { class: "bk", style: `background:${b[2]}`, "aria-hidden": "true" }, ICONS[b[3]] ? ic(b[3]) : b[3]); };
 const AC = ["#0d7a52", "#5b6470", "#3b82f6", "#8b5cf6", "#f97316", "#ec4899", "#06b6d4"]; // Журналдағы шот карталарының түсі
 function home() {
   const T = today(), hide = S.settings.hide, mon = (n) => hide ? "••••• ₸" : tg(n), ms = S.settings.monthStart || 1, cur = FS.periodKey(T, ms), ym = jMonth || cur;

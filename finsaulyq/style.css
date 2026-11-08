@@ -241,3 +241,5 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .bk.lg{background:#fff!important}.bk img{width:100%;height:100%;object-fit:contain;border-radius:inherit}
 .acprev{background:none!important}.acprev .bk{width:72px;height:72px;border-radius:22px;font-size:1.5rem}.acprev .bk .ic svg{width:34px;height:34px}
 .ib .bk{width:30px;height:30px}
+
+.bk.pad{padding:15%;box-sizing:border-box}.bk.pad img{border-radius:0}.jcb .bk.lg{background:#fff!important}
