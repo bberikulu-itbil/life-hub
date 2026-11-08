@@ -7,6 +7,7 @@ const CATS = ["Тамақ", "Көлік", "Тұрмыс", "Кітап", "Күт�
 const MONTHS = ["Қаңтар", "Ақпан", "Наурыз", "Сәуір", "Мамыр", "Маусым", "Шілде", "Тамыз", "Қыркүйек", "Қазан", "Қараша", "Желтоқсан"];
 const COLORS = ["var(--acc)", "var(--star)", "var(--warn)", "var(--acc-2)", "var(--good)", "var(--mute)"];
 const ICONS = {
+  soda: '<path d="M6 8h12l-1.5 13h-9z"/><path d="M5 8h14"/><path d="M13.5 8L15 3h3"/><circle cx="10.5" cy="13" r=".6"/><circle cx="13.5" cy="15" r=".6"/><circle cx="11" cy="18" r=".6"/>',
   gamepad: '<line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="2"/>',
   dumbbell: '<path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/>',
   paw: '<circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="4" cy="8" r="2"/><path d="M8 18c0-3 2-5 4-5s4 2 4 5c0 2-2 3-4 2.5S8 20 8 18z"/>',
@@ -503,7 +504,7 @@ const catColor = (n) => PALETTE[[...FS.normCat(n)].reduce((a, ch) => a + ch.char
 // Санат көрінісі: сақталған жазба, болмаса әдепкі стиль; ішкі санат — { name, icon }
 const DEF_STYLE = { "Тамақ": ["utensils", "#ef9b37"], "Көлік": ["car", "#5b3cc4"], "Тұрмыс": ["home", "#8ecb3e"], "Кітап": ["book", "#ec4899"], "Күтім": ["heart", "#62d6c0"], "Жалақы": ["wallet", "#8ecb3e"], "Басқа": ["tag", "#d9d9d9"] };
 const COLORS_PICK = ["#e5534b", "#ef9b37", "#e3be40", "#8ecb3e", "#62d6c0", "#3b82f6", "#5b3cc4", "#ec4899", "#a21cf3", "#5b6470", "#d9d9d9"];
-const ICON_KEYS = ["utensils", "coffee", "bag", "cart", "car", "bus", "plane", "home", "book", "grad", "heart", "pill", "smile", "film", "music", "gift", "phone", "monitor", "wifi", "zap", "drop", "scissors", "briefcase", "star", "moon", "sun", "tag", "card", "trend", "shield", "tool", "pin", "box", "wallet", "camera", "target",
+const ICON_KEYS = ["utensils", "coffee", "soda", "bag", "cart", "car", "bus", "plane", "home", "book", "grad", "heart", "pill", "smile", "film", "music", "gift", "phone", "monitor", "wifi", "zap", "drop", "scissors", "briefcase", "star", "moon", "sun", "tag", "card", "trend", "shield", "tool", "pin", "box", "wallet", "camera", "target",
   "fuel", "truck", "bike", "shirt", "bed", "key", "tv", "laptop", "headphones", "gamepad", "dumbbell", "paw", "baby", "tree", "cake", "umbrella", "bell", "clock", "globe", "cloud", "percent", "coin", "palette", "pen", "flag", "flame", "ticket", "sparkles"];
 function catInfo(name) {
   const n = FS.normCat(name), rec = S.categories.find((c) => FS.normCat(c.name) === n), d = DEF_STYLE[n];
