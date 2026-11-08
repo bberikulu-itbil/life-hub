@@ -238,5 +238,8 @@ function payerState(c, today) {
   return { kind: "cycle", status: next <= today ? "unpaid" : "upcoming", next };
 }
 
-const FS = { periodKey, periodRange, instMonthly, instLeft, instDone, instPay, instDue, instIn, recalcCycle, payerStats, payerState, cyclePrice, perDay, migrate, itemIdOf, matchCycle, groupReceipt, addDays, daysBetween, cycleDaysLeft, stockPct, nextBuy, brandMatch, goalSaved, goalsView, goalMonthly, forecast, normCat, monthTotals, balance, wallet, APP_OF, fromRow, toRow, mergePull };
+// Тілек приоритеті: қажеттілік қалаудан жоғары, ішінде «қашан керек» (0 қазір … 2 кейін). rank 0–5, level 0 жоғары … 2 төмен
+const wishRank = (w) => (w.kind === "need" ? 0 : 3) + Math.min(2, Math.max(0, w.when ?? 1));
+const wishLevel = (w) => Math.floor(wishRank(w) / 2);
+const FS = { wishRank, wishLevel, periodKey, periodRange, instMonthly, instLeft, instDone, instPay, instDue, instIn, recalcCycle, payerStats, payerState, cyclePrice, perDay, migrate, itemIdOf, matchCycle, groupReceipt, addDays, daysBetween, cycleDaysLeft, stockPct, nextBuy, brandMatch, goalSaved, goalsView, goalMonthly, forecast, normCat, monthTotals, balance, wallet, APP_OF, fromRow, toRow, mergePull };
 if (typeof module !== "undefined") module.exports = FS;

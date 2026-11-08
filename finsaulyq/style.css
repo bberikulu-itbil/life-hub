@@ -1,12 +1,14 @@
 /* FinSaulyq — Liquid Glass. Түстер brand/tokens.css-тен (data-app="finsaulyq"). */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{touch-action:manipulation;background:var(--bg)}
-body{margin:0;color:var(--ink);font:16px/1.5 var(--font-sans);-webkit-font-smoothing:antialiased;padding:0 16px calc(96px + env(safe-area-inset-bottom))}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{margin:0;color:var(--ink);font:16px/1.5 var(--font-sans);-webkit-font-smoothing:antialiased}
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:radial-gradient(38% 32% at 12% 8%,var(--blob1),transparent 70%),radial-gradient(34% 30% at 92% 22%,var(--blob2),transparent 70%),radial-gradient(44% 38% at 55% 98%,var(--blob3),transparent 70%)}
 [hidden]{display:none!important}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-main{max-width:640px;margin:0 auto;padding-top:calc(16px + env(safe-area-inset-top))}
+/* бет тек main ішінде жылжиды, мәзір мен body қозғалмайды (iOS-та fixed мәзір бетпен бірге серпілмейді) */
+main{position:fixed;inset:0;overflow-y:auto;overscroll-behavior:none;-webkit-overflow-scrolling:touch;padding:calc(16px + env(safe-area-inset-top)) max(16px,calc((100vw - 640px) / 2)) calc(96px + env(safe-area-inset-bottom))}
 h1{font-size:1.35rem;margin:.2rem 0 1rem}
 h2{font-size:1rem;margin:0}
 .muted{color:var(--mute)}
@@ -182,3 +184,24 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .jbtop{display:flex;justify-content:space-between;align-items:center}.jbal{margin:.2rem 0 .5rem}
 .acts{display:inline-flex;gap:2px}
 .fbar{bottom:calc(92px + env(safe-area-inset-bottom))}
+/* Есеп: Төлемгер карточкалары, бөліп-төлем/жинақ, Wish List */
+.end.wrap{flex-wrap:wrap}.end.wrap button{flex:1 1 40%}.end .warn{color:var(--bad,#e5534b)}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pcard{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:18px;background:var(--glass-2);min-width:0}.pcard.gone{opacity:.65}
+.pbody{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:3px;cursor:pointer;min-width:0}.pbody b,.pbody small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pcard .tile{width:44px;height:44px;border-radius:14px;margin-bottom:4px}.pcard .tile .ic svg{width:24px;height:24px}
+.pbuy{font-size:.82rem;padding:.5rem .4rem}
+.kx{box-shadow:inset 4px 0 0 var(--kc);padding-left:12px}.k-inst{--kc:#e5534b}.k-goal{--kc:#3b82f6}.k-inst .bar>i{background:#e5534b}.k-goal .bar>i{background:#3b82f6}.gold .bar>i{background:linear-gradient(90deg,var(--star),var(--star-ink))}
+.kt{font-size:.72rem;font-weight:700;color:var(--kc);text-transform:uppercase;letter-spacing:.03em}
+.kpick{display:grid;gap:10px;margin:.6rem 0}.kpick button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:.8rem 1rem;border-radius:16px;border:0;color:#fff;text-align:left}.kpick .k-inst{background:#e5534b}.kpick .k-goal{background:#3b82f6}.kpick small{color:rgba(255,255,255,.9)}
+.wcard{border:0;color:inherit;font:inherit;text-align:left;cursor:pointer}.wchips{display:flex;flex-wrap:wrap;gap:4px}
+.wchip{font-size:.7rem;font-weight:600;border-radius:999px;padding:2px 8px;background:var(--glass);color:var(--mute)}.wchip.need{background:#e5534b;color:#fff}.wchip.want{background:#8b5cf6;color:#fff}.wchip.p0{background:#16a34a;color:#fff}.wchip.p1{background:#ef9b37;color:#fff}
+.wimg{width:100%;max-height:200px;object-fit:cover;border-radius:14px}
+
+/* Журнал: шот карталары */
+.achips{gap:10px}.achip{position:relative;width:132px;min-height:84px;justify-content:space-between;gap:2px;border:0;border-radius:20px;padding:.6rem .8rem;background:linear-gradient(150deg,var(--cc),color-mix(in srgb,var(--cc) 70%,#000));color:#fff;opacity:.7;box-shadow:0 6px 16px var(--sh)}
+.achip .ic svg{width:20px;height:20px;opacity:.9}.achip small,.achip[aria-pressed=true] small{color:rgba(255,255,255,.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}.achip b{font-size:1rem}
+.achip[aria-pressed=true]{opacity:1;background:linear-gradient(150deg,var(--cc),color-mix(in srgb,var(--cc) 70%,#000));box-shadow:0 0 0 3px var(--bg),0 0 0 5px var(--cc),0 8px 20px var(--sh)}
+.achips{padding:8px 16px 10px;margin-top:0}
+.kx{flex-wrap:wrap;justify-content:flex-end}.kx .main{flex:1 1 100%}
+.catdlg .crow{gap:2px}.catdlg .inl{min-height:40px;font-size:.92rem;color:var(--mute)}.catdlg .inl input,.catdlg .inl select{padding:.3rem 0;min-height:0;font-size:1rem;color:var(--ink)}.catdlg .inl input[type=checkbox]{flex:none;width:22px;height:22px;min-height:0}
+.catdlg .seg2 button{padding:.45rem .5rem;font-size:.85rem;min-height:0}
+.catdlg .seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px}.catdlg .seg2 button{width:100%}

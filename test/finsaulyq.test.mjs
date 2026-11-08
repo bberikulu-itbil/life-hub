@@ -268,3 +268,8 @@ test("айдың басы: periodKey/periodRange/monthTotals", () => {
   const tx = [{ kind: "expense", amount: 100, date: "2026-11-20", category: "а" }, { kind: "expense", amount: 40, date: "2026-11-26", category: "а" }];
   assert.equal(FS.monthTotals(tx, "2026-11-28", 25).expense, 40); assert.equal(FS.monthTotals(tx, "2026-11-28").expense, 140);
 });
+test("тілек приоритеті: қажеттілік қалаудан жоғары, ішінде шұғылдық", () => {
+  assert.equal(FS.wishRank({ kind: "need", when: 0 }), 0); assert.equal(FS.wishRank({ kind: "want", when: 0 }), 3); assert.equal(FS.wishRank({}), 4);
+  assert.deepEqual([{ kind: "need", when: 2 }, { kind: "need", when: 1 }, { kind: "want", when: 0 }, { kind: "want", when: 2 }].map(FS.wishLevel), [1, 0, 1, 2]);
+  assert.ok(FS.wishRank({ kind: "need", when: 2 }) < FS.wishRank({ kind: "want", when: 0 }));
+});
