@@ -211,11 +211,10 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.pcard{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:18px;background:var(--glass-2);min-width:0}.pcard.gone{opacity:.65}
 .pbody{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:3px;cursor:pointer;min-width:0}.pbody b,.pbody small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pcard .tile{width:44px;height:44px;border-radius:14px;margin-bottom:4px}.pcard .tile .ic svg{width:24px;height:24px}
 .pbuy{font-size:.82rem;padding:.5rem .4rem}
-.kx{box-shadow:inset 4px 0 0 var(--kc);padding-left:12px}.k-inst{--kc:#e5534b}.k-goal{--kc:#3b82f6}.k-inst .bar>i{background:#e5534b}.k-goal .bar>i{background:#3b82f6}.gold .bar>i{background:linear-gradient(90deg,var(--star),var(--star-ink))}
-.kt{font-size:.72rem;font-weight:700;color:var(--kc);text-transform:uppercase;letter-spacing:.03em}
+.k-inst{--kc:#e5534b}.k-goal{--kc:#3b82f6}.k-inst .bar>i{background:#e5534b}.k-goal .bar>i{background:#3b82f6}.gold .bar>i{background:linear-gradient(90deg,var(--star),var(--star-ink))}
 .kpick{display:grid;gap:10px;margin:.6rem 0}.kpick button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:.8rem 1rem;border-radius:16px;border:0;color:#fff;text-align:left}.kpick .k-inst{background:#e5534b}.kpick .k-goal{background:#3b82f6}.kpick small{color:rgba(255,255,255,.9)}
 .wcard{border:0;color:inherit;font:inherit;text-align:left;cursor:pointer}.wchips{display:flex;flex-wrap:wrap;gap:4px}
-.wchip{font-size:.7rem;font-weight:600;border-radius:999px;padding:2px 8px;background:var(--glass);color:var(--mute)}.wchip.need{background:#e5534b;color:#fff}.wchip.want{background:#8b5cf6;color:#fff}.wchip.p0{background:#16a34a;color:#fff}.wchip.p1{background:#ef9b37;color:#fff}
+.wchip{font-size:.7rem;font-weight:600;border-radius:999px;padding:2px 8px;background:var(--glass);color:var(--mute)}.wchip.p0{background:#16a34a;color:#fff}.wchip.p1{background:#ef9b37;color:#fff}
 .wimg{width:100%;max-height:200px;object-fit:cover;border-radius:14px}
 
 
@@ -233,3 +232,4 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .jcard[aria-pressed=true]{opacity:1}.jcard small{color:rgba(255,255,255,.8);font-size:.95rem}.jcard b{font-size:1.7rem;line-height:1.1}.jcs{display:flex;gap:14px;color:rgba(255,255,255,.85);font-size:.9rem}
 .jcw{position:absolute;right:14px;bottom:10px;opacity:.28}.jcw svg{width:64px;height:64px}
 .jdots{display:flex;justify-content:center;gap:6px;margin:0 0 .6rem}.jdots i{width:7px;height:7px;border-radius:50%;background:var(--line)}.jdots i.on{background:var(--mute)}
+.wchips{justify-content:center}

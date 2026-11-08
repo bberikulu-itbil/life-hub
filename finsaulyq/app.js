@@ -322,7 +322,7 @@ function payerCard(c) {
 function goalRow(g, full, tag) {
   const done = g.saved >= g.target, pct = Math.min(100, Math.round(g.saved / g.target * 100));
   return h("div", { class: "row" + (done ? " gold" : "") + (tag ? " kx k-goal" : "") },
-    h("div", { class: "main" }, tag && h("small", { class: "kt" }, "Жинақ"), h("b", {}, g.name),
+    h("div", { class: "main" }, h("b", {}, g.name),
       h("small", { class: "num muted" }, `${tg(g.saved)} / ${tg(g.target)} · ${pct}%`),
       h("small", { class: done ? "" : "muted" }, done ? "Мақсатқа жеттің. Құттықтаймыз" : `Осы айға жарна: ${tg(FS.goalMonthly(g, today()))}`),
       bar(pct)),
@@ -447,7 +447,7 @@ const payInst = (x) => ask(`Төлем: ${x.name}`, [{ name: "amount", label: "�
   put("installments", { ...x, paid: x.paid + 1 }); save(); });
 function instRow(x) {
   const done = FS.instDone(x), paidSum = Math.min(x.total, x.total - FS.instLeft(x)), pct = Math.round(paidSum / x.total * 100), due = FS.instDue(x);
-  return h("div", { class: "row kx k-inst" + (done ? " gold" : "") }, h("div", { class: "main" }, h("small", { class: "kt" }, "Бөліп-төлем"), h("b", {}, x.name),
+  return h("div", { class: "row kx k-inst" + (done ? " gold" : "") }, h("div", { class: "main" }, h("b", {}, x.name),
     h("small", { class: "num muted" }, `${tg(paidSum)} / ${tg(x.total)} · ${x.paid}/${x.months} ай`),
     h("small", { class: done ? "" : due < today() ? "warn" : "muted" }, done ? "Толық төленді" : `${due < today() ? "Мерзімі өтті" : "Келесі"}: ${due} · ${tg(FS.instPay(x))}`), bar(pct)),
     !done && h("button", { onclick: () => payInst(x) }, ic("check"), "Төледім"), del("installments", x.id, x.name));
@@ -461,23 +461,28 @@ const addFin = () => {
   dlg.addEventListener("close", () => dlg.remove()); document.body.append(dlg); dlg.showModal();
 };
 
-// Тілек: қалау ма, қажеттілік пе + қашан керек → приоритет (FS.wishRank)
-const WK = [["want", "Қалау"], ["need", "Қажеттілік"]], WW = [["0", "Қазір керек"], ["1", "Жақын айларда"], ["2", "Кейін, асықпаймын"]], WL = ["Жоғары", "Орташа", "Төмен"];
-const wishForm = (w) => ask(w ? "Тілекті өзгерту" : "Жаңа тілек", [
+// Тілек: екі бөлек шкала (қажеттілік, қалау) → приоритет (FS.wishScore)
+const WN = [["0", "Қажет емес"], ["1", "Ыңғайсыздау болады"], ["2", "Тұрмыс қиындайды"], ["3", "Жұмыс не оқу бұзылады"], ["4", "Денсаулыққа не қауіпсіздікке зиян"], ["5", "Негізгі қажеттілік: тамақ, баспана, ем"]];
+const WW = [["0", "Қаламаймын"], ["1", "Жай ғана ұнайды"], ["2", "Біраз қалаймын"], ["3", "Қатты қалаймын"], ["4", "Өте қатты қалаймын"], ["5", "Үнемі ойлаймын"]], WL = ["Жоғары", "Орташа", "Төмен"];
+const wishForm = (w) => { const sc = w ? FS.wishScores(w) : { need: 0, want: 3 }; return ask(w ? "Тілекті өзгерту" : "Жаңа тілек", [
   { name: "name", label: "Не қалайсың", value: w?.name ?? "" },
   { name: "price", label: "Бағасы, ₸", type: "number", min: 1, value: w?.price ?? "" },
-  { name: "kind", label: "Бұл не? Онсыз тұрмыс не жұмыс қиындаса — қажеттілік", options: WK, value: w?.kind || "want" },
-  { name: "when", label: "Қашан керек", options: WW, value: String(w?.when ?? 1) },
+  { name: "need", label: "Қажеттілік шкаласы: онсыз не болады?", options: WN, value: String(sc.need) },
+  { name: "want", label: "Қалау шкаласы: қаншалықты қалайсың?", options: WW, value: String(sc.want) },
   { name: "image", label: w?.image ? "Суретті ауыстыру" : "Сурет", type: "file", optional: true }],
 async (v) => { const image = v.image?.size ? await shrink(v.image, 480).catch(() => "") : w?.image;
-  put("wishes", { ...w, id: w?.id ?? crypto.randomUUID(), name: v.name.trim(), price: num(v.price), kind: v.kind, when: num(v.when), ...(image ? { image } : {}) }); save(); });
-const wishChips = (w) => h("div", { class: "wchips" }, h("span", { class: "wchip " + (w.kind === "need" ? "need" : "want") }, w.kind === "need" ? "Қажеттілік" : "Қалау"), h("span", { class: "wchip p" + FS.wishLevel(w) }, WL[FS.wishLevel(w)]));
+  const { kind, when, ...rest } = w ?? {};
+  put("wishes", { ...rest, id: w?.id ?? crypto.randomUUID(), name: v.name.trim(), price: num(v.price), need: num(v.need), want: num(v.want), created: w?.created ?? today(), ...(image ? { image } : {}) }); save(); }); };
+const wishChips = (w) => { const x = FS.wishScores(w); return h("div", { class: "wchips" }, h("span", { class: "wchip p" + FS.wishLevel(w) }, WL[FS.wishLevel(w)]), h("span", { class: "wchip" }, `Қажет ${x.need}/5`), h("span", { class: "wchip" }, `Қалау ${x.want}/5`)); };
 const buyWish = (w) => ask(`Сатып алу: ${w.name}`, [{ name: "amount", label: "Сома, ₸", type: "number", min: 0.01, value: w.price }, { name: "category", label: "Санат", options: catOpts("expense", "Басқа"), value: "Басқа" }, ...accField()], (v) => {
   put("tx", withAcc({ id: crypto.randomUUID(), kind: "expense", amount: num(v.amount), category: FS.normCat(v.category), note: w.name, date: today() }, v));
   put("wishes", { ...w, status: "done", to: "tx" }); save(); });
+// Қалау уақыт өте басылуы мүмкін: жаңа, бірақ қатты қалауға 30 күн күту — практикалық кеңес (ғылыми дәлелденген ереже емес)
+const wishAge = (w) => { if (!w.created || w.status === "done") return null; const d = FS.daysBetween(w.created, today()), x = FS.wishScores(w);
+  return h("p", { class: "muted" }, `Тізімде ${d} күн.`, x.want > x.need && x.need < 3 && d < 30 ? " Қалау жаңа: 30 күн күтіп, әлі қаласаң сатып ал." : ""); };
 function wishDetail(w) {
   const done = w.status === "done", dlg = h("dialog", {}), mark = (to) => { put("wishes", { ...w, status: "done", to }); save(); }, go = (f) => () => { dlg.close(); f(); };
-  dlg.append(...[w.image ? h("img", { class: "wimg", src: w.image, alt: w.name }) : null, h("h3", {}, w.name), h("p", { class: "num" }, tg(w.price)), wishChips(w),
+  dlg.append(...[w.image ? h("img", { class: "wimg", src: w.image, alt: w.name }) : null, h("h3", {}, w.name), h("p", { class: "num" }, tg(w.price)), wishChips(w), wishAge(w),
     done ? h("p", { class: "good" }, w.to === "inst" ? "Бөліп-төлемге өтті" : w.to === "tx" ? "Сатып алынды" : "Жинаққа өтті") : null,
     h("div", { class: "end wrap" },
       !done && h("button", { class: "primary", onclick: go(() => buyWish(w)) }, "Сатып алдым"),
@@ -507,7 +512,7 @@ function stock() {
     h("button", { type: "button", role: "tab", "aria-selected": String(accTab === k), "aria-pressed": String(accTab === k), onclick: () => { accTab = k; try { localStorage.setItem("fs-acc", k); } catch {} render(); } }, t)));
   if (accTab === "goal") {
     const fin = [...S.installments.filter((x) => FS.instDone(x) === arc.fin).sort((a, b) => FS.instDue(a).localeCompare(FS.instDue(b))).map(instRow), ...FS.goalsView(S).filter((g) => (g.saved >= g.target) === arc.fin).map((g) => goalRow(g, true, true))];
-    const wishes = S.wishes.filter((w) => (w.status === "done") === arc.wish).sort((a, b) => FS.wishRank(a) - FS.wishRank(b) || a.price - b.price);
+    const wishes = S.wishes.filter((w) => (w.status === "done") === arc.wish).sort((a, b) => FS.wishScore(b) - FS.wishScore(a) || (a.created || "").localeCompare(b.created || "") || a.price - b.price);
     return [head("Есеп"), seg,
       sec(arc.fin ? "Бөліп-төлем және жинақ · архив" : "Бөліп-төлем және жинақ", hdr("fin", addFin), fin.length ? fin : empty(arc.fin ? "Архив бос." : "Бөліп-төлем не жинақ жоқ. Мысалы: Mac 12 ай, саяхат.")),
       sec(arc.wish ? "Wish List · архив" : "Wish List", hdr("wish", () => wishForm()), wishes.length ? h("div", { class: "wgrid" }, wishes.map(wishRow)) : empty(arc.wish ? "Архив бос." : "Арманыңды жаз, кейін сатып аласың, жинайсың не бөліп-төлемге аласың."))];

@@ -268,8 +268,9 @@ test("айдың басы: periodKey/periodRange/monthTotals", () => {
   const tx = [{ kind: "expense", amount: 100, date: "2026-11-20", category: "а" }, { kind: "expense", amount: 40, date: "2026-11-26", category: "а" }];
   assert.equal(FS.monthTotals(tx, "2026-11-28", 25).expense, 40); assert.equal(FS.monthTotals(tx, "2026-11-28").expense, 140);
 });
-test("тілек приоритеті: қажеттілік қалаудан жоғары, ішінде шұғылдық", () => {
-  assert.equal(FS.wishRank({ kind: "need", when: 0 }), 0); assert.equal(FS.wishRank({ kind: "want", when: 0 }), 3); assert.equal(FS.wishRank({}), 4);
-  assert.deepEqual([{ kind: "need", when: 2 }, { kind: "need", when: 1 }, { kind: "want", when: 0 }, { kind: "want", when: 2 }].map(FS.wishLevel), [1, 0, 1, 2]);
-  assert.ok(FS.wishRank({ kind: "need", when: 2 }) < FS.wishRank({ kind: "want", when: 0 }));
+test("тілек приоритеті: екі бөлек шкала, қажеттілік басым", () => {
+  const sc = (need, want) => FS.wishScore({ need, want });
+  assert.equal(sc(5, 0), 15); assert.equal(sc(0, 5), 5); assert.ok(sc(4, 0) > sc(2, 5) && sc(2, 5) > sc(0, 5));
+  assert.deepEqual([[5, 0], [3, 3], [2, 5], [1, 5], [0, 5], [0, 2]].map(([n, w]) => FS.wishLevel({ need: n, want: w })), [0, 0, 1, 1, 2, 2]);
+  assert.deepEqual(FS.wishScores({ kind: "need" }), { need: 4, want: 0 }); assert.deepEqual(FS.wishScores({}), { need: 0, want: 3 }); assert.deepEqual(FS.wishScores({ need: 0, want: 0 }), { need: 0, want: 0 });
 });
