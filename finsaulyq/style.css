@@ -238,3 +238,6 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .bk{width:28px;height:28px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.72rem;letter-spacing:-.02em;flex:none}.bk .ic svg{width:16px;height:16px}
 .jcb{position:absolute;right:14px;top:12px}.jcb .bk{width:34px;height:34px;border-radius:11px;background:rgba(255,255,255,.22)!important;font-size:.8rem}
 .account-card-head .acts{margin-left:auto}
+.bk.lg{background:#fff!important}.bk img{width:100%;height:100%;object-fit:contain;border-radius:inherit}
+.acprev{background:none!important}.acprev .bk{width:72px;height:72px;border-radius:22px;font-size:1.5rem}.acprev .bk .ic svg{width:34px;height:34px}
+.ib .bk{width:30px;height:30px}

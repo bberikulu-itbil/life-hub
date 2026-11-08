@@ -221,11 +221,11 @@ const txForm = (t, pre) => { const d = t ?? pre ?? {}; ask(t ? "Транзакц
   }); };
 
 // Чекті түсіру: суретті кішірейтіп, `receipt` функциясына жібереміз; нәтиже форманы толтырады, сақтауды өзің растайсың
-async function shrink(file, max = 1800) {
+async function shrink(file, max = 1800, type = "image/jpeg") {
   const bmp = await createImageBitmap(file), k = Math.min(1, max / Math.max(bmp.width, bmp.height));
   const c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
   c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
-  return c.toDataURL("image/jpeg", 0.8);
+  return c.toDataURL(type, 0.8);
 }
 function receiptFlow() {
   if (!navigator.onLine) return alert("Чекті оқуға интернет керек. Транзакцияны қолмен енгізе аласың.");
@@ -370,8 +370,12 @@ function pickPeriod(ym, from, to, custom) {
 }
 // Қазақстан банктері: ресми логотип емес — шамамен бренд түсі мен қысқа әріп. Файл берсең, нақты логотипке ауыстырамыз
 const KZ_CITIES = ["Астана", "Алматы", "Шымкент", "Қарағанды", "Ақтөбе", "Тараз", "Павлодар", "Өскемен", "Семей", "Қостанай", "Қызылорда", "Орал", "Атырау", "Петропавл", "Ақтау", "Көкшетау", "Түркістан", "Талдықорған", "Қонаев", "Теміртау", "Екібастұз", "Рудный", "Жезқазған", "Балқаш", "Арқалық", "Ақсу", "Жаңаөзен", "Сәтбаев", "Лисаков", "Степногорск", "Көкшетау", "Шу", "Ұштөбе"].filter((c, i, a) => a.indexOf(c) === i);
-const BANKS = [["cash", "Қолма-қол", "#16a34a", "coin"], ["kaspi", "Kaspi", "#f14635", "K"], ["halyk", "Halyk", "#2fa84f", "H"], ["jusan", "Jusan", "#ff7a1a", "J"], ["forte", "ForteBank", "#c8102e", "F"], ["freedom", "Freedom", "#00a3e0", "Fr"], ["bereke", "Bereke", "#00833e", "B"], ["eurasian", "Eurasian", "#1e4ea1", "E"], ["homecredit", "Home Credit", "#e30613", "HC"], ["cenc", "CenterCredit", "#0a8f6b", "CC"], ["alatau", "Alatau City", "#2a3f8f", "AC"], ["rbk", "RBK", "#7a1fa2", "R"], ["nurbank", "Nurbank", "#e2231a", "N"], ["other", "Басқа", "#5b6470", "wallet"]];
-const bankMark = (key) => { const b = BANKS.find((x) => x[0] === key) ?? ["", "", "#5b6470", "wallet"]; return h("span", { class: "bk", style: `background:${b[2]}`, "aria-hidden": "true" }, ICONS[b[3]] ? ic(b[3]) : b[3]); };
+const BANKS = [["cash", "Қолма-қол", "#16a34a", "coin"], ["kaspi", "Kaspi", "#f14635", "K"], ["halyk", "Halyk", "#2fa84f", "H"], ["jusan", "Jusan", "#ff7a1a", "J"], ["forte", "ForteBank", "#c8102e", "F"], ["freedom", "Freedom", "#00a3e0", "Fr"], ["bereke", "Bereke", "#00833e", "B"], ["eurasian", "Eurasian", "#1e4ea1", "E"], ["homecredit", "Home Credit", "#e30613", "HC"], ["cenc", "CenterCredit", "#0a8f6b", "CC"], ["alatau", "Alatau City", "#2a3f8f", "AC"], ["rbk", "RBK", "#7a1fa2", "R"], ["nurbank", "Nurbank", "#e2231a", "N"]]; 
+const GEN = ["card", "wallet", "coin", "briefcase", "home", "trend", "shield", "target", "gift", "star"]; // жалпы белгішелер (шот белгісі "i:<кілт>")
+const bankMark = (a) => { const key = a?.bank || "";
+  if (a?.logo) return h("span", { class: "bk lg", "aria-hidden": "true" }, h("img", { src: a.logo, alt: "" }));
+  if (key.startsWith("i:")) return h("span", { class: "bk", style: "background:#475569", "aria-hidden": "true" }, ic(key.slice(2)));
+  const b = BANKS.find((x) => x[0] === key) ?? ["", "", "#5b6470", "wallet"]; return h("span", { class: "bk", style: `background:${b[2]}`, "aria-hidden": "true" }, ICONS[b[3]] ? ic(b[3]) : b[3]); };
 const AC = ["#0d7a52", "#5b6470", "#3b82f6", "#8b5cf6", "#f97316", "#ec4899", "#06b6d4"]; // Журналдағы шот карталарының түсі
 function home() {
   const T = today(), hide = S.settings.hide, mon = (n) => hide ? "••••• ₸" : tg(n), ms = S.settings.monthStart || 1, cur = FS.periodKey(T, ms), ym = jMonth || cur;
@@ -403,8 +407,8 @@ function home() {
         const el = e.currentTarget; if (!el._u) return; clearTimeout(el._t); el._t = setTimeout(() => { el._u = 0; if (!el.isConnected) return; const mid = el.scrollLeft + el.clientWidth / 2, c = [...el.children].reduce((p, x) => (Math.abs(x.offsetLeft + x.offsetWidth / 2 - mid) < Math.abs(p.offsetLeft + p.offsetWidth / 2 - mid) ? x : p));
           if (c.dataset.id !== (jv.acc || "")) setJv({ acc: c.dataset.id }); }, 140); } },
       chips.map(([id, name, b], k) => { const st = stat(id === "_" ? "_" : id);
-        return h("button", { class: "jcard", "data-id": id, "data-sel": String(id === accId), style: `--cc:${BANKS.find((x) => x[0] === S.accounts.find((y) => y.id === id)?.bank)?.[2] ?? AC[id === "" ? 0 : id === "_" ? 1 : 2 + Math.max(0, S.accounts.findIndex((x) => x.id === id)) % (AC.length - 2)]}`, "aria-pressed": String(id === accId), "aria-label": `Шот: ${name}`, onclick: () => setJv({ acc: id }) },
-          S.accounts.find((x) => x.id === id)?.bank ? h("span", { class: "jcb" }, bankMark(S.accounts.find((x) => x.id === id).bank)) : h("span", { class: "jcw", "aria-hidden": "true" }, ic("wallet")), h("small", {}, name), h("b", { class: "num" }, mon(b)),
+        return h("button", { class: "jcard", "data-id": id, "data-sel": String(id === accId), style: `--cc:${(!S.accounts.find((y) => y.id === id)?.logo && BANKS.find((x) => x[0] === S.accounts.find((y) => y.id === id)?.bank)?.[2]) || AC[id === "" ? 0 : id === "_" ? 1 : 2 + Math.max(0, S.accounts.findIndex((x) => x.id === id)) % (AC.length - 2)]}`, "aria-pressed": String(id === accId), "aria-label": `Шот: ${name}`, onclick: () => setJv({ acc: id }) },
+          (S.accounts.find((x) => x.id === id)?.bank || S.accounts.find((x) => x.id === id)?.logo) ? h("span", { class: "jcb" }, bankMark(S.accounts.find((x) => x.id === id))) : h("span", { class: "jcw", "aria-hidden": "true" }, ic("wallet")), h("small", {}, name), h("b", { class: "num" }, mon(b)),
           h("span", { class: "jcs num" }, h("span", {}, `+${mon(st.income)}`), h("span", {}, `−${mon(st.expense)}`))); })),
     chips.length > 1 ? h("div", { class: "jdots", "aria-hidden": "true" }, chips.map(([id]) => h("i", { class: id === accId ? "on" : "" }))) : null,
     ...Object.keys(days).sort().reverse().map((d) => { const x = days[d], tot = x.tx.reduce((a, t) => a + (t.kind === "income" ? t.amount : -t.amount), 0);
@@ -570,7 +574,7 @@ function walletPage() {
   const cards = pockets.map((a) => {
     const m = metric(a.id), sign = m.net > 0 ? "+" : m.net < 0 ? "−" : "";
     return h("article", { class: "account-card" },
-      h("div", { class: "account-card-head" }, bankMark(a.bank), h("b", {}, a.name), a.id && h("button", { class: "ghost sm acts", "aria-label": `Әрекеттер: ${a.name}`, onclick: () => acctMenu(a) }, ic("more"))),
+      h("div", { class: "account-card-head" }, bankMark(a), h("b", {}, a.name), a.id && h("button", { class: "ghost sm acts", "aria-label": `Әрекеттер: ${a.name}`, onclick: () => acctMenu(a) }, ic("more"))),
       h("div", { class: "account-balance num " + (a.balance < 0 ? "warn" : "") }, mon(a.balance)),
       h("small", { class: "muted" }, range.label),
       h("div", { class: "account-net num " + (m.net < 0 ? "warn" : m.net > 0 ? "good" : "muted") }, `${sign}${mon(Math.abs(m.net))}`),
@@ -603,11 +607,20 @@ function walletPage() {
       return h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, `${nm(t.from)} → ${nm(t.to)}`), h("small", { class: "muted" }, t.date)), h("span", { class: "num" }, mon(t.amount)), del("transfers", t.id, `${nm(t.from)} → ${nm(t.to)}`));
     })) : null,
   ];
-  function acctForm(a) { const cur = a?.balance ?? 0, bankOpts = [["", "—"], ...BANKS.map((b) => [b[0], b[1]])];
-    return ask(a ? "Шотты өзгерту" : "Жаңа шот", [{ name: "name", label: "Атауы (бос болса — банк аты)", optional: true, value: a?.name ?? "" }, { name: "bank", label: "Банк не түрі", options: bankOpts, value: a?.bank ?? "" },
-      a ? { name: "cur", label: "Қазіргі қалдық, ₸", type: "number", min: -1e12, value: cur } : { name: "opening", label: "Қазіргі қалдық, ₸", type: "number", min: -1e12, value: 0 }],
-    (v) => { const name = v.name.trim() || BANKS.find((b) => b[0] === v.bank)?.[1] || "Шот";
-      put("accounts", a ? { ...a, name, bank: v.bank, opening: a.opening + (num(v.cur) - cur) } : { id: crypto.randomUUID(), name, bank: v.bank, opening: num(v.opening) }); save(); }); }
+  function acctForm(a) {
+    const cur = a?.balance ?? 0, st = { name: a?.name ?? "", bank: a?.bank ?? "", logo: a?.logo ?? "", val: a ? cur : 0 }, dlg = h("dialog", { class: "sheet catdlg" });
+    const label = (k) => k.startsWith("i:") ? k.slice(2) : BANKS.find((b) => b[0] === k)?.[1] ?? k;
+    const inl = (t, key, at) => h("label", { class: "inl" }, t, h("input", { value: st[key], "aria-label": t, oninput: (e) => { st[key] = e.target.value; }, ...at }));
+    const draw = () => dlg.replaceChildren(h("h2", { class: "ctitle" }, a ? "Шотты өзгерту" : "Жаңа шот"), h("div", { class: "cprev acprev" }, bankMark(st)),
+      h("div", { class: "sec crow" }, inl("Атауы", "name", { name: "name", placeholder: "Мысалы: Kaspi Gold" }), inl("Қазіргі қалдық, ₸", "val", { name: a ? "cur" : "opening", type: "number", step: "any", inputmode: "decimal" })),
+      h("div", { class: "sec swatches" }, ...[...BANKS.map((b) => b[0]), ...GEN.map((k) => "i:" + k)].map((k) => h("button", { type: "button", class: "ib" + (k === st.bank && !st.logo ? " on" : ""), "aria-label": `Белгіше ${label(k)}`, onclick: () => { st.bank = k; st.logo = ""; draw(); } }, bankMark({ bank: k })))),
+      h("label", { class: "inl" }, st.logo ? "Өз логотипің қосылды" : "Өз логотипім (сурет)", h("input", { type: "file", accept: "image/*", name: "logo", onchange: async (e) => { const f = e.target.files[0]; if (f) { st.logo = await shrink(f, 96, "image/png").catch(() => ""); draw(); } } })),
+      h("div", { class: "end sticky" }, st.logo && h("button", { type: "button", class: "ghost warn", style: "margin-right:auto", onclick: () => { st.logo = ""; draw(); } }, "Логотипті алу"), h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"),
+        h("button", { type: "button", class: "primary", onclick: () => {
+          const name = st.name.trim() || (st.bank && !st.bank.startsWith("i:") ? label(st.bank) : "Шот"), v = num(st.val) || 0, { balance: _b, ...base } = a ?? {}, rec = { ...base, name, bank: st.bank, logo: st.logo || undefined };
+          if (!st.logo) delete rec.logo;
+          put("accounts", a ? { ...rec, opening: a.opening + (v - cur) } : { ...rec, id: crypto.randomUUID(), opening: v }); dlg.close(); save(); } }, "Сақтау")));
+    dlg.addEventListener("close", () => dlg.remove()); document.body.append(dlg); draw(); dlg.showModal(); }
   function acctMenu(a) { const dlg = h("dialog", {}), go = (f) => () => { dlg.close(); f(); };
     dlg.append(h("h3", {}, a.name), h("div", { class: "end wrap" }, h("button", { onclick: go(() => acctForm(a)) }, "Өзгерту"), h("button", { class: "warn", onclick: go(() => delAcc(a)) }, "Өшіру"), h("button", { class: "ghost", onclick: () => dlg.close() }, "Жабу")));
     dlg.addEventListener("close", () => dlg.remove()); document.body.append(dlg); dlg.showModal(); }
