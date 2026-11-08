@@ -169,7 +169,7 @@ const del = (key, id, what) => h("button", { class: "ghost sm", "aria-label": `�
 } }, ic("trash"));
 
 // Бір диалог — барлық енгізу формалары үшін. fields: { name, label, type, value, options, min, step, optional }
-function ask(title, fields, ok, extra) {
+function ask(title, fields, ok, extra, setup) {
   const form = h("form", { method: "dialog" }, h("h3", {}, title));
   const dlg = h("dialog", {}, form);
   for (const f of fields) {
@@ -184,6 +184,7 @@ function ask(title, fields, ok, extra) {
   form.addEventListener("submit", () => ok(Object.fromEntries(new FormData(form))));
   dlg.addEventListener("close", () => dlg.remove());
   document.body.append(dlg);
+  setup?.(form.elements);
   dlg.showModal();
 }
 const num = (v) => Number(v);
@@ -197,17 +198,24 @@ const withAcc = (e, v) => { if (v.account) { e.account = v.account; S.settings.l
 const catList = () => [...new Set([...S.tx.map((t) => FS.normCat(t.category)), ...CATS])];
 const subsOf = (cat) => catInfo(cat).subs.map((x) => x.name);
 const stores = () => [...new Set([...S.tx.map((t) => t.store), ...S.items.map((i) => i.store)].filter(Boolean))];
+const catOpts = (kind, cur) => { const n = allCats(kind).map((c) => c.name), c = cur && FS.normCat(cur); if (c && !n.includes(c)) n.unshift(c); return n.map((x) => [x, x]); };
+const subOpts = (cat, cur) => { const n = subsOf(cat); if (cur && !n.includes(cur)) n.push(cur); return [["", "—"], ...n.map((x) => [x, x])]; };
+const fillSel = (sel, opts, val) => { sel.replaceChildren(...opts.map(([v, t]) => h("option", { value: v }, t))); sel.value = opts.some(([v]) => v === val) ? val : opts[0][0]; };
 const txForm = (t, pre) => { const d = t ?? pre ?? {}; ask(t ? "Транзакцияны өзгерту" : pre ? "Чектен оқылды: тексеріп сақта" : "Жаңа транзакция", [
   { name: "kind", label: "Түрі", options: [["expense", "Шығыс"], ["income", "Кіріс"]], value: d.kind },
   { name: "amount", label: "Сома, ₸", type: "number", min: 0.01, value: d.amount },
-  { name: "category", label: "Санат", value: d.category ?? "Тамақ", suggest: catList() },
-  { name: "sub", label: "Ішкі санат", optional: true, value: d.sub },
+  { name: "category", label: "Санат", value: FS.normCat(d.category ?? "Тамақ"), options: catOpts(d.kind ?? "expense", d.category ?? "Тамақ") },
+  { name: "sub", label: "Ішкі санат", optional: true, value: d.sub ?? "", options: subOpts(FS.normCat(d.category ?? "Тамақ"), d.sub) },
   { name: "store", label: "Дүкен", optional: true, value: d.store, suggest: stores() },
   { name: "note", label: "Ескертпе", optional: true, value: d.note },
   { name: "date", label: "Күні", type: "date", value: d.date ?? today() },
   ...accField(t ? (t.account ?? "") : undefined),
 ], (v) => { put("tx", withAcc({ id: t?.id ?? crypto.randomUUID(), kind: v.kind, amount: num(v.amount), category: FS.normCat(v.category), note: v.note.trim(), date: v.date, ...(v.store.trim() ? { store: v.store.trim() } : {}), ...(v.sub.trim() ? { sub: v.sub.trim() } : {}) }, v)); save(); },
-  t && { label: "Өшіру", fn: () => confirm(`«${t.category} ${tg(t.amount)}» өшіру ме? Байланысқан тауар жазбалары да өшеді.`) && removeTx(t.id) }); };
+  t && { label: "Өшіру", fn: () => confirm(`«${t.category} ${tg(t.amount)}» өшіру ме? Байланысқан тауар жазбалары да өшеді.`) && removeTx(t.id) },
+  (el) => { // түрі өзгерсе — санаттар, санат өзгерсе — ішкі санаттар жаңарады
+    el.kind.addEventListener("change", () => { fillSel(el.category, catOpts(el.kind.value), el.category.value); fillSel(el.sub, subOpts(el.category.value), ""); });
+    el.category.addEventListener("change", () => fillSel(el.sub, subOpts(el.category.value), ""));
+  }); };
 
 // Чекті түсіру: суретті кішірейтіп, `receipt` функциясына жібереміз; нәтиже форманы толтырады, сақтауды өзің растайсың
 async function shrink(file, max = 1800) {
@@ -360,7 +368,7 @@ function home() {
   const pick = () => ask("Айды таңдау", [{ name: "m", label: "Ай", type: "month", value: ym }], (v) => { jMonth = v.m; render(); });
   const mk = (t) => { const c = catInfo(t.category), sgn = t.kind === "income" ? "+" : "";
     return h("button", { class: "jt", style: `background:${c.color}`, "aria-label": `${t.category} ${tg(t.amount)}`, onclick: () => txForm(t) },
-      h("span", { class: "wm", "aria-hidden": "true" }, ic(c.icon)), h("small", {}, t.sub || t.category), h("b", { class: "num" }, `${sgn}${mon(t.amount)}`)); };
+      h("span", { class: "wm", "aria-hidden": "true" }, ic(c.subs.find((x) => x.name === t.sub)?.icon || c.icon)), h("small", {}, t.sub || t.category), h("b", { class: "num" }, `${sgn}${mon(t.amount)}`)); };
   return [
     h("div", { class: "head" }, h("h1", {}, jv.span === 3 ? `${MONTHS[Number(months[2].slice(5)) - 1]} – ${MONTHS[mm - 1]} ${yy}` : `${MONTHS[mm - 1]} ${yy}`),
       h("div", { class: "hbtns" }, h("button", { class: "ghost round", "aria-label": "Айды таңдау", onclick: pick }, ic("calendar")),
@@ -503,7 +511,7 @@ const PALETTE = ["#f59e0b", "#6d4ad8", "#3b82f6", "#10b981", "#ec4899", "#84cc16
 const catColor = (n) => PALETTE[[...FS.normCat(n)].reduce((a, ch) => a + ch.charCodeAt(0), 0) % PALETTE.length];
 // Санат көрінісі: сақталған жазба, болмаса әдепкі стиль; ішкі санат — { name, icon }
 const DEF_STYLE = { "Тамақ": ["utensils", "#ef9b37"], "Көлік": ["car", "#5b3cc4"], "Тұрмыс": ["home", "#8ecb3e"], "Кітап": ["book", "#ec4899"], "Күтім": ["heart", "#62d6c0"], "Жалақы": ["wallet", "#8ecb3e"], "Басқа": ["tag", "#d9d9d9"] };
-const COLORS_PICK = ["#e5534b", "#ef9b37", "#e3be40", "#8ecb3e", "#62d6c0", "#3b82f6", "#5b3cc4", "#ec4899", "#a21cf3", "#5b6470", "#d9d9d9"];
+const COLORS_PICK = ["#e5534b", "#f43f5e", "#f97316", "#ef9b37", "#e3be40", "#a3e635", "#8ecb3e", "#22c55e", "#10b981", "#62d6c0", "#06b6d4", "#38bdf8", "#3b82f6", "#6366f1", "#5b3cc4", "#a21cf3", "#d946ef", "#ec4899", "#b45309", "#78716c", "#5b6470", "#334155", "#d9d9d9", "#0f172a"];
 const ICON_KEYS = ["utensils", "coffee", "soda", "bag", "cart", "car", "bus", "plane", "home", "book", "grad", "heart", "pill", "smile", "film", "music", "gift", "phone", "monitor", "wifi", "zap", "drop", "scissors", "briefcase", "star", "moon", "sun", "tag", "card", "trend", "shield", "tool", "pin", "box", "wallet", "camera", "target",
   "fuel", "truck", "bike", "shirt", "bed", "key", "tv", "laptop", "headphones", "gamepad", "dumbbell", "paw", "baby", "tree", "cake", "umbrella", "bell", "clock", "globe", "cloud", "percent", "coin", "palette", "pen", "flag", "flame", "ticket", "sparkles"];
 function catInfo(name) {
@@ -694,7 +702,7 @@ function deleteCat(c) {
 // opts: { cat } санатты өзгерту · { parent } ішкі санат қосу · { parent, sub } ішкі санатты өзгерту
 function catForm(opts = {}) {
   const info = opts.cat, parent0 = opts.parent ? catInfo(opts.parent) : null, sub0 = opts.sub;
-  const st = { name: sub0?.name ?? info?.name ?? "", parent: parent0?.name ?? "", budget: info?.budget || "", color: info?.color ?? parent0?.color ?? COLORS_PICK[Math.floor(Math.random() * 9)], icon: sub0?.icon || info?.icon || "tag" };
+  const st = { name: sub0?.name ?? info?.name ?? "", parent: parent0?.name ?? "", budget: info?.budget || "", color: info?.color ?? parent0?.color ?? COLORS_PICK[Math.floor(Math.random() * COLORS_PICK.length)], icon: sub0?.icon || info?.icon || "tag" };
   const dlg = h("dialog", { class: "sheet catdlg" });
   const editing = !!(info || sub0), usedBy = info ? S.tx.filter((t) => FS.normCat(t.category) === info.name).length : 0;
   const draw = () => {
