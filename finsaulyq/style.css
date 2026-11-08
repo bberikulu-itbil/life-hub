@@ -173,3 +173,12 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .wcard>.ghost.sm{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.85);border-radius:50%}
 .wcard.gone{opacity:.65}
 .row .main[role=button]{cursor:pointer}
+/* Журнал: шот чиптері, аралық, жасыру батырмасы */
+.jtitle{display:flex;flex-direction:column;min-width:0}.jtitle h1{margin:0}.head .hbtns button:disabled{opacity:.35}
+.achips,.rchips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:.3rem -16px .5rem;padding:2px 16px}.achips::-webkit-scrollbar,.rchips::-webkit-scrollbar{display:none}
+.achip{flex:none;display:flex;flex-direction:column;align-items:flex-start;gap:0;border:1px solid var(--gb);background:var(--glass);border-radius:16px;padding:.45rem .8rem;min-width:96px;color:inherit;font:inherit;text-align:left}
+.achip small{color:var(--mute);font-size:.72rem}.achip b{font-size:.95rem}.achip[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}.achip[aria-pressed=true] small{color:rgba(255,255,255,.85)}
+.rchip{flex:none;border:0;border-radius:999px;background:var(--glass-2);color:var(--mute);padding:.45rem .9rem;font:inherit;font-size:.85rem}.rchip[aria-pressed=true]{background:var(--acc);color:#fff}
+.jbtop{display:flex;justify-content:space-between;align-items:center}.jbal{margin:.2rem 0 .5rem}
+.acts{display:inline-flex;gap:2px}
+.fbar{bottom:calc(92px + env(safe-area-inset-bottom))}

@@ -69,10 +69,16 @@ function forecast(S, today, count = 3) {
 const normCat = (c) => { const t = String(c ?? "").trim(); return t ? t[0].toUpperCase() + t.slice(1).toLowerCase() : "Басқа"; };
 
 // Осы айдың кірісі, шығыны және санат бойынша шығын
-function monthTotals(tx, today) {
-  const month = today.slice(0, 7), out = { income: 0, expense: 0, byCat: {}, bySub: {} };
+// Қаржылық ай startDay-ден басталады (1 = күнтізбелік ай). Кезең аты — ол басталған ай (YYYY-MM)
+const periodKey = (date, startDay = 1) => { const [y, m, d] = date.split("-").map(Number); return startDay <= 1 || d >= startDay ? date.slice(0, 7) : new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7); };
+function periodRange(key, startDay = 1) {
+  const [y, m] = key.split("-").map(Number), sd = Math.min(28, Math.max(1, startDay || 1));
+  return { from: new Date(Date.UTC(y, m - 1, sd)).toISOString().slice(0, 10), to: new Date(Date.UTC(y, m, sd - 1)).toISOString().slice(0, 10) };
+}
+function monthTotals(tx, today, startDay = 1) {
+  const month = periodKey(today, startDay), out = { income: 0, expense: 0, byCat: {}, bySub: {} };
   for (const t of tx) {
-    if (t.date.slice(0, 7) !== month) continue;
+    if (periodKey(t.date, startDay) !== month) continue;
     out[t.kind] += t.amount;
     if (t.kind === "expense") { const k = normCat(t.category); out.byCat[k] = (out.byCat[k] || 0) + t.amount; if (t.sub) { out.bySub[k] ||= {}; out.bySub[k][t.sub] = (out.bySub[k][t.sub] || 0) + t.amount; } }
   }
@@ -107,7 +113,7 @@ function fromRow(r) {
   if (!k) return null;
   if (k === "tx") return n(d.amount) && (d.kind === "income" || d.kind === "expense")
     ? { id: r.id, kind: d.kind, amount: Number(d.amount), category: normCat(d.category), note: String(d.note ?? ""), date: /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : localDate(r.created_at), ...(typeof d.account === "string" && d.account ? { account: d.account } : {}), ...(typeof d.store === "string" && d.store ? { store: d.store } : {}), ...(typeof d.sub === "string" && d.sub ? { sub: d.sub } : {}) } : null;
-  if (k === "settings") return { key: "settings", item: { capital: Number(d.capital) || 0, income: Number(d.income) || 0, fixed: Number(d.fixed) || 0, city: typeof d.city === "string" && d.city.trim() ? d.city.trim() : "Астана", ...(d.payerRecentCount != null ? { payerRecentCount: Number(d.payerRecentCount) } : {}), ...(d.payerReminderDays != null ? { payerReminderDays: Number(d.payerReminderDays) } : {}), ...(d.payerAutoLink != null ? { payerAutoLink: d.payerAutoLink !== false } : {}) }, id: r.id };
+  if (k === "settings") return { key: "settings", item: { capital: Number(d.capital) || 0, income: Number(d.income) || 0, fixed: Number(d.fixed) || 0, city: typeof d.city === "string" && d.city.trim() ? d.city.trim() : "Астана", ...(d.payerRecentCount != null ? { payerRecentCount: Number(d.payerRecentCount) } : {}), ...(d.payerReminderDays != null ? { payerReminderDays: Number(d.payerReminderDays) } : {}), ...(d.payerAutoLink != null ? { payerAutoLink: d.payerAutoLink !== false } : {}), ...(d.monthStart != null ? { monthStart: Math.min(28, Math.max(1, Math.round(Number(d.monthStart)) || 1)) } : {}) }, id: r.id };
   const ok = { cycles: n(d.price) && n(d.every) && d.every >= 0 && typeof (d.last || d.first) === "string", goals: n(d.target) && n(d.saved) && n(d.months) && typeof d.start === "string",
     installments: typeof d.name === "string" && n(d.total) && d.total > 0 && n(d.months) && d.months >= 1 && n(d.paid) && /^\d{4}-\d{2}-\d{2}$/.test(d.start),
     wishes: typeof d.name === "string" && d.name.trim() && n(d.price) && d.price > 0,
@@ -118,7 +124,7 @@ function fromRow(r) {
   return ok ? { id: r.id, ...d } : null;
 }
 const toRow = (k, e, settingsId) => {
-  if (k === "settings") return { id: settingsId, app: APP_OF[k], data: { capital: e.capital, income: e.income, fixed: e.fixed, city: e.city, payerRecentCount: e.payerRecentCount, payerReminderDays: e.payerReminderDays, payerAutoLink: e.payerAutoLink } };
+  if (k === "settings") return { id: settingsId, app: APP_OF[k], data: { capital: e.capital, income: e.income, fixed: e.fixed, city: e.city, payerRecentCount: e.payerRecentCount, payerReminderDays: e.payerReminderDays, payerAutoLink: e.payerAutoLink, monthStart: e.monthStart } };
   const { id, ...data } = e;
   return { id, app: APP_OF[k], data: k === "tx" ? { ...data, currency: "KZT" } : data };
 };
@@ -232,5 +238,5 @@ function payerState(c, today) {
   return { kind: "cycle", status: next <= today ? "unpaid" : "upcoming", next };
 }
 
-const FS = { instMonthly, instLeft, instDone, instPay, instDue, instIn, recalcCycle, payerStats, payerState, cyclePrice, perDay, migrate, itemIdOf, matchCycle, groupReceipt, addDays, daysBetween, cycleDaysLeft, stockPct, nextBuy, brandMatch, goalSaved, goalsView, goalMonthly, forecast, normCat, monthTotals, balance, wallet, APP_OF, fromRow, toRow, mergePull };
+const FS = { periodKey, periodRange, instMonthly, instLeft, instDone, instPay, instDue, instIn, recalcCycle, payerStats, payerState, cyclePrice, perDay, migrate, itemIdOf, matchCycle, groupReceipt, addDays, daysBetween, cycleDaysLeft, stockPct, nextBuy, brandMatch, goalSaved, goalsView, goalMonthly, forecast, normCat, monthTotals, balance, wallet, APP_OF, fromRow, toRow, mergePull };
 if (typeof module !== "undefined") module.exports = FS;

@@ -7,6 +7,7 @@ const CATS = ["Тамақ", "Көлік", "Тұрмыс", "Кітап", "Күт�
 const MONTHS = ["Қаңтар", "Ақпан", "Наурыз", "Сәуір", "Мамыр", "Маусым", "Шілде", "Тамыз", "Қыркүйек", "Қазан", "Қараша", "Желтоқсан"];
 const COLORS = ["var(--acc)", "var(--star)", "var(--warn)", "var(--acc-2)", "var(--good)", "var(--mute)"];
 const ICONS = {
+  user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   archive: '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>',
   soda: '<path d="M6 8h12l-1.5 13h-9z"/><path d="M5 8h14"/><path d="M13.5 8L15 3h3"/><circle cx="10.5" cy="13" r=".6"/><circle cx="13.5" cy="15" r=".6"/><circle cx="11" cy="18" r=".6"/>',
   gamepad: '<line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/><rect x="2" y="6" width="20" height="12" rx="2"/>',
@@ -343,36 +344,52 @@ function donut(m) {
 }
 
 /* ---------- беттер ---------- */
-let jMonth = "";
-// Журнал сүзгісі: бір шот (acc: "" = барлығы, "_" = шотсыз) және 1 не 3 ай; құрылғыда сақталады
-let jv = (() => { try { const v = JSON.parse(localStorage.getItem("fs-jv")); return { acc: typeof v?.acc === "string" ? v.acc : "", span: v?.span === 3 ? 3 : 1 }; } catch { return { acc: "", span: 1 }; } })();
+let jMonth = ""; // көрсетілген кезеңнің аты (басталған ай, YYYY-MM)
+// Журнал сүзгісі: шот ("" = барлығы, "_" = шотсыз) және аралық (1/3/6/12 ай не 0 = өз аралығың); құрылғыда сақталады
+let jv = (() => { try { const v = JSON.parse(localStorage.getItem("fs-jv")); return { acc: typeof v?.acc === "string" ? v.acc : "", span: [0, 1, 3, 6, 12].includes(v?.span) ? v.span : 1, from: typeof v?.from === "string" ? v.from : "", to: typeof v?.to === "string" ? v.to : "" }; } catch { return { acc: "", span: 1, from: "", to: "" }; } })();
 const setJv = (patch) => { jv = { ...jv, ...patch }; try { localStorage.setItem("fs-jv", JSON.stringify(jv)); } catch {} render(); };
 const WD = ["Жексенбі", "Дүйсенбі", "Сейсенбі", "Сәрсенбі", "Бейсенбі", "Жұма", "Сенбі"];
+const shiftMonth = (key, k) => new Date(Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5)) - 1 + k, 1)).toISOString().slice(0, 7);
+const dm = (d) => `${Number(d.slice(8))} ${MONTHS[Number(d.slice(5, 7)) - 1]}`;
+function pickRange() {
+  const to = today(), from = jv.from || shiftMonth(to.slice(0, 7), -1) + "-" + to.slice(8);
+  ask("Аралықты таңда", [{ name: "from", label: "Басы", type: "date", value: jv.from || from }, { name: "to", label: "Соңы", type: "date", value: jv.to || to }],
+    (v) => { if (v.from > v.to) return alert("Басы соңынан кейін болмауы керек."); setJv({ span: 0, from: v.from, to: v.to }); });
+}
 function home() {
-  const T = today(), hide = S.settings.hide, mon = (n) => hide ? "*** ₸" : tg(n), ym = jMonth || T.slice(0, 7);
+  const T = today(), hide = S.settings.hide, mon = (n) => hide ? "••••• ₸" : tg(n), ms = S.settings.monthStart || 1, cur = FS.periodKey(T, ms), ym = jMonth || cur;
+  const custom = jv.span === 0 && jv.from && jv.to, span = jv.span || 1;
+  const from = custom ? jv.from : FS.periodRange(shiftMonth(ym, 1 - span), ms).from, to = custom ? jv.to : FS.periodRange(ym, ms).to;
   const ids = new Set(S.accounts.map((a) => a.id)), wal = FS.wallet(S), accId = jv.acc && (jv.acc === "_" || ids.has(jv.acc)) ? jv.acc : "";
-  const inAcc = (id) => !accId || (ids.has(id) ? id : "_") === accId;
-  const [yy, mm] = ym.split("-").map(Number), months = Array.from({ length: jv.span }, (_, k) => new Date(Date.UTC(yy, mm - 1 - k, 1)).toISOString().slice(0, 7));
-  const txs = S.tx.filter((t) => inAcc(t.account)), trs = S.transfers.filter((t) => !accId || inAcc(t.from) || inAcc(t.to));
-  const m = months.reduce((a, k) => { const r = FS.monthTotals(txs, k + "-15"); return { income: a.income + r.income, expense: a.expense + r.expense }; }, { income: 0, expense: 0 });
+  const inAcc = (id) => !accId || (ids.has(id) ? id : "_") === accId, inRange = (d) => d >= from && d <= to;
+  const txs = S.tx.filter((t) => inAcc(t.account) && inRange(t.date)), trs = S.transfers.filter((t) => (!accId || inAcc(t.from) || inAcc(t.to)) && inRange(t.date));
+  const m = txs.reduce((a, t) => { a[t.kind] += t.amount; return a; }, { income: 0, expense: 0 });
   const days = {}, at = (d) => (days[d] ??= { tx: [], tr: [] });
-  for (const t of txs) if (months.includes(t.date.slice(0, 7))) at(t.date).tx.push(t);
-  for (const t of trs) if (months.includes(t.date.slice(0, 7))) at(t.date).tr.push(t);
-  if (ym === T.slice(0, 7)) at(T); // бүгінгі күнде әрқашан «+» бар
+  for (const t of txs) at(t.date).tx.push(t);
+  for (const t of trs) at(t.date).tr.push(t);
+  if (inRange(T)) at(T); // бүгінгі күнде әрқашан «+» бар
   const nm = (id) => S.accounts.find((a) => a.id === id)?.name ?? "Шотсыз";
-  const pick = () => ask("Айды таңдау", [{ name: "m", label: "Ай", type: "month", value: ym }], (v) => { jMonth = v.m; render(); });
+  const [y2, m2] = ym.split("-");
+  const title = custom ? `${dm(from)} – ${dm(to)}` : span === 1 ? `${MONTHS[Number(m2) - 1]} ${y2}` : `${MONTHS[Number(shiftMonth(ym, 1 - span).slice(5)) - 1]} – ${MONTHS[Number(m2) - 1]} ${y2}`;
+  const sub = custom ? "" : ms > 1 || span > 1 ? `${dm(from)} – ${dm(to)}` : "";
+  const pick = () => ask("Айды таңдау", [{ name: "m", label: "Ай", type: "month", value: ym }], (v) => { jMonth = v.m; setJv({ span: custom ? 1 : jv.span }); });
+  const go = (k) => { jMonth = shiftMonth(ym, k * span); if (jMonth >= cur) jMonth = ""; render(); };
+  const chips = [["", "Барлығы", FS.balance(S)], ...wal.accounts.map((a) => [a.id, a.name, a.balance]), ...(wal.loose != null && ids.size ? [["_", "Шотсыз", wal.loose]] : [])];
+  const bal = accId === "_" ? wal.loose ?? 0 : accId ? wal.accounts.find((a) => a.id === accId).balance : FS.balance(S);
   const mk = (t) => { const c = catInfo(t.category), sgn = t.kind === "income" ? "+" : "";
     return h("button", { class: "jt", style: `background:${c.color}`, "aria-label": `${t.category} ${tg(t.amount)}`, onclick: () => txForm(t) },
       h("span", { class: "wm", "aria-hidden": "true" }, ic(c.subs.find((x) => x.name === t.sub)?.icon || c.icon)), h("small", {}, t.sub || t.category), h("b", { class: "num" }, `${sgn}${mon(t.amount)}`)); };
   return [
-    h("div", { class: "head" }, h("h1", {}, jv.span === 3 ? `${MONTHS[Number(months[2].slice(5)) - 1]} – ${MONTHS[mm - 1]} ${yy}` : `${MONTHS[mm - 1]} ${yy}`),
-      h("div", { class: "hbtns" }, h("button", { class: "ghost round", "aria-label": "Айды таңдау", onclick: pick }, ic("calendar")),
-        h("button", { class: "ghost round", "aria-label": hide ? "Балансты көрсету" : "Балансты жасыру", onclick: () => { S.settings.hide = !hide; save(); } }, ic(hide ? "eye-off" : "eye")))),
-    h("div", { class: "jfilter" },
-      ids.size || wal.loose != null ? h("select", { "aria-label": "Шот", onchange: (e) => setJv({ acc: e.target.value }) }, [["", "Барлық шот"], ...S.accounts.map((a) => [a.id, a.name]), ...(wal.loose != null && ids.size ? [["_", "Шотсыз"]] : [])].map(([v, t]) => h("option", { value: v, selected: v === accId }, t))) : null,
-      h("div", { class: "seg2" }, [[1, "1 ай"], [3, "3 ай"]].map(([k, t]) => h("button", { "aria-pressed": String(jv.span === k), onclick: () => setJv({ span: k }) }, t)))),
-    h("div", { class: "jbal" }, h("span", { class: "muted" }, accId ? (accId === "_" ? "Шотсыз" : S.accounts.find((a) => a.id === accId).name) : "Қалдық"), h("b", { class: "big num" }, mon(accId === "_" ? wal.loose ?? 0 : accId ? wal.accounts.find((a) => a.id === accId).balance : FS.balance(S))),
+    h("div", { class: "head" }, h("div", { class: "jtitle" }, h("h1", {}, title), sub && h("small", { class: "muted" }, sub)),
+      h("div", { class: "hbtns" }, !custom && h("button", { class: "ghost round", "aria-label": "Бұрынғы кезең", onclick: () => go(-1) }, ic("chevl")), !custom && h("button", { class: "ghost round", "aria-label": "Кейінгі кезең", disabled: ym >= cur, onclick: () => go(1) }, ic("chev")),
+        h("button", { class: "ghost round", "aria-label": "Айды таңдау", onclick: pick }, ic("calendar")))),
+    ids.size ? h("div", { class: "achips", role: "tablist", "aria-label": "Шот" }, chips.map(([id, name, b]) => h("button", { class: "achip", role: "tab", "aria-selected": String(id === accId), "aria-pressed": String(id === accId), "aria-label": `Шот: ${name}`, onclick: () => setJv({ acc: id }) }, h("small", {}, name), h("b", { class: "num" }, mon(b))))) : null,
+    h("div", { class: "jbal" }, h("div", { class: "jbtop" }, h("span", { class: "muted" }, accId ? nm(accId === "_" ? "" : accId) : "Қалдық"),
+        h("button", { class: "ghost round sm", "aria-label": hide ? "Сандарды көрсету" : "Сандарды жасыру", "aria-pressed": String(hide), onclick: () => { S.settings.hide = !hide; save(); } }, ic(hide ? "eye-off" : "eye"))),
+      h("b", { class: "big num" }, mon(bal)),
       h("small", { class: "num" }, h("span", { class: "good" }, `+${mon(m.income)}`), " ", h("span", { class: "warn" }, `−${mon(m.expense)}`))),
+    h("div", { class: "rchips", "aria-label": "Аралық" }, [[1, "Ай"], [3, "3 ай"], [6, "6 ай"], [12, "Жыл"], [0, custom ? `${dm(from)} – ${dm(to)}` : "Аралық"]].map(([k, t]) =>
+      h("button", { class: "rchip", "aria-pressed": String(k === (custom ? 0 : span)), onclick: () => (k === 0 ? pickRange() : setJv({ span: k })) }, t))),
     ...Object.keys(days).sort().reverse().map((d) => { const x = days[d], tot = x.tx.reduce((a, t) => a + (t.kind === "income" ? t.amount : -t.amount), 0);
       return h("section", { class: "jday" },
         h("div", { class: "jh" }, h("b", {}, `${Number(d.slice(8))} ${WD[new Date(d + "T00:00:00").getDay()]}`), h("span", { class: "num " + (tot < 0 ? "warn" : "good") }, x.tx.length ? `${tot > 0 ? "+" : "−"}${mon(Math.abs(tot))}` : "")),
@@ -380,19 +397,19 @@ function home() {
           ...x.tr.map((t) => h("div", { class: "jt tr", "aria-label": `${nm(t.from)} → ${nm(t.to)} ${tg(t.amount)}` }, h("span", { class: "wm", "aria-hidden": "true" }, ic("swap")), h("small", {}, `${nm(t.from)} → ${nm(t.to)}`), h("b", { class: "num" }, mon(t.amount)))),
           h("button", { class: "jt jadd", "aria-label": `Қосу: ${d}`, onclick: () => openAdd({ date: d }) }, ic("plus"))));
     }),
-    Object.keys(days).length ? null : empty(jv.span === 3 ? "Бұл 3 айда жазба жоқ." : "Бұл айда жазба жоқ."),
+    Object.keys(days).length ? null : empty("Бұл аралықта жазба жоқ."),
   ];
 }
 
 function plan() {
-  const T = today(), m = FS.monthTotals(S.tx, T), w = FS.wallet(S), hide = S.settings.hide, mon = (n) => hide ? "*** ₸" : tg(n), next = liveCycles().filter((c) => c.every > 0).sort((a, b) => FS.nextBuy(a).localeCompare(FS.nextBuy(b))), f = FS.forecast(S, T, 3);
+  const T = today(), m = FS.monthTotals(S.tx, T, S.settings.monthStart), w = FS.wallet(S), hide = S.settings.hide, mon = (n) => hide ? "*** ₸" : tg(n), next = liveCycles().filter((c) => c.every > 0).sort((a, b) => FS.nextBuy(a).localeCompare(FS.nextBuy(b))), f = FS.forecast(S, T, 3);
   return [
     head("Summary"),
     sec("Шығындар бөлінісі", null, donut(m)),
     Object.keys(m.byCat).length ? sec("Санаттар", null, h("div", { class: "cards" }, Object.entries(m.byCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => h("div", { class: "card2" },
       h("span", { class: "nm" }, h("i", { style: `background:${catInfo(k).color}` }), k), h("b", { class: "num" }, mon(v)),
       h("small", { class: "muted" }, (catInfo(k).budget ? `Бюджет ${mon(catInfo(k).budget)} · ${Math.round(v / catInfo(k).budget * 100)}%\n` : "") + Object.entries(m.bySub[k] ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([sk, sv]) => `${sk} · ${mon(sv)}`).join("\n") || " "))))) : null,
-    S.incomes.length ? sec("Кіріс көздері", null, S.incomes.map((i) => { const got = S.tx.filter((t) => t.kind === "income" && t.date.slice(0, 7) === T.slice(0, 7) && FS.normCat(t.category) === FS.normCat(i.name)).reduce((a, t) => a + t.amount, 0), pct = Math.min(100, Math.round(got / i.amount * 100));
+    S.incomes.length ? sec("Кіріс көздері", null, S.incomes.map((i) => { const got = S.tx.filter((t) => t.kind === "income" && FS.periodKey(t.date, S.settings.monthStart) === FS.periodKey(T, S.settings.monthStart) && FS.normCat(t.category) === FS.normCat(i.name)).reduce((a, t) => a + t.amount, 0), pct = Math.min(100, Math.round(got / i.amount * 100));
       return h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, i.name), h("small", { class: "num muted" }, `${mon(got)} / ${mon(i.amount)} · ${pct}%`), bar(pct))); })) : null,
     S.goals.length ? sec("Жинақтар", null, FS.goalsView(S).map((g) => goalRow(g))) : null,
     sec("Шоттар", null, S.accounts.length || w.loose !== null ? h("div", { class: "cards" }, [...w.accounts.map((a) => [a.name, a.balance]), ...(w.loose !== null ? [["Шотсыз", w.loose]] : [])].map(([n, b]) => h("div", { class: "card2" },
@@ -493,7 +510,7 @@ function walletPage() {
       h("div", { class: "big num" }, mon(total)), h("small", { class: "muted" }, "Мақсаттарға аударылған сома кірмейді")),
     sec("Шоттар", add(() => ask("Жаңа шот", [{ name: "name", label: "Атауы (қолма-қол, карта…)" }, { name: "opening", label: "Қазіргі қалдық, ₸", type: "number", min: -1e12, value: 0 }],
       (v) => { put("accounts", { id: crypto.randomUUID(), name: v.name.trim(), opening: num(v.opening) }); save(); })),
-      S.accounts.length ? w.accounts.map((a) => pocket(a.name, a.balance, del2(a))) : empty("Шот жоқ. Қолма-қол, карта сияқты шоттарды қос: әр транзакция шотқа байланады."),
+      S.accounts.length ? w.accounts.map((a) => pocket(a.name, a.balance, h("span", { class: "acts" }, editBtn(a, a.balance), del2(a)))) : empty("Шот жоқ. Қолма-қол, карта сияқты шоттарды қос: әр транзакция шотқа байланады."),
       w.loose !== null && S.accounts.length ? pocket("Шотсыз", w.loose) : null),
     S.accounts.length ? h("div", { class: "end", style: "margin-top:0" }, h("button", { onclick: trForm }, ic("swap"), "Аударым")) : null,
     S.transfers.length ? sec("Аударымдар", null, [...S.transfers].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10).map((t) => {
@@ -501,6 +518,8 @@ function walletPage() {
       return h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, `${nm(t.from)} → ${nm(t.to)}`), h("small", { class: "muted" }, t.date)), h("span", { class: "num" }, tg(t.amount)), del("transfers", t.id, `${nm(t.from)} → ${nm(t.to)}`));
     })) : null,
   ];
+  function editBtn(a, cur) { return h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${a.name}`, onclick: () => ask("Шотты өзгерту", [{ name: "name", label: "Атауы", value: a.name }, { name: "cur", label: "Қазіргі қалдық, ₸", type: "number", min: -1e12, value: cur }],
+    (v) => { put("accounts", { ...a, name: v.name.trim(), opening: a.opening + (num(v.cur) - cur) }); save(); }) }, ic("edit")); }
   function del2(a) { return h("button", { class: "ghost sm", "aria-label": `Өшіру: ${a.name}`, onclick: () => delAcc(a) }, ic("trash")); }
 }
 
@@ -838,10 +857,12 @@ function settings() {
       { name: "capital", label: "Бастапқы капитал, ₸", type: "number", min: -1e12, value: st.capital },
       { name: "income", label: "Айлық тұрақты кіріс, ₸", type: "number", value: st.income },
       { name: "fixed", label: "Айлық тұрақты шығын, ₸", type: "number", value: st.fixed },
-    ], (v) => { Object.assign(S.settings, { capital: num(v.capital), income: num(v.income), fixed: num(v.fixed) }); put("settings"); save(); }) }, "Өзгерту"),
+      { name: "monthStart", label: "Айдың басы (айдың қай күні, 1–28)", type: "number", min: 1, max: 28, step: 1, value: st.monthStart || 1 },
+    ], (v) => { Object.assign(S.settings, { capital: num(v.capital), income: num(v.income), fixed: num(v.fixed), monthStart: Math.min(28, Math.max(1, Math.round(num(v.monthStart)) || 1)) }); put("settings"); save(); }) }, "Өзгерту"),
     h("div", { class: "row" }, h("span", {}, "Бастапқы капитал"), h("span", { class: "num" }, tg(st.capital))),
     h("div", { class: "row" }, h("span", {}, "Айлық кіріс"), h("span", { class: "num" }, tg(st.income))),
-    h("div", { class: "row" }, h("span", {}, "Айлық тұрақты шығын"), h("span", { class: "num" }, tg(st.fixed))));
+    h("div", { class: "row" }, h("span", {}, "Айлық тұрақты шығын"), h("span", { class: "num" }, tg(st.fixed))),
+    h("div", { class: "row" }, h("span", {}, "Айдың басы"), h("span", { class: "num" }, `${st.monthStart || 1}-ші күн`)));
   const payerSec = sec("Төлемгер баптаулары", h("button", { class: "ghost", onclick: () => ask("Төлемгер баптаулары", [
       { name: "recentCount", label: "Негізгі орташаға алынатын соңғы төлем саны", type: "number", min: 1, max: 20, step: 1, value: st.payerRecentCount },
       { name: "reminderDays", label: "Әдепкі ескерту: қанша күн бұрын", type: "number", min: 0, max: 365, step: 1, value: st.payerReminderDays },
@@ -872,11 +893,10 @@ function settings() {
 }
 
 const PAGES = { home, plan, stock, set: settings };
-const NAV = [["home", "Журнал", "home"], ["plan", "Summary", "bars"], ["+"], ["stock", "Есеп", "box"], ["set", "Профиль", "sliders"]];
+const NAV = [["home", "Журнал", "home"], ["plan", "Summary", "bars"], ["+"], ["stock", "Есеп", "box"], ["set", "Профиль", "user"]];
 
 function render() {
   document.getElementById("view").replaceChildren(...PAGES[tab]().filter(Boolean));
-  document.getElementById("nav").hidden = tab === "set" && sub === "cats"; // санаттар беті толық экран
   document.getElementById("nav").replaceChildren(...NAV.map(([id, label, icon]) => id === "+"
     ? h("button", { class: "plus primary", "aria-label": "Қосу", onclick: () => openAdd() }, ic("plus"))
     : h("button", { "aria-current": id === tab ? "page" : null, onclick: () => go(id) }, ic(icon), label)));

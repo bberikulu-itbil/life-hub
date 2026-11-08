@@ -262,3 +262,9 @@ test("бөліп-төлем пен тілек: fromRow жарамсыз жолд
   assert.equal(FS.fromRow({ id: "a", app: "fs_install", data: { name: "Mac", total: 900000, months: 0, paid: 0, start: "2026-11-05" } }), null);
   assert.ok(FS.fromRow({ id: "b", app: "fs_wish", data: { name: "Дрон", price: 500000 } })); assert.equal(FS.fromRow({ id: "b", app: "fs_wish", data: { name: "", price: 5 } }), null);
 });
+test("айдың басы: periodKey/periodRange/monthTotals", () => {
+  assert.equal(FS.periodKey("2026-11-10", 25), "2026-10"); assert.equal(FS.periodKey("2026-11-25", 25), "2026-11"); assert.equal(FS.periodKey("2026-01-05", 25), "2025-12"); assert.equal(FS.periodKey("2026-11-10"), "2026-11");
+  assert.deepEqual(FS.periodRange("2026-11", 25), { from: "2026-11-25", to: "2026-12-24" }); assert.deepEqual(FS.periodRange("2026-02", 1), { from: "2026-02-01", to: "2026-02-28" });
+  const tx = [{ kind: "expense", amount: 100, date: "2026-11-20", category: "а" }, { kind: "expense", amount: 40, date: "2026-11-26", category: "а" }];
+  assert.equal(FS.monthTotals(tx, "2026-11-28", 25).expense, 40); assert.equal(FS.monthTotals(tx, "2026-11-28").expense, 140);
+});
