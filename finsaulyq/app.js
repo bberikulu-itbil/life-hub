@@ -520,11 +520,47 @@ function stock() {
   ];
 }
 
+let walletRange = "month";
+let walletCustom = { from: "", to: "" };
 function walletPage() {
-  const w = FS.wallet(S), hide = S.settings.hide, mon = (n) => hide ? "*** ₸" : tg(n);
-  const total = FS.balance(S);
-  const pocket = (name, balance, extra) => h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, name), h("small", { class: "muted" }, balance < 0 ? "Қалдық теріс" : " ")), h("span", { class: "num " + (balance < 0 ? "warn" : "") }, mon(balance)), extra);
-  const pockets = [{ id: "", name: "Шотсыз" }, ...S.accounts];
+  const T = today(), w = FS.wallet(S), hide = S.settings.hide, mon = (n) => hide ? "••••••" : tg(n), total = FS.balance(S);
+  const range = walletRangeInfo(T);
+  const pockets = [...w.accounts, ...(w.loose !== null ? [{ id: "", name: "Шотсыз", balance: w.loose }] : [])];
+  const inRange = (date) => !date || ((!range.from || date >= range.from) && (!range.to || date <= range.to));
+  const metric = (id) => {
+    const own = (x) => (x.account || "") === id;
+    const out = { income: 0, expense: 0, goals: 0, in: 0, out: 0 };
+    for (const x of S.tx) if (inRange(x.date) && own(x)) out[x.kind] += x.amount;
+    for (const x of S.contribs || []) if (inRange(x.date) && own(x)) out.goals += x.amount;
+    for (const x of S.transfers || []) if (inRange(x.date)) {
+      if ((x.to || "") === id) out.in += x.amount;
+      if ((x.from || "") === id) out.out += x.amount;
+    }
+    out.net = out.income - out.expense - out.goals + out.in - out.out;
+    return out;
+  };
+  const customRange = () => ask("Уақыт аралығы", [
+    { name: "from", label: "Басталуы", type: "date", value: walletCustom.from || range.from || T },
+    { name: "to", label: "Аяқталуы", type: "date", value: walletCustom.to || range.to || T },
+  ], (v) => {
+    if (v.from > v.to) return alert("Басталу күні аяқталу күнінен кейін болмауы керек.");
+    walletCustom = { from: v.from, to: v.to }; walletRange = "custom"; render();
+  });
+  const chooseRange = (key) => { if (key === "custom") return customRange(); walletRange = key; render(); };
+  const rangeBar = h("div", { class: "wallet-range", role: "tablist", "aria-label": "Уақыт аралығы" },
+    [["month", "Осы ай"], ["30d", "30 күн"], ["90d", "90 күн"], ["year", "Жыл"], ["all", "Барлығы"], ["custom", "Өзім"]].map(([key, label]) =>
+      h("button", { type: "button", role: "tab", "aria-selected": String(walletRange === key), "aria-pressed": String(walletRange === key), onclick: () => chooseRange(key) }, label)));
+  const cards = pockets.map((a) => {
+    const m = metric(a.id), sign = m.net > 0 ? "+" : m.net < 0 ? "−" : "";
+    return h("article", { class: "account-card" },
+      h("div", { class: "account-card-head" }, h("span", { class: "account-mark", style: `background:${catColor(a.name)}` }), h("b", {}, a.name), a.id && h("small", { class: "muted" }, "Шот"), a.id && h("span", { class: "acts" }, editBtn(a, a.balance), del2(a))),
+      h("div", { class: "account-balance num " + (a.balance < 0 ? "warn" : "") }, mon(a.balance)),
+      h("small", { class: "muted" }, range.label),
+      h("div", { class: "account-net num " + (m.net < 0 ? "warn" : m.net > 0 ? "good" : "muted") }, `${sign}${mon(Math.abs(m.net))}`),
+      h("div", { class: "account-breakdown" },
+        h("span", {}, h("small", { class: "muted" }, "Кіріс"), h("b", { class: "num" }, mon(m.income))),
+        h("span", {}, h("small", { class: "muted" }, "Шығыс"), h("b", { class: "num" }, mon(m.expense)))));
+  });
   const trForm = () => {
     const opts = [...S.accounts.map((a) => [a.id, a.name]), ...(w.loose !== null ? [["", "Шотсыз"]] : [])];
     if (opts.length < 2) return alert("Аударым үшін кемінде екі шот керек.");
@@ -538,22 +574,35 @@ function walletPage() {
     S.transfers.filter((t) => t.from === a.id || t.to === a.id).forEach((t) => rm("transfers", t.id));
     rm("accounts", a.id); save(); };
   return [
-    head("Әмиян"),
-    h("section", { class: "sec" }, h("header", {}, h("span", { class: "muted" }, "Барлық қаражат"), h("button", { class: "ghost sm", "aria-label": hide ? "Балансты көрсету" : "Балансты жасыру", onclick: () => { S.settings.hide = !hide; save(); } }, ic(hide ? "eye-off" : "eye"))),
-      h("div", { class: "big num" }, mon(total)), h("small", { class: "muted" }, "Мақсаттарға аударылған сома кірмейді")),
+    h("div", { class: "wallet-head" }, h("div", {}, h("h1", {}, "Шоттар"), h("p", { class: "muted" }, `${pockets.length || 0} шот · ${range.label}`)), h("button", { class: "ghost round", "aria-label": hide ? "Сомаларды көрсету" : "Сомаларды жасыру", "aria-pressed": String(hide), onclick: () => { S.settings.hide = !hide; save(); } }, ic(hide ? "eye-off" : "eye"))),
+    h("section", { class: "wallet-total" }, h("div", { class: "wallet-total-top" }, h("span", { class: "muted" }, "Барлық қаражат"), h("span", { class: "chip" }, "Қазір")),
+      h("div", { class: "wallet-total-value num" }, mon(total)), h("small", { class: "muted" }, "Мақсаттарға аударылған сома кірмейді")),
+    h("section", { class: "sec wallet-filter-card" }, h("header", {}, h("h2", {}, "Кезең"), h("small", { class: "muted" }, range.detail)), rangeBar),
     sec("Шоттар", add(() => ask("Жаңа шот", [{ name: "name", label: "Атауы (қолма-қол, карта…)" }, { name: "opening", label: "Қазіргі қалдық, ₸", type: "number", min: -1e12, value: 0 }],
       (v) => { put("accounts", { id: crypto.randomUUID(), name: v.name.trim(), opening: num(v.opening) }); save(); })),
-      S.accounts.length ? w.accounts.map((a) => pocket(a.name, a.balance, h("span", { class: "acts" }, editBtn(a, a.balance), del2(a)))) : empty("Шот жоқ. Қолма-қол, карта сияқты шоттарды қос: әр транзакция шотқа байланады."),
-      w.loose !== null && S.accounts.length ? pocket("Шотсыз", w.loose) : null),
-    S.accounts.length ? h("div", { class: "end", style: "margin-top:0" }, h("button", { onclick: trForm }, ic("swap"), "Аударым")) : null,
+      pockets.length ? h("div", { class: "account-grid" }, cards) : empty("Шот жоқ. Қолма-қол, карта сияқты шоттарды қос: әр транзакция шотқа байланады.")),
+    S.accounts.length ? h("div", { class: "end wallet-actions", style: "margin-top:0" }, h("button", { onclick: trForm }, ic("swap"), "Шоттар арасында аудару")) : null,
     S.transfers.length ? sec("Аударымдар", null, [...S.transfers].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10).map((t) => {
       const nm = (id) => S.accounts.find((a) => a.id === id)?.name ?? "Шотсыз";
-      return h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, `${nm(t.from)} → ${nm(t.to)}`), h("small", { class: "muted" }, t.date)), h("span", { class: "num" }, tg(t.amount)), del("transfers", t.id, `${nm(t.from)} → ${nm(t.to)}`));
+      return h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, `${nm(t.from)} → ${nm(t.to)}`), h("small", { class: "muted" }, t.date)), h("span", { class: "num" }, mon(t.amount)), del("transfers", t.id, `${nm(t.from)} → ${nm(t.to)}`));
     })) : null,
   ];
   function editBtn(a, cur) { return h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${a.name}`, onclick: () => ask("Шотты өзгерту", [{ name: "name", label: "Атауы", value: a.name }, { name: "cur", label: "Қазіргі қалдық, ₸", type: "number", min: -1e12, value: cur }],
     (v) => { put("accounts", { ...a, name: v.name.trim(), opening: a.opening + (num(v.cur) - cur) }); save(); }) }, ic("edit")); }
   function del2(a) { return h("button", { class: "ghost sm", "aria-label": `Өшіру: ${a.name}`, onclick: () => delAcc(a) }, ic("trash")); }
+}
+
+function walletRangeInfo(T) {
+  const month = `${T.slice(0, 7)}-01`;
+  const ranges = {
+    month: { from: month, to: T, label: "Осы ай", detail: `${month.slice(8)}.${month.slice(5, 7)} — ${T.slice(8)}.${T.slice(5, 7)}` },
+    "30d": { from: FS.addDays(T, -29), to: T, label: "Соңғы 30 күн", detail: `${FS.addDays(T, -29)} — ${T}` },
+    "90d": { from: FS.addDays(T, -89), to: T, label: "Соңғы 90 күн", detail: `${FS.addDays(T, -89)} — ${T}` },
+    year: { from: `${T.slice(0, 4)}-01-01`, to: T, label: "Осы жыл", detail: `01.01.${T.slice(0, 4)} — ${T}` },
+    all: { from: "", to: T, label: "Барлық уақыт", detail: "Барлық жазбалар" },
+  };
+  if (walletRange === "custom") return { from: walletCustom.from, to: walletCustom.to, label: "Таңдалған кезең", detail: `${walletCustom.from} — ${walletCustom.to}` };
+  return ranges[walletRange] || ranges.month;
 }
 
 /* ---------- санпернелі енгізу: 1) сома 2) санат не тауар 3) егжей-тегжей ---------- */
