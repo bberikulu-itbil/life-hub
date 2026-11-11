@@ -243,3 +243,5 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .ib .bk{width:30px;height:30px}
 
 .bk.pad{padding:15%;box-sizing:border-box}.bk.pad img{border-radius:0}.jcb .bk.lg{background:#fff!important}
+
+.clist{display:grid}.crow2{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer}.crow2:last-child{border:0}.crow2 .tile{width:44px;height:44px;border-radius:50%}.crow2 .main{flex:1;min-width:0}.crow2 .main b{display:block}.crow2 .pct{font-size:1.05rem}.crow2.over .pct{color:var(--warn)}

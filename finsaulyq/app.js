@@ -428,14 +428,25 @@ function home() {
   ];
 }
 
+let sumCat = "cards";
+// Summary: санат тізімі — белгіше, прогресс, % және жұмсалған / айлық болжам
+function catList_(m, mon) {
+  const names = [...new Set([...Object.keys(m.byCat), ...allCats("expense").filter((c) => catInfo(c.name).budget).map((c) => c.name)])].sort((a, b) => (m.byCat[b] || 0) - (m.byCat[a] || 0));
+  return h("div", { class: "clist" }, names.map((k) => { const v = m.byCat[k] || 0, c = catInfo(k), pct = c.budget ? Math.round(v / c.budget * 100) : null;
+    return h("div", { class: "crow2" + (pct > 100 ? " over" : ""), role: "button", tabindex: 0, onclick: () => { catKind = "expense"; catForm({ cat: c }); }, onkeydown: (e) => { if (e.key === "Enter") e.target.click(); } }, tile(k),
+      h("div", { class: "main" }, h("b", {}, k), h("div", { class: "bar", role: "progressbar", "aria-valuenow": pct ?? 0, "aria-valuemin": 0, "aria-valuemax": 100 }, h("i", { style: `width:${Math.min(100, pct ?? 0)}%;background:${c.color}` })),
+        h("small", { class: "num muted" }, c.budget ? `${mon(v)} / ${mon(c.budget)}` : `${mon(v)} · болжам жоқ`)),
+      h("b", { class: "pct num" }, pct === null ? "" : pct + "%")); }));
+}
 function plan() {
   const T = today(), m = FS.monthTotals(S.tx, T, S.settings.monthStart), w = FS.wallet(S), hide = S.settings.hide, mon = (n) => hide ? "*** ₸" : tg(n), next = liveCycles().filter((c) => c.every > 0).sort((a, b) => FS.nextBuy(a).localeCompare(FS.nextBuy(b))), f = FS.forecast(S, T, 3);
   return [
     head("Summary"),
     sec("Шығындар бөлінісі", null, donut(m)),
-    Object.keys(m.byCat).length ? sec("Санаттар", null, h("div", { class: "cards" }, Object.entries(m.byCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => h("div", { class: "card2" },
+    Object.keys(m.byCat).length || S.categories.some((c) => c.budget) ? sec("Санаттар", h("div", { class: "seg2" }, [["cards", "Карточка"], ["list", "Тізім"]].map(([k, t]) => h("button", { type: "button", "aria-pressed": String(sumCat === k), onclick: () => { sumCat = k; render(); } }, t))),
+      sumCat === "list" ? catList_(m, mon) : h("div", { class: "cards" }, Object.entries(m.byCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => h("div", { class: "card2" },
       h("span", { class: "nm" }, h("i", { style: `background:${catInfo(k).color}` }), k), h("b", { class: "num" }, mon(v)),
-      h("small", { class: "muted" }, (catInfo(k).budget ? `Бюджет ${mon(catInfo(k).budget)} · ${Math.round(v / catInfo(k).budget * 100)}%\n` : "") + Object.entries(m.bySub[k] ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([sk, sv]) => `${sk} · ${mon(sv)}`).join("\n") || " "))))) : null,
+      h("small", { class: "muted" }, (catInfo(k).budget ? `Болжам ${mon(catInfo(k).budget)} · ${Math.round(v / catInfo(k).budget * 100)}%\n` : "") + Object.entries(m.bySub[k] ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([sk, sv]) => `${sk} · ${mon(sv)}`).join("\n") || " "))))) : null,
     S.incomes.length ? sec("Кіріс көздері", null, S.incomes.map((i) => { const got = S.tx.filter((t) => t.kind === "income" && FS.periodKey(t.date, S.settings.monthStart) === FS.periodKey(T, S.settings.monthStart) && FS.normCat(t.category) === FS.normCat(i.name)).reduce((a, t) => a + t.amount, 0), pct = Math.min(100, Math.round(got / i.amount * 100));
       return h("div", { class: "row" }, h("div", { class: "main" }, h("b", {}, i.name), h("small", { class: "num muted" }, `${mon(got)} / ${mon(i.amount)} · ${pct}%`), bar(pct))); })) : null,
     S.goals.length ? sec("Жинақтар", null, FS.goalsView(S).map((g) => goalRow(g))) : null,
@@ -860,7 +871,7 @@ function catForm(opts = {}) {
       h("div", { class: "sec crow" },
         h("label", { class: "inl" }, "Атауы", h("input", { value: st.name, placeholder: "Қысқа әрі нақты", "aria-label": "Атауы", oninput: (e) => { st.name = e.target.value; } })),
         !info && h("label", { class: "inl" }, "Орны", h("select", { "aria-label": "Орны", onchange: (e) => { st.parent = e.target.value; draw(); } }, [["", "Санаттар"], ...allCats(catKind).map((c) => [c.name, c.name])].map(([v, t]) => h("option", { value: v, selected: v === st.parent }, t))))),
-      !st.parent && h("div", { class: "sec crow" }, h("label", { class: "inl" }, "Бюджет", h("input", { type: "number", min: 0, step: "any", inputmode: "decimal", value: st.budget, placeholder: "₸0", "aria-label": "Бюджет", oninput: (e) => { st.budget = e.target.value; } }))),
+      !st.parent && h("div", { class: "sec crow" }, h("label", { class: "inl" }, "Айлық болжам", h("input", { type: "number", min: 0, step: "any", inputmode: "decimal", value: st.budget, placeholder: "₸0", "aria-label": "Айлық болжам", oninput: (e) => { st.budget = e.target.value; } }))),
       !st.parent && h("div", { class: "sec swatches" }, ...COLORS_PICK.map((c) => h("button", { type: "button", class: "sw" + (c === st.color ? " on" : ""), style: `background:${c}`, "aria-label": `Түс ${c}`, onclick: () => { st.color = c; draw(); } })),
         h("label", { class: "sw rainbow", "aria-label": "Басқа түс" }, h("input", { type: "color", value: st.color, onchange: (e) => { st.color = e.target.value; draw(); } }))),
       h("div", { class: "sec swatches" }, ...ICON_KEYS.map((k) => h("button", { type: "button", class: "ib" + (k === st.icon ? " on" : ""), "aria-label": `Белгіше ${k}`, onclick: () => { st.icon = k; draw(); } }, ic(k)))),
