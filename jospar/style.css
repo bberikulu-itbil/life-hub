@@ -51,4 +51,13 @@ dialog{position:fixed;inset:auto 0 0;max-width:600px;width:100%;max-height:88%;m
 .icon-grid input{position:absolute;opacity:0;width:1px;height:1px;min-height:0}
 .icon-grid label:has(input:checked){background:color-mix(in srgb,var(--acc) 14%,transparent);border-color:var(--acc);color:var(--acc)}
 .icon-grid label:has(input:focus-visible){outline:2px solid var(--acc);outline-offset:2px}
-label.check{display:flex;align-items:center;gap:10px;color:var(--ink)}label.check input{width:22px;min-height:22px;flex:none}
+
+/* форма: жанына жылжымайды, күн/уақыт өрісі iOS-та торға сыяды */
+html,body,#view{overflow-x:hidden}#view,dialog{touch-action:pan-y}
+dialog{overflow-x:hidden;overscroll-behavior:contain}
+dialog input,dialog select,dialog textarea{min-width:0;max-width:100%;box-sizing:border-box}
+dialog input[type=date],dialog input[type=time]{-webkit-appearance:none;appearance:none;display:block;width:100%;text-align:left}
+dialog select{text-overflow:ellipsis}
+dialog .quick{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}dialog .quick button{min-height:40px;padding:.3rem .9rem}
+details.more{margin-top:14px;border-top:1px solid var(--line);padding-top:6px}details.more>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;color:var(--mute);font-weight:600}
+.add-plan{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;margin:0 0 14px;border-style:dashed;color:var(--acc);font-weight:600}

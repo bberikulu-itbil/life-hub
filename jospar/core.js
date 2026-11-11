@@ -65,7 +65,7 @@ function rate(S, h, today, days = 30) {
 }
 
 // Қосалқы тапсырмалар негізгі тапсырмамен бірге сақталады.
-const taskStepProgress = t => ({done:(t.subtasks || []).filter(s => s.done).length,total:t.subtasks?.length || 0});
+const taskStepProgress = t => ({done:t.done ? t.subtasks?.length || 0 : (t.subtasks || []).filter(s => s.done).length,total:t.subtasks?.length || 0}); // Hub/ассистент тапсырманы жапса, қадамдары жабылмайды: орындалған тапсырма — барлық қадам орындалған
 function taskWithSubtasks(t, subtasks, date) {
   const done = subtasks.length ? subtasks.every(s => s.done) : t.done;
   return {...t,subtasks,done,doneAt:done ? t.done && t.doneAt ? t.doneAt : date : ""};

@@ -293,3 +293,10 @@ test("мақсат белгішесі: тізімдегісі сақталады
   assert.equal(JO.fromRow(JO.toRow("goals", { id: "g", title: "М", why: "", deadline: "2026-12-20", icon: "star" })).icon, "star");
   assert.ok(JO.GOAL_ICONS.includes("target") && new Set(JO.GOAL_ICONS).size === JO.GOAL_ICONS.length);
 });
+
+test("Hub не ассистент тапсырманы жапса, қосалқы қадамдар да орындалған есептеледі", () => {
+  const t = { subtasks: [{ id: "a", title: "x", done: true }, { id: "b", title: "y", done: false }] };
+  assert.deepEqual(JO.taskStepProgress(t), { done: 1, total: 2 });
+  assert.deepEqual(JO.taskStepProgress({ ...t, done: true }), { done: 2, total: 2 });
+  assert.deepEqual(JO.taskStepProgress({ done: true }), { done: 0, total: 0 });
+});
