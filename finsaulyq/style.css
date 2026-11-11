@@ -177,18 +177,18 @@ button:disabled{opacity:.45;cursor:default}
 .end.sticky{position:sticky;bottom:0;padding-top:8px}
 .mrow .ml{display:flex;flex-direction:column;gap:2px;min-width:0}
 .mrow>.num{margin-left:auto}
-.end.sticky{background:var(--card,#fff);margin:0 -4px;padding:10px 4px;border-radius:14px}
+.end.sticky{background:var(--glass-2);margin:0 -4px;padding:10px 4px;border-radius:14px}
 /* Санперне: төменге тиіп тұрған парақ */
 dialog.sheet.pk{padding:0;overflow:hidden}
-.phead{display:grid;grid-template-columns:1fr auto;gap:8px 10px;align-items:center;padding:14px 16px;background:var(--card,#fff)}
+.phead{display:grid;grid-template-columns:1fr auto;gap:8px 10px;align-items:center;padding:14px 16px;background:var(--glass-2)}
 .phead .modes{grid-column:1/-1;justify-self:center;margin:0}.modes button{min-width:64px;display:inline-flex;justify-content:center}
 .ptitle{display:flex;align-items:center;gap:10px;font-size:1.8rem}.ptitle b{font-weight:800}.amtchip{font-size:1.6rem;font-weight:800;color:var(--mute)}
 .ppanel{background:var(--glass-2);padding:6px 14px calc(14px + env(safe-area-inset-bottom))}
 .ppanel .amt{font-size:2rem;color:var(--acc);min-height:56px;padding:8px 14px}
 .krow{display:grid;grid-template-columns:3fr 1fr;gap:10px;margin-bottom:10px}
 .kseg{display:flex;gap:4px;background:rgba(0,0,0,.07);border-radius:22px;padding:4px}.kseg button{flex:1;border:0;background:transparent;border-radius:18px;min-height:46px;color:var(--mute)}.kseg button[aria-pressed=true]{background:rgba(0,0,0,.14);color:var(--ink)}
-.pad{grid-template-columns:repeat(4,1fr);gap:10px}.pad button,.krow .op{border-radius:999px;min-height:58px;border:0;background:#fff;font-size:1.6rem}
-.pad .op,.krow .op{background:rgba(0,0,0,.18);color:var(--ink)}.pad .okb{background:#3b82f6;color:#fff;box-shadow:0 6px 16px rgba(59,130,246,.4)}.pad .okb:disabled{opacity:.45}
+.pad{grid-template-columns:repeat(4,1fr);gap:10px}.pad button,.krow .op{border-radius:999px;min-height:58px;border:0;background:var(--glass-2);color:var(--ink);font-size:1.6rem}
+.pad .op,.krow .op{background:var(--glass);color:var(--ink)}.pad .okb{background:#3b82f6;color:#fff;box-shadow:0 6px 16px rgba(59,130,246,.4)}.pad .okb:disabled{opacity:.45}
 .phead .modes{gap:8px}.modes button{flex:none;width:64px;height:40px;border-radius:14px;padding:0;display:inline-flex;align-items:center;justify-content:center}.modes svg{width:22px;height:22px}
 /* Есеп: екі бөлім */
 .seg.tabs{margin:.4rem 0 .8rem}.seg.tabs button{padding:.6rem .2rem;font-weight:600}
@@ -202,7 +202,7 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .wcard{position:relative;display:flex;flex-direction:column;gap:4px;padding:8px;border-radius:18px;background:var(--glass-2);min-width:0}
 .wcard img,.wcard .wph{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px;background:rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;color:var(--mute)}
 .wcard .wph svg{width:36px;height:36px}.wcard .wbtn{display:flex;flex-direction:column;gap:6px;margin-top:4px}.wcard .wbtn button{font-size:.8rem;padding:.5rem .4rem}
-.wcard>.ghost.sm{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.85);border-radius:50%}
+.wcard>.ghost.sm{position:absolute;top:12px;right:12px;background:var(--glass-2);border-radius:50%}
 .wcard.gone{opacity:.65}
 .row .main[role=button]{cursor:pointer}
 
