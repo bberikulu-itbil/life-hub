@@ -213,7 +213,7 @@ const txForm = (t, pre) => { const d = t ?? pre ?? {}; ask(t ? "Транзакц
   { name: "note", label: "Ескертпе", optional: true, value: d.note },
   { name: "date", label: "Күні", type: "date", value: d.date ?? today() },
   ...accField(t ? (t.account ?? "") : undefined),
-], (v) => { put("tx", withAcc({ id: t?.id ?? crypto.randomUUID(), kind: v.kind, amount: num(v.amount), category: FS.normCat(v.category), note: v.note.trim(), date: v.date, ...(v.store.trim() ? { store: v.store.trim() } : {}), ...(v.sub.trim() ? { sub: v.sub.trim() } : {}) }, v)); save(); },
+], (v) => { put("tx", withAcc({ id: t?.id ?? crypto.randomUUID(), kind: v.kind, amount: num(v.amount), category: FS.normCat(v.category), note: v.note.trim(), date: v.date, ...(v.store.trim() ? { store: v.store.trim() } : {}), ...(v.sub.trim() ? { sub: v.sub.trim() } : {}), ...(t?.receipt ? { receipt: t.receipt } : {}) }, v)); save(); },
   t && { label: "Өшіру", fn: () => confirm(`«${t.category} ${tg(t.amount)}» өшіру ме? Байланысқан тауар жазбалары да өшеді.`) && removeTx(t.id) },
   (el) => { // түрі өзгерсе — санаттар, санат өзгерсе — ішкі санаттар жаңарады
     el.kind.addEventListener("change", () => { fillSel(el.category, catOpts(el.kind.value), el.category.value); fillSel(el.sub, subOpts(el.category.value), ""); });
@@ -400,6 +400,10 @@ function home() {
   const mk = (t) => { const c = catInfo(t.category), sgn = t.kind === "income" ? "+" : "";
     return h("button", { class: "jt", style: `background:${c.color}`, "aria-label": `${t.category} ${tg(t.amount)}`, onclick: () => txForm(t) },
       h("span", { class: "wm", "aria-hidden": "true" }, ic(c.subs.find((x) => x.name === t.sub)?.icon || c.icon)), h("small", {}, t.sub || t.category), h("b", { class: "num" }, `${sgn}${mon(t.amount)}`)); };
+  // бір чектен шыққан бірнеше транзакция — бір ұяшық
+  const cells = (list) => { const g = Map.groupBy(list, (t) => t.receipt || t.id);
+    return [...g.values()].map((m) => m.length < 2 ? mk(m[0]) : h("button", { class: "jt", style: "background:#64748b", "aria-label": `Чек ${m[0].store || ""} ${tg(m.reduce((a, t) => a + t.amount, 0))}`, onclick: () => receiptCell(m) },
+      h("span", { class: "wm", "aria-hidden": "true" }, ic("cart")), h("small", {}, m[0].store || "Чек"), h("b", { class: "num" }, mon(m.reduce((a, t) => a + t.amount, 0))))); };
   return [
     h("div", { class: "head" }, h("div", { class: "jtitle" }, h("h1", {}, title), sub && h("small", { class: "muted" }, sub)),
       h("div", { class: "hbtns" }, !custom && h("button", { class: "ghost round", "aria-label": "Бұрынғы кезең", onclick: () => go(-1) }, ic("chevl")), !custom && h("button", { class: "ghost round", "aria-label": "Кейінгі кезең", disabled: ym >= cur, onclick: () => go(1) }, ic("chev")),
@@ -416,9 +420,9 @@ function home() {
     ...Object.keys(days).sort().reverse().map((d) => { const x = days[d], tot = x.tx.reduce((a, t) => a + (t.kind === "income" ? t.amount : -t.amount), 0);
       return h("section", { class: "jday" },
         h("div", { class: "jh" }, h("b", {}, `${Number(d.slice(8))} ${WD[new Date(d + "T00:00:00").getDay()]}`), h("span", { class: "num " + (tot < 0 ? "warn" : "good") }, x.tx.length ? `${tot > 0 ? "+" : "−"}${mon(Math.abs(tot))}` : "")),
-        h("div", { class: "jgrid" }, ...x.tx.map(mk),
+        h("div", { class: "jgrid" }, ...cells(x.tx),
           ...x.tr.map((t) => h("div", { class: "jt tr", "aria-label": `${nm(t.from)} → ${nm(t.to)} ${tg(t.amount)}` }, h("span", { class: "wm", "aria-hidden": "true" }, ic("swap")), h("small", {}, `${nm(t.from)} → ${nm(t.to)}`), h("b", { class: "num" }, mon(t.amount)))),
-          h("button", { class: "jt jadd", "aria-label": `Қосу: ${d}`, onclick: () => openAdd({ date: d }) }, ic("plus"))));
+          h("button", { class: "jt jadd", "aria-label": `Қосу: ${d}`, onclick: () => openAdd({ date: d, account: accId && accId !== "_" ? accId : undefined }) }, ic("plus"))));
     }),
     Object.keys(days).length ? null : empty("Бұл аралықта жазба жоқ."),
   ];
@@ -740,7 +744,7 @@ function openAdd(init = {}) {
       if (c) recordItem(c, { cost: tx.amount, qty: num(v.qty) || 1, store, discount: v.discount === "1", note, date: v.date, txId: tx.id });
       save(); dlg.close();
     } },
-      ...accField().map((a) => fld(a.label, sel("account", a.options, a.value))),
+      ...accField(init.account).map((a) => fld(a.label, sel("account", a.options, a.value))),
       fld("Дүкен", h("input", { name: "store", list: "dl-store", autocomplete: "off" })), h("datalist", { id: "dl-store" }, stores().map((v) => h("option", { value: v }))),
       c && fld(`Саны, ${c.unit || "дана"}`, h("input", { name: "qty", type: "number", min: 0.01, step: "any", value: 1, inputmode: "decimal" })),
       c && fld("Жеңілдікпен алдың ба?", sel("discount", [["0", "Жоқ"], ["1", "Иә"]], "0")),
@@ -763,6 +767,13 @@ function openAdd(init = {}) {
 }
 
 // Төлемгердің тарихы: нақты төлемдер, екі орташа сома және цикл ұсынысы
+function receiptCell(m) {
+  const dlg = h("dialog", {}), ids = new Set(m.map((t) => t.id)), tr = S.tx.filter((t) => ids.has(t.id));
+  dlg.append(h("h3", {}, `Чек · ${tg(tr.reduce((a, t) => a + t.amount, 0))}`), h("p", { class: "muted" }, [tr[0]?.store, tr[0]?.date].filter(Boolean).join(" · ")),
+    ...tr.map((t) => h("button", { class: "mrow", onclick: () => { dlg.close(); txForm(t); } }, h("span", { class: "tile", style: `background:${catInfo(t.category).color}`, "aria-hidden": "true" }, ic(catInfo(t.category).icon)), h("span", {}, t.sub || t.category), h("b", { class: "num" }, tg(t.amount)))),
+    h("div", { class: "acts" }, h("button", { class: "ghost", onclick: () => dlg.close() }, "Жабу")));
+  dlg.addEventListener("close", () => dlg.remove()); document.body.append(dlg); dlg.showModal();
+}
 function cycleDetail(c) {
   const its = S.items.filter((i) => i.cycleId === c.id).sort((a, b) => b.time.localeCompare(a.time)), gone = c.status === "archived", stats = FS.payerStats(c, S.items, S.settings.payerRecentCount), state = FS.payerState(c, today());
   const dlg = h("dialog", {}), again = () => { dlg.close(); cycleDetail(c); };
@@ -803,7 +814,7 @@ function receiptReview(r) {
       if (c) cyc.push([c, x.price, cat]);
     });
     const ids = Object.fromEntries(Object.keys(txs).map((k) => [k, crypto.randomUUID()]));
-    for (const [cat, amount] of Object.entries(txs)) put("tx", withAcc({ id: ids[cat], kind: "expense", amount, category: cat, note: store || "Чек", date, ...(store ? { store } : {}) }, { account: v.get("account") }));
+    for (const [cat, amount] of Object.entries(txs)) put("tx", withAcc({ id: ids[cat], kind: "expense", amount, category: cat, note: store || "Чек", date, receipt: rid, ...(store ? { store } : {}) }, { account: v.get("account") }));
     for (const [c, cost, cat] of cyc) recordItem(c, { cost, qty: 1, store, date, txId: ids[cat], receipt: rid });
     save(); dlg.close();
   } }, h("h3", {}, `Чек · ${tg(r.total)}`), h("p", { class: "muted" }, "Позициялар өздігінен бөлінді. Қате болса, санатын өзгерт."),
