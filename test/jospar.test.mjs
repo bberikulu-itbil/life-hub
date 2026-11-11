@@ -285,3 +285,11 @@ test("қосалқы тапсырмалар: соңғы қадам ата-ана
   assert.equal(added.done,false);
   assert.equal(JO.taskWithSubtasks(t,t.subtasks.filter(s=>s.id!=="two"),T).done,true);
 });
+
+test("мақсат белгішесі: тізімдегісі сақталады, жарамсыз не жоқ болса қосылмайды (интерфейс «target» көрсетеді)", () => {
+  const row = (icon) => ({ id: "g", app: "jo_goal", data: { title: "Олимпиада", deadline: "2026-12-20", ...(icon !== undefined && { icon }) } });
+  assert.equal(JO.fromRow(row("book")).icon, "book");
+  assert.ok(!("icon" in JO.fromRow(row("<script>"))) && !("icon" in JO.fromRow(row())));
+  assert.equal(JO.fromRow(JO.toRow("goals", { id: "g", title: "М", why: "", deadline: "2026-12-20", icon: "star" })).icon, "star");
+  assert.ok(JO.GOAL_ICONS.includes("target") && new Set(JO.GOAL_ICONS).size === JO.GOAL_ICONS.length);
+});

@@ -22,10 +22,18 @@ const ICONS = {
   chevron: '<path d="M9 18l6-6-6-6"/>',
   back: '<path d="M15 18l-6-6 6-6"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+  briefcase: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+  activity: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+  award: '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+  code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+  sun: '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
   heart: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
 };
 
-let S = structuredClone(DEF), tab = "home", habitDate = "", basketTab = "tasks", selectedHabit = "", habitOrigin = "home", selectedTask = "", taskOrigin = "home", profileTab = "overview";
+let S = structuredClone(DEF), selectedGoal = "", tab = "home", habitDate = "", basketTab = "tasks", selectedHabit = "", habitOrigin = "home", selectedTask = "", taskOrigin = "home", profileTab = "overview";
 try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch { /* бұзылған жазба — бос күйден бастаймыз */ }
 if (!S.synced) S.pending = []; // алғашқы синхронда барлығы қайта кезекке қойылады
 
@@ -87,6 +95,11 @@ function ask(title, fields, ok, onDel) {
       form.append(h("fieldset", { class: "weekdays" }, h("legend", {}, f.label), hidden, h("div", {}, buttons)));
       continue;
     }
+    if (f.type === "icons") { // белгіше торы: радио-батырмалар
+      form.append(h("fieldset", { class: "icon-grid" }, h("legend", {}, f.label), ...f.options.map(([k, t]) => h("label", { "aria-label": t, title: t }, h("input", { type: "radio", name: f.name, value: k, checked: k === f.value }), ic(k)))));
+      continue;
+    }
+    if (f.type === "checkbox") { form.append(h("label", { class: "check" }, h("input", { type: "checkbox", name: f.name, checked: !!f.value }), f.label)); continue; }
     const input = f.options ? h("select", { name: f.name }, f.options.map(([v, t]) => h("option", { value: v }, t)))
       : f.type === "textarea" ? h("textarea", { name: f.name, rows: 4 }, f.value ?? "")
       : h("input", { name: f.name, type: f.type || "text", value: f.value ?? "", required: !f.optional, pattern: f.type ? null : "\\S.*", ...(f.type === "number" ? { min: f.min ?? 0, step: f.step ?? "any", inputmode: "numeric" } : {}) });
@@ -209,14 +222,17 @@ function dayTask(t) {
 function home() {
   const t=today(),d=new Date(t+"T12:00:00"), habits=S.habits.filter(hb=>JO.scheduled(hb,t)).sort((a,b)=>(a.time || "99").localeCompare(b.time || "99"));
   const tasks=S.tasks.filter(x=>JO.todayTask(x,t)).sort((a,b)=>Number(a.done)-Number(b.done)||(a.time || "99").localeCompare(b.time || "99"));
+  const loose=S.tasks.filter(x=>!x.due && !x.done); // күнсіз істер бүгінгі санға кірмейді, бірақ көзден таса қалмайды
   const goods=habits.filter(hb=>hb.kind === "good"), done=goods.filter(hb=>JO.dayStatus(hb,JO.logOf(S,hb.id,t)) === "done").length+tasks.filter(x=>x.done).length,total=goods.length+tasks.length;
   return [h("h1",{},"Жоспаргер"),h("p",{class:"muted sub"},`${d.getDate()} ${MO[d.getMonth()]}, ${WD[d.getDay()]}`),
     total>0 && h("section",{class:"sec today-summary"},h("div",{class:"summary-heading"},h("span",{class:"eyebrow"},"Бүгін орындалды"),h("strong",{class:"summary-number num"},`${done}`,h("span",{class:"muted"},` / ${total}`))),bar(Math.round(done/total*100)),h("p",{class:"muted"},done === total ? "Бүгінгі жоспар орындалды ✓" : `${total-done} іс қалды. Бір қадамнан бастаңыз.`)),
     habits.length>0 && sec(`Әдеттер · ${habits.length}`,...habits.map(hb=>dayRow(hb))),
     tasks.length>0 && sec(`Тапсырмалар · ${tasks.length}`,...tasks.map(taskLine)),
-    !habits.length && !tasks.length && empty("Бүгінгі жоспарыңыз бос. Төмендегі «+» арқылы алғашқы ісіңізді қосыңыз.")];
+    loose.length>0 && sec(`Күні жоқ істер · ${loose.length}`,...loose.map(taskLine)),
+    !habits.length && !tasks.length && !loose.length && empty("Бүгінгі жоспарыңыз бос. Төмендегі «+» арқылы алғашқы ісіңізді қосыңыз.")];
 }
 
+const GOAL_ICON_NAMES = { target: "Нысана", book: "Кітап", briefcase: "Жұмыс", activity: "Денсаулық", star: "Жұлдыз", globe: "Тіл, әлем", award: "Жетістік", heart: "Жүрек", home: "Үй", flame: "Жалын", code: "Код", sun: "Күн" };
 const WEIGHTS = [["1", "1 · жеңіл"], ["2", "2"], ["3", "3 · орташа"], ["4", "4"], ["5", "5 · маңызды"], ["0", "0 · міндетті емес, ұпай бермейді"]];
 /* ---------- Әдеттер ---------- */
 function habitForm(hb) {
@@ -284,12 +300,14 @@ function taskForm(t) {
   ask(t?.id ? "Тапсырманы өзгерту" : "Жаңа тапсырма", [
     { name: "title", label: "Тапсырма", value: t?.title },
     { name: "goal", label: "Мақсат", options: [["", "Мақсатсыз"], ...S.goals.map((g) => [g.id, g.title])], value: t?.goal ?? "" },
-    { name: "due", label: "Мерзімі", type: "date", optional: true, value: t ? t.due : today() },
-    { name: "time", label: "Басталу уақыты", type: "time", optional: true, value: t?.time },
+    { name: "due", label: "Мерзімі", type: "date", optional: true, value: t ? t.due : "" },
+    { name: "time", label: "Басталу уақыты (күні болса ғана)", type: "time", optional: true, value: t?.time },
+    ...(t?.due ? [{ name: "nodue", label: "Күнсіз қалдыру: күні мен уақыты өшеді", type: "checkbox" }] : []),
     { name: "dur", label: "Ұзақтығы, минут", type: "number", optional: true, min: 0, step: 1, value: t?.dur || "" },
     { name: "w", label: "Салмағы · профильдегі ұпайға әсері", options: WEIGHTS, value: String(t?.w ?? 1) },
-  ], (v) => {
-    put("tasks", { ...t, id: t?.id ?? crypto.randomUUID(), title: v.title.trim(), goal: v.goal || "", due: v.due || "", time: v.time || "", dur: Math.round(Number(v.dur)) || 0, w: Number(v.w), done: t?.done ?? false, doneAt: t?.doneAt ?? "" });
+  ], (v0) => {
+    const v = v0.nodue ? { ...v0, due: "", time: "" } : v0; // «күнсіз» таңдалса, күн мен уақыт өшеді
+    put("tasks", { ...t, id: t?.id ?? crypto.randomUUID(), title: v.title.trim(), goal: v.goal || "", due: v.due || "", time: v.due ? v.time || "" : "", dur: v.due && v.time ? Math.round(Number(v.dur)) || 0 : 0, w: Number(v.w), done: t?.done ?? false, doneAt: t?.doneAt ?? "" });
     save();
   }, t?.id && (() => { if (!confirm(`«${t.title}» өшіру ме?`)) return; rm("tasks", t.id); save(); }));
 }
@@ -385,12 +403,13 @@ function tasksPage() {
 function goalForm(g) {
   ask(g ? "Мақсатты өзгерту" : "Жаңа мақсат", [
     { name: "title", label: "Мақсат: нақты және өлшенетін", value: g?.title },
+    { name: "icon", label: "Белгіше", type: "icons", options: JO.GOAL_ICONS.map((k) => [k, GOAL_ICON_NAMES[k]]), value: g?.icon ?? "target" },
     { name: "why", label: "Неге маңызды", type: "textarea", value: g?.why },
     { name: "target", label: "Сандық меже (мысалы, 12 кітап)", type: "number", optional: true, value: g?.target || "", min: 0 },
     { name: "current", label: "Қазіргі нәтиже", type: "number", optional: true, value: g?.current || "", min: 0 },
     { name: "unit", label: "Өлшем бірлігі (кітап, км, сағат…)", optional: true, value: g?.unit },
     { name: "deadline", label: "Мерзімі", type: "date", value: g?.deadline },
-  ], (v) => { put("goals", { ...g, history:[...(g?.history || []), {date:today(),current:Math.max(0,Number(v.current)||0)}], id: g?.id ?? crypto.randomUUID(), title: v.title.trim(), why: v.why.trim(), target: Math.max(0, Number(v.target) || 0), current: Math.max(0, Number(v.current) || 0), unit: v.unit.trim(), deadline: v.deadline }); save(); },
+  ], (v) => { put("goals", { ...g, history:[...(g?.history || []), {date:today(),current:Math.max(0,Number(v.current)||0)}], id: g?.id ?? crypto.randomUUID(), title: v.title.trim(), icon: v.icon || "target", why: v.why.trim(), target: Math.max(0, Number(v.target) || 0), current: Math.max(0, Number(v.current) || 0), unit: v.unit.trim(), deadline: v.deadline }); save(); },
   g && (() => {
     if (!confirm(`«${g.title}» өшіру ме? Тапсырмалар қалады, мақсатпен байланысы үзіледі.`)) return;
     S.tasks.filter((t) => t.goal === g.id).forEach((t) => { t.goal = ""; put("tasks", t); });
@@ -399,25 +418,40 @@ function goalForm(g) {
   }));
 }
 
+function goalCard(g, t) {
+  const o = JO.goalOverview(S, g, t), left = JO.daysBetween(t, g.deadline);
+  return h("button", { class: "goal-card", onclick: () => { selectedGoal = g.id; render(); document.getElementById("view").scrollTop = 0; } },
+    h("span", { class: "menu-icon" }, ic(g.icon || "target")), h("span", { class: "main" }, h("b", { class: "goal-title" }, g.title),
+      h("small", { class: "muted" }, [`${o.pct}%`, left >= 0 ? `${left} күн қалды` : `Мерзімі ${-left} күн бұрын өтті`].join(" · ")), bar(o.pct)), ic("chevron"));
+}
+
+function goalPage(g) {
+  const t = today(), o = JO.goalOverview(S, g, t), p = JO.goalProgress(S, g), metric = JO.goalMetric(g), left = JO.daysBetween(t, g.deadline);
+  const linked = S.habits.filter((hb) => hb.goal === g.id), steps = S.tasks.filter((x) => x.goal === g.id).sort((a, b) => Number(a.done) - Number(b.done) || (a.due || "9").localeCompare(b.due || "9"));
+  return [
+    h("div", { class: "page-heading" }, h("button", { class: "ghost", onclick: () => { selectedGoal = ""; render(); } }, ic("back"), "Мақсаттар"), h("button", { class: "ghost", onclick: () => goalForm(g) }, ic("edit"), "Өзгерту")),
+    h("div", { class: "goal-head" }, h("span", { class: "menu-icon" }, ic(g.icon || "target")), h("div", {}, h("h1", {}, g.title),
+      h("p", { class: "muted sub" }, left >= 0 ? `Мерзімі: ${dshort(g.deadline)} · ${left} күн қалды` : `Мерзімі ${-left} күн бұрын өтті`))),
+    g.why && h("p", { class: "muted" }, g.why),
+    h("section", { class: "sec" }, h("p", { class: "num" }, `Орындалуы: ${o.pct}% · ${o.done}/${o.total}`), bar(o.pct),
+      metric.target > 0 && h("p", { class: "num" }, `${metric.current} / ${metric.target} ${g.unit || ""}`)),
+    sec(`Қадамдар · ${p.done}/${p.total}`, ...steps.map(taskLine), !steps.length && empty("Қадам жоқ: мақсатқа апаратын бір реттік істерді қос."),
+      h("button", { onclick: () => taskForm({ goal: g.id, due: "" }) }, ic("plus"), "Қадам қосу")),
+    sec(`Әдеттер · ${linked.length}`, ...linked.map(habitRow), !linked.length && empty("Әдет жоқ: мақсатқа көмектесетін тұрақты әдетті қос."),
+      h("button", { onclick: () => habitForm({ goal: g.id }) }, ic("repeat"), "Әдет қосу")),
+    sec("Келесі қадам және тарих", goalExtras(g)),
+  ];
+}
+
 function goalsPage() {
-  const t = today(), ms = JO.monthStats(S, t), stat = (k, v) => h("div", { class: "row" }, h("span", {}, k), h("b", { class: "num" }, v));
-  const goals = [...S.goals].sort((a, b) => a.deadline.localeCompare(b.deadline)), rated = S.habits.filter((x) => x.kind !== "neutral");
+  const g = selectedGoal && S.goals.find((x) => x.id === selectedGoal);
+  if (g) return goalPage(g);
+  selectedGoal = "";
+  const t = today(), goals = [...S.goals].sort((a, b) => a.deadline.localeCompare(b.deadline));
   return [
     h("div", { class: "page-heading" }, h("div", {}, h("h1", {}, "Мақсаттар"), h("p", { class: "muted sub" }, "Әр мақсатқа бір қадам жақынырақ"))),
-    h("div", {class:"goal-list"}, ...goals.map((g) => {
-      const overview = JO.goalOverview(S, g, t), p = JO.goalProgress(S, g), metric = JO.goalMetric(g), linked = S.habits.filter((hb) => hb.goal === g.id), left = JO.daysBetween(t, g.deadline);
-      return h("article", { class: "goal-card" }, h("div", { class: "main" }, h("b", { class: "goal-title" }, g.title),
-        h("small", { class: "muted" }, [`${p.done}/${p.total} тапсырма`, left >= 0 ? `${left} күн қалды` : `Мерзімі ${-left} күн бұрын өтті`].join(" · ")), g.why && h("p", { class: "muted" }, g.why),
-        metric.target > 0 && h("p", { class: "num" }, `${metric.current} / ${metric.target} ${g.unit || ""}`),
-        h("p", { class: "num" }, `Орындалуы: ${overview.pct}% · ${overview.done}/${overview.total}`), bar(overview.pct), metric.target > 0 && h("small", { class: "muted" }, `Сандық меже: ${Math.min(100, Math.round(metric.current / metric.target * 100))}%`),
-        linked.length > 0 && h("small", { class: "muted" }, "Көмектесетін әдеттер: " + linked.map((hb) => hb.name).join(", ")),
-        h("details", { class: "goal-contents" }, h("summary", {}, `Әдеттер · ${linked.length}   Қадамдар · ${p.total}`),
-          goalExtras(g), ...linked.map(habitRow), ...S.tasks.filter(task => task.goal === g.id).map(taskLine),
-          h("div", { class: "quantity-actions" }, h("button", { onclick: () => habitForm({ goal: g.id }) }, ic("repeat"), "Әдет қосу"),
-          h("button", { onclick: () => taskForm({ goal: g.id, due: today() }) }, ic("plus"), "Қадам қосу")))),
-        h("button", { class: "ghost sm", "aria-label": `Өзгерту: ${g.title}`, onclick: () => goalForm(g) }, ic("edit")));
-    }), !goals.length && h("section",{class:"sec empty-state"},ic("target"),h("h2",{},"Алғашқы мақсатыңыз"),empty("Межені белгілеңіз. Әдеттер мен тапсырмаларды сол мақсатқа байланыстырыңыз."),h("button",{class:"primary",onclick:()=>goalForm()},"Мақсат қосу"))),
-
+    h("div", { class: "goal-list" }, ...goals.map((x) => goalCard(x, t)),
+      !goals.length && h("section", { class: "sec empty-state" }, ic("target"), h("h2", {}, "Алғашқы мақсатыңыз"), empty("Межені белгілеңіз. Әдеттер мен тапсырмаларды сол мақсатқа байланыстырыңыз."), h("button", { class: "primary", onclick: () => goalForm() }, "Мақсат қосу"))),
   ];
 }
 
@@ -458,7 +492,7 @@ function plusMenu() {
 
 const PAGES = { habits: habitsPage, home, tasks: tasksPage, goals: goalsPage, profile: profilePage };
 const NAV = [["home", "Жоспаргер", "home"], ["tasks", "Қоржын", "tasks"], ["+"], ["goals", "Мақсат", "target"], ["profile", "Профиль", "user"]];
-const go = (t) => { selectedTask = ""; selectedHabit = ""; habitDate = ""; tab = t; render(); document.getElementById("view").scrollTop = 0; };
+const go = (t) => { selectedGoal = ""; selectedTask = ""; selectedHabit = ""; habitDate = ""; tab = t; render(); document.getElementById("view").scrollTop = 0; };
 
 function render() {
   document.documentElement?.setAttribute("data-text-size",preferences.textSize);
