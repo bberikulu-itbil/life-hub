@@ -245,3 +245,5 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .bk.pad{padding:15%;box-sizing:border-box}.bk.pad img{border-radius:0}.jcb .bk.lg{background:#fff!important}
 
 .clist{display:grid}.crow2{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer}.crow2:last-child{border:0}.crow2 .tile{width:44px;height:44px;border-radius:50%}.crow2 .main{flex:1;min-width:0}.crow2 .main b{display:block}.crow2 .pct{font-size:1.05rem}.crow2.over .pct{color:var(--warn)}
+
+.pbtns{display:flex;gap:8px}.mrows{display:grid;gap:10px;margin:10px 0}.mrow2{display:grid;grid-template-columns:1fr 96px 40px;gap:6px}.mrow2 select{grid-column:1/-1}.mrow2 input,.mrow2 select{min-width:0}.addpos{width:100%;height:42px;border:1.5px dashed var(--line);border-radius:12px;background:none;color:var(--acc);font-weight:600}.tot{display:flex;justify-content:space-between;align-items:center;margin:12px 2px;font-size:1.1rem}

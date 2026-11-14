@@ -42,6 +42,7 @@ const ICONS = {
   target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
   box: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
   wallet: '<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>',
+  receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
   camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
   swap: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
   sliders: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
@@ -711,7 +712,8 @@ function openAdd(init = {}) {
   const view1 = () => [
     h("div", { class: "phead" }, h("div", { class: "seg modes" }, ...MODES.map(([m, t, i]) => h("button", { type: "button", "aria-label": t, title: t, "aria-pressed": String(st.mode === m), onclick: () => { st.mode = m; st.kind = "expense"; st.cycleId = ""; draw(); } }, ic(i)))),
       h("div", { class: "ptitle" }, h("b", {}, st.mode === "item" ? "Төлемгер" : { expense: "Төледім", income: "Түсті", transfer: "Аударым" }[st.kind]), h("span", { class: "amtchip num" }, `₸${grp(st.amount)}`)),
-      h("button", { type: "button", class: "ghost round", "aria-label": "Чек сканерлеу", onclick: () => { dlg.close(); receiptFlow(); } }, ic("camera"))),
+      h("span", { class: "pbtns" }, h("button", { type: "button", class: "ghost round", "aria-label": "Қолмен чек", onclick: () => { const a = st.amount; dlg.close(); manualReceipt(a); } }, ic("receipt")),
+        h("button", { type: "button", class: "ghost round", "aria-label": "Чек сканерлеу", onclick: () => { dlg.close(); receiptFlow(); } }, ic("camera")))),
     h("div", { class: "ppanel" },
       h("div", { class: "amt num", "aria-live": "polite" }, (shown() || "0") + " ₸"),
       h("div", { class: "krow" }, st.mode === "tx" ? h("div", { class: "kseg" }, ...KINDS.map(([k, t]) => h("button", { type: "button", "aria-label": t, title: t, "aria-pressed": String(st.kind === k), onclick: () => { st.kind = k; draw(); } }, ic(KICON[k])))) : h("div"),
@@ -811,6 +813,51 @@ function cycleDetail(c) {
 }
 
 // Чек позициялары: циклге не санатқа өздігінен бөлінеді, пайдаланушы тексеріп «Растау» басады
+// Чекті сақтау: позициялар санат бойынша топталып, бір `receipt` белгісімен жазылады (сурет те, қолмен де осыны қолданады)
+function commitReceipt(items, store, date, account) {
+  const rid = crypto.randomUUID(), txs = {}, cyc = [];
+  items.forEach((x) => {
+    const [t, id] = [x.choice.slice(0, 1), x.choice.slice(2)], c = t === "c" ? S.cycles.find((y) => y.id === id) : null, cat = c ? FS.normCat(c.cat || "Тұрмыс") : id;
+    txs[cat] = Math.round(((txs[cat] || 0) + x.price) * 100) / 100;
+    if (c) cyc.push([c, x.price, cat]);
+  });
+  const ids = Object.fromEntries(Object.keys(txs).map((k) => [k, crypto.randomUUID()]));
+  for (const [cat, amount] of Object.entries(txs)) put("tx", withAcc({ id: ids[cat], kind: "expense", amount, category: cat, note: store || "Чек", date, receipt: rid, ...(store ? { store } : {}) }, { account }));
+  for (const [c, cost, cat] of cyc) recordItem(c, { cost, qty: 1, store, date, txId: ids[cat], receipt: rid });
+  save();
+}
+// Қолмен чек: позиция атауынан санатты болжау (Төлемгер → бұрын таңдалған → кілт сөз → «Басқа»)
+const GUESS = { "Тамақ": ["нан", "сүт", "жұмыртқа", "ет", "май", "шай", "кофе", "су", "шырын", "ірімшік", "күріш", "қант", "тұз", "алма", "хлеб", "молоко", "яйц", "мясо", "сыр", "сок", "вода", "чай", "сахар", "рис", "шоколад", "печень", "колбас", "бургер", "пицц"], "Көлік": ["такси", "таксі", "бензин", "жанармай", "автобус", "метро", "жол ақы", "парковк", "автомой"], "Кітап": ["кітап", "книга", "дәптер", "қалам"], "Күтім": ["шампунь", "сабын", "крем", "дезодорант", "мыл", "бритв"], "Тұрмыс": ["ұнтақ", "порошок", "губка", "пакет", "лампа", "батарейка", "тазала"] };
+function guessChoice(name, store) {
+  const n = name.trim().toLowerCase(); if (!n) return "k:Басқа";
+  const c = S.settings.payerAutoLink === false ? null : FS.matchCycle(name, liveCycles(), store); if (c) return "c:" + c.id;
+  const l = S.settings.itemCat?.[n]; if (l) return "k:" + l;
+  for (const [cat, ws] of Object.entries(GUESS)) if (ws.some((w) => n.includes(w))) return "k:" + cat;
+  return "k:Басқа";
+}
+function manualReceipt(amount = "") {
+  const rows = [], cats = catList(), opts = () => [...[...new Set([...cats, "Басқа"])].map((c) => ["k:" + c, c]), ...liveCycles().map((c) => ["c:" + c.id, "Төлемгер: " + c.name])];
+  const list = h("div", { class: "mrows" }), tot = h("b", { class: "num" }), store = h("input", { name: "store", list: "dl-store" });
+  const total = () => rows.reduce((t, r) => t + (num(r.price) > 0 ? num(r.price) : 0), 0), upd = () => { tot.textContent = tg(total()); dlg.querySelector("h3 b").textContent = tg(total()); };
+  const addRow = (price = "") => { const r = { name: "", price, choice: "k:Басқа", manual: false }; rows.push(r);
+    const selEl = sel("c", opts(), r.choice); selEl.setAttribute("aria-label", "Санат"); selEl.onchange = () => { r.choice = selEl.value; r.manual = true; };
+    const nm = h("input", { placeholder: "Атауы", "aria-label": "Позиция атауы", oninput: (e) => { r.name = e.target.value; }, onchange: () => { if (!r.manual) { r.choice = guessChoice(r.name, store.value); selEl.value = r.choice; } } });
+    const pr = h("input", { type: "number", min: 0, step: "any", inputmode: "decimal", placeholder: "₸0", "aria-label": "Бағасы", value: price, oninput: (e) => { r.price = e.target.value; upd(); } });
+    const row = h("div", { class: "mrow2" }, nm, pr, h("button", { type: "button", class: "ghost round", "aria-label": "Позицияны өшіру", onclick: () => { rows.splice(rows.indexOf(r), 1); row.remove(); upd(); } }, "×"), selEl);
+    list.append(row); };
+  const f = h("form", { method: "dialog", onsubmit: (e) => { e.preventDefault(); const v = new FormData(f), ok = rows.filter((r) => num(r.price) > 0);
+    if (!ok.length) return alert("Кемінде бір позицияның бағасын жаз.");
+    for (const r of ok) if (r.choice.startsWith("k:") && r.name.trim()) (S.settings.itemCat ??= {})[r.name.trim().toLowerCase()] = r.choice.slice(2);
+    commitReceipt(ok.map((r) => ({ price: num(r.price), choice: r.choice })), v.get("store").trim(), v.get("date"), v.get("account")); dlg.close(); } },
+    h("h3", {}, "Чек · ", h("b", { class: "num" }, tg(0))), h("p", { class: "muted" }, "Позиция атын жазсаң, санат өздігінен таңдалады."),
+    fld("Дүкен", store), h("datalist", { id: "dl-store" }, stores().map((x) => h("option", { value: x }))), fld("Күні", h("input", { type: "date", name: "date", value: today(), required: true })),
+    ...accField().map((a) => fld(a.label, sel("account", a.options, a.value))), list,
+    h("button", { type: "button", class: "addpos", onclick: () => addRow() }, "+ Позиция қосу"),
+    h("div", { class: "tot" }, h("span", {}, "Жалпы"), tot),
+    h("div", { class: "end" }, h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"), h("button", { class: "primary" }, "Растау")));
+  const dlg = h("dialog", { class: "sheet" }, f); dlg.addEventListener("close", () => dlg.remove());
+  document.body.append(dlg); addRow(amount); upd(); dlg.showModal();
+}
 function receiptReview(r) {
   const pos = [...(r.items || [])], sum = pos.reduce((t, p) => t + p.price, 0);
   if (!pos.length || sum > r.total + 1) return txForm(null, { kind: "expense", amount: r.total, category: r.category, note: r.store, store: r.store, date: r.date }); // позиция оқылмады — жалпы сома
@@ -818,16 +865,9 @@ function receiptReview(r) {
   const { rows } = FS.groupReceipt(pos, S.settings.payerAutoLink === false ? [] : S.cycles, r.category, r.store), cats = [...new Set([...catList(), ...rows.map((x) => x.category)])];
   const opts = [...cats.map((c) => ["k:" + c, c]), ...liveCycles().map((c) => ["c:" + c.id, "Төлемгер: " + c.name])];
   const f = h("form", { method: "dialog", onsubmit: (e) => {
-    e.preventDefault(); const v = new FormData(f), rid = crypto.randomUUID(), store = v.get("store").trim(), date = v.get("date"), txs = {}, cyc = [];
-    rows.forEach((x, i) => {
-      const [t, id] = [v.get("r" + i).slice(0, 1), v.get("r" + i).slice(2)], c = t === "c" ? S.cycles.find((y) => y.id === id) : null, cat = c ? FS.normCat(c.cat || "Тұрмыс") : id;
-      txs[cat] = Math.round(((txs[cat] || 0) + x.price) * 100) / 100;
-      if (c) cyc.push([c, x.price, cat]);
-    });
-    const ids = Object.fromEntries(Object.keys(txs).map((k) => [k, crypto.randomUUID()]));
-    for (const [cat, amount] of Object.entries(txs)) put("tx", withAcc({ id: ids[cat], kind: "expense", amount, category: cat, note: store || "Чек", date, receipt: rid, ...(store ? { store } : {}) }, { account: v.get("account") }));
-    for (const [c, cost, cat] of cyc) recordItem(c, { cost, qty: 1, store, date, txId: ids[cat], receipt: rid });
-    save(); dlg.close();
+    e.preventDefault(); const v = new FormData(f);
+    commitReceipt(rows.map((x, i) => ({ price: x.price, choice: v.get("r" + i) })), v.get("store").trim(), v.get("date"), v.get("account"));
+    dlg.close();
   } }, h("h3", {}, `Чек · ${tg(r.total)}`), h("p", { class: "muted" }, "Позициялар өздігінен бөлінді. Қате болса, санатын өзгерт."),
     ...rows.map((x, i) => h("label", {}, `${x.name} · ${tg(x.price)}`, sel("r" + i, opts, x.cycleId ? "c:" + x.cycleId : "k:" + x.category))),
     fld("Дүкен", h("input", { name: "store", value: r.store })), fld("Күні", h("input", { type: "date", name: "date", value: r.date, required: true })),
