@@ -797,12 +797,13 @@ function receiptCell(m) {
     for (const t of tr) { const n = { ...t, date: v.date, note: store || "Чек" }; if (store) n.store = store; else delete n.store; if ("account" in v) { if (v.account) n.account = v.account; else delete n.account; } put("tx", n); }
     for (const i of S.items.filter((x) => rid && x.receipt === rid)) put("items", { ...i, time: v.date, store });
     save(); dlg.close(); } },
-    h("h3", {}, "Чек · ", h("b", { class: "num" }, tg(sum))), h("p", { class: "muted" }, `${tr.length} санат бойынша бөлінген`),
+    h("h3", {}, "Чек · ", h("b", { class: "num" }, tg(sum))), h("p", { class: "muted" }, `${tr.length} санат · ${tr.reduce((a, t) => a + (t.lines?.length || 0), 0) || "—"} позиция`),
     fld("Дүкен", h("input", { name: "store", value: tr[0].store ?? "", list: "dl-store3", autocomplete: "off" })), h("datalist", { id: "dl-store3" }, stores().map((x) => h("option", { value: x }))),
     fld("Күні", h("input", { type: "date", name: "date", value: tr[0].date, required: true })),
     ...acc.map((a) => fld(a.label, sel("account", a.options, a.value))),
     h("div", { class: "lbl2" }, "Санаттар"),
-    ...tr.map((t) => h("button", { type: "button", class: "mrow", "aria-label": `${t.sub || t.category} ${tg(t.amount)}`, onclick: () => { dlg.close(); txForm(t); } }, tile(t.category), h("span", {}, t.sub || t.category), h("b", { class: "num" }, tg(t.amount)))),
+    ...tr.flatMap((t) => [h("button", { type: "button", class: "mrow", "aria-label": `${t.sub || t.category} ${tg(t.amount)}`, onclick: () => { dlg.close(); txForm(t); } }, tile(t.category), h("span", {}, t.sub || t.category), h("b", { class: "num" }, tg(t.amount))),
+      ...(t.lines?.length ? [h("ul", { class: "plines" }, t.lines.map((l) => h("li", {}, h("span", {}, l.qty > 1 ? `${l.name} ×${l.qty}` : l.name), h("span", { class: "num" }, tg(l.price)))))] : [])]),
     h("div", { class: "end" }, h("button", { type: "button", class: "ghost warn", style: "margin-right:auto", onclick: () => { if (confirm(`Бүкіл чекті (${tg(sum)}) өшіру ме? Байланысқан тауар жазбалары да өшеді.`)) { dlg.close(); tr.forEach((t) => removeTx(t.id)); } } }, "Чекті өшіру"),
       h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Жабу"), h("button", { class: "primary" }, "Сақтау")));
   dlg.append(f); dlg.addEventListener("close", () => dlg.remove()); document.body.append(dlg); dlg.showModal();
@@ -835,14 +836,22 @@ function cycleDetail(c) {
 // Чек позициялары: циклге не санатқа өздігінен бөлінеді, пайдаланушы тексеріп «Растау» басады
 // Чекті сақтау: позициялар санат бойынша топталып, бір `receipt` белгісімен жазылады (сурет те, қолмен де осыны қолданады)
 function commitReceipt(items, store, date, account) {
-  const rid = crypto.randomUUID(), txs = {}, cyc = [];
+  const rid = crypto.randomUUID(), txs = {}, lines = {}, cyc = [], made = new Map();
   items.forEach((x) => {
-    const [t, id] = [x.choice.slice(0, 1), x.choice.slice(2)], c = t === "c" ? S.cycles.find((y) => y.id === id) : null, cat = c ? FS.normCat(c.cat || "Тұрмыс") : id;
+    const [t, id] = [x.choice.slice(0, 1), x.choice.slice(2)]; let c = t === "c" ? S.cycles.find((y) => y.id === id) : null, cat = c ? FS.normCat(c.cat || "Тұрмыс") : id;
+    if (t === "n") { // белгісіз тауар → жаңа «бақыланатын» Төлемгер (штрих-код не атау бойынша қайталанбайды)
+      const key = x.code || (x.name || "").trim().toLowerCase();
+      c = (x.code && S.cycles.find((y) => y.codes?.includes(x.code))) || made.get(key);
+      if (!c && x.name?.trim()) { c = { id: crypto.randomUUID(), name: x.name.trim(), type: "tracked", icon: "bag", color: catInfo(cat).color, price: x.price, unit: "рет", every: 0, buffer: 0, cat, sub: "", first: date, last: "", status: "active", alert: false, intervalLocked: true, codes: [] }; made.set(key, c); }
+      if (c) cat = FS.normCat(c.cat || cat); else cat = FS.normCat(cat);
+    }
+    if (c && x.code && !c.codes?.includes(x.code)) c.codes = [...(c.codes || []), x.code]; // келесі жолы штрих-кодпен танылады
     txs[cat] = Math.round(((txs[cat] || 0) + x.price) * 100) / 100;
+    if (x.name) (lines[cat] ??= []).push({ name: x.name, price: x.price, ...(x.qty > 1 ? { qty: x.qty } : {}), ...(x.code ? { code: x.code } : {}) });
     if (c) cyc.push([c, x.price, cat]);
   });
   const ids = Object.fromEntries(Object.keys(txs).map((k) => [k, crypto.randomUUID()]));
-  for (const [cat, amount] of Object.entries(txs)) put("tx", withAcc({ id: ids[cat], kind: "expense", amount, category: cat, note: store || "Чек", date, receipt: rid, ...(store ? { store } : {}) }, { account }));
+  for (const [cat, amount] of Object.entries(txs)) put("tx", withAcc({ id: ids[cat], kind: "expense", amount, category: cat, note: store || "Чек", date, receipt: rid, ...(store ? { store } : {}), ...(lines[cat]?.length ? { lines: lines[cat] } : {}) }, { account }));
   for (const [c, cost, cat] of cyc) recordItem(c, { cost, qty: 1, store, date, txId: ids[cat], receipt: rid });
   save();
 }
@@ -868,7 +877,7 @@ function manualReceipt(amount = "") {
   const f = h("form", { method: "dialog", onsubmit: (e) => { e.preventDefault(); const v = new FormData(f), ok = rows.filter((r) => num(r.price) > 0);
     if (!ok.length) return alert("Кемінде бір позицияның бағасын жаз.");
     for (const r of ok) if (r.choice.startsWith("k:") && r.name.trim()) (S.settings.itemCat ??= {})[r.name.trim().toLowerCase()] = r.choice.slice(2);
-    commitReceipt(ok.map((r) => ({ price: num(r.price), choice: r.choice })), v.get("store").trim(), v.get("date"), v.get("account")); dlg.close(); } },
+    commitReceipt(ok.map((r) => ({ price: num(r.price), choice: r.choice, name: r.name.trim() })), v.get("store").trim(), v.get("date"), v.get("account")); dlg.close(); } },
     h("h3", {}, "Чек · ", h("b", { class: "num" }, tg(0))), h("p", { class: "muted" }, "Позиция атын жазсаң, санат өздігінен таңдалады."),
     fld("Дүкен", store), h("datalist", { id: "dl-store" }, stores().map((x) => h("option", { value: x }))), fld("Күні", h("input", { type: "date", name: "date", value: today(), required: true })),
     ...accField().map((a) => fld(a.label, sel("account", a.options, a.value))), list,
@@ -884,12 +893,13 @@ function receiptReview(r) {
   if (r.total - sum > 1) pos.push({ name: "Танылмаған қалдық", price: Math.round((r.total - sum) * 100) / 100, category: "Басқа" });
   const { rows } = FS.groupReceipt(pos, S.settings.payerAutoLink === false ? [] : S.cycles, r.category, r.store), cats = [...new Set([...catList(), ...rows.map((x) => x.category)])];
   const opts = [...cats.map((c) => ["k:" + c, c]), ...liveCycles().map((c) => ["c:" + c.id, "Төлемгер: " + c.name])];
+  const optsFor = (x) => [...opts, ["n:" + x.category, "Жаңа Төлемгер (өздігінен)"]];
   const f = h("form", { method: "dialog", onsubmit: (e) => {
     e.preventDefault(); const v = new FormData(f);
-    commitReceipt(rows.map((x, i) => ({ price: x.price, choice: v.get("r" + i) })), v.get("store").trim(), v.get("date"), v.get("account"));
+    commitReceipt(rows.map((x, i) => ({ price: x.price, choice: v.get("r" + i), name: x.name, qty: x.qty, code: x.code })), v.get("store").trim(), v.get("date"), v.get("account"));
     dlg.close();
-  } }, h("h3", {}, `Чек · ${tg(r.total)}`), h("p", { class: "muted" }, "Позициялар өздігінен бөлінді. Қате болса, санатын өзгерт."),
-    ...rows.map((x, i) => h("label", {}, `${x.name} · ${tg(x.price)}`, sel("r" + i, opts, x.cycleId ? "c:" + x.cycleId : "k:" + x.category))),
+  } }, h("h3", {}, `Чек · ${tg(r.total)}`), h("p", { class: "muted" }, "Позициялар өздігінен бөлінді: белгілі тауар — өз Төлемгеріне, жаңасы — жаңа Төлемгер болып ашылады. Қаламасаң, санатқа ауыстыр."),
+    ...rows.map((x, i) => h("label", {}, `${x.name}${x.qty > 1 ? ` ×${x.qty}` : ""} · ${tg(x.price)}`, sel("r" + i, optsFor(x), x.cycleId ? "c:" + x.cycleId : "n:" + x.category))),
     fld("Дүкен", h("input", { name: "store", value: r.store })), fld("Күні", h("input", { type: "date", name: "date", value: r.date, required: true })),
     ...accField().map((a) => fld(a.label, sel("account", a.options, a.value))),
     h("div", { class: "end" }, h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"), h("button", { class: "primary" }, "Растау")));

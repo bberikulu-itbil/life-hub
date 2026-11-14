@@ -1,11 +1,11 @@
 // Чек: модель жауабынан қауіпсіз түрде { store, total, date, category } алу. Модельге сенбейміз: сома мен күн тексеріледі.
-export type Receipt = { store: string; total: number; date: string; category: string; items: { name: string; price: number; category: string }[] };
+export type Receipt = { store: string; total: number; date: string; category: string; items: { name: string; price: number; category: string; qty: number; code: string }[] };
 
 export const PROMPT = [
   "You read a photographed shop receipt (Kazakhstan, amounts in tenge, ₸ / тг / KZT).",
   "Reply with ONE JSON object and nothing else, no markdown:",
-  '{"store":"shop name","total":12345.5,"date":"YYYY-MM-DD","category":"one Kazakh word","items":[{"name":"Сүт 1л","price":450,"category":"Тамақ"}]}',
-  "items = every purchased line of the receipt: name as printed (shortened to at most 40 chars), price = the line total after quantity, a plain number, category as below. Skip discount/total lines. Use [] if lines are unreadable.",
+  '{"store":"shop name","total":12345.5,"date":"YYYY-MM-DD","category":"one Kazakh word","items":[{"name":"Сүт 1л","code":"4870254132705","qty":1,"price":450,"category":"Тамақ"}]}',
+  "items = every purchased line of the receipt: name as printed (shortened to at most 40 chars), price = the line total after quantity, a plain number, category as below. code = the barcode / article number printed next to the line (digits only, 6-14 digits), empty string if none; qty = quantity (1 if not shown). Skip discount/total lines. Use [] if lines are unreadable.",
   "total = the final amount paid (ИТОГО / К оплате / Жиыны), a plain number without spaces or currency.",
   "category = one Kazakh word for what was bought, e.g. Тамақ, Көлік, Тұрмыс, Киім, Дәрі, Кітап, Күтім. Use Тамақ for groceries.",
   "If the date is not visible, use null. If the total cannot be read, use null. Never invent values.",
@@ -20,7 +20,7 @@ export function parseReceipt(text: string, today: string): Receipt | { error: st
   if (!Number.isFinite(total) || total <= 0 || total > 1e9) return { error: "Жалпы сома оқылмады. Чекті жақынырақ, жарықта түсір не қолмен енгіз." };
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(d.date)) && String(d.date) <= today && String(d.date) >= "2000-01-01" ? String(d.date) : today;
   const clean = (v: unknown, n: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, n);
-  const items = (Array.isArray(d.items) ? d.items : []).slice(0, 80).map((x: any) => ({ name: clean(x?.name, 40), price: Math.round(Number(String(x?.price ?? "").replace(/\s/g, "").replace(",", ".")) * 100) / 100, category: clean(x?.category, 30) || "Басқа" }))
+  const items = (Array.isArray(d.items) ? d.items : []).slice(0, 80).map((x: any) => ({ name: clean(x?.name, 40), price: Math.round(Number(String(x?.price ?? "").replace(/\s/g, "").replace(",", ".")) * 100) / 100, category: clean(x?.category, 30) || "Басқа", qty: Math.max(1, Math.min(999, Number(String(x?.qty ?? 1).replace(",", ".")) || 1)), code: /^\d{6,14}$/.test(String(x?.code ?? "").replace(/\s/g, "")) ? String(x.code).replace(/\s/g, "") : "" }))
     .filter((x: { name: string; price: number }) => x.name && Number.isFinite(x.price) && x.price > 0 && x.price <= 1e9);
   return { store: clean(d.store, 60), total: Math.round(total * 100) / 100, date, category: clean(d.category, 30) || "Басқа", items };
 }

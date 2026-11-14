@@ -112,7 +112,7 @@ function fromRow(r) {
   const k = KEY_OF[r.app], d = r.data || {}, n = (v) => Number.isFinite(Number(v)) && v !== "" && v != null;
   if (!k) return null;
   if (k === "tx") return n(d.amount) && (d.kind === "income" || d.kind === "expense")
-    ? { id: r.id, kind: d.kind, amount: Number(d.amount), category: normCat(d.category), note: String(d.note ?? ""), date: /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : localDate(r.created_at), ...(typeof d.account === "string" && d.account ? { account: d.account } : {}), ...(typeof d.store === "string" && d.store ? { store: d.store } : {}), ...(typeof d.sub === "string" && d.sub ? { sub: d.sub } : {}), ...(typeof d.receipt === "string" && d.receipt ? { receipt: d.receipt } : {}) } : null;
+    ? { id: r.id, kind: d.kind, amount: Number(d.amount), category: normCat(d.category), note: String(d.note ?? ""), date: /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : localDate(r.created_at), ...(typeof d.account === "string" && d.account ? { account: d.account } : {}), ...(typeof d.store === "string" && d.store ? { store: d.store } : {}), ...(typeof d.sub === "string" && d.sub ? { sub: d.sub } : {}), ...(typeof d.receipt === "string" && d.receipt ? { receipt: d.receipt } : {}), ...(Array.isArray(d.lines) && d.lines.length ? { lines: d.lines.slice(0, 80).filter((l) => l && typeof l.name === "string" && n(l.price)).map((l) => ({ name: l.name, price: Number(l.price), ...(n(l.qty) && Number(l.qty) !== 1 ? { qty: Number(l.qty) } : {}), ...(typeof l.code === "string" && l.code ? { code: l.code } : {}) })) } : {}) } : null;
   if (k === "settings") return { key: "settings", item: { capital: Number(d.capital) || 0, income: Number(d.income) || 0, fixed: Number(d.fixed) || 0, city: typeof d.city === "string" && d.city.trim() ? d.city.trim() : "Астана", ...(d.payerRecentCount != null ? { payerRecentCount: Number(d.payerRecentCount) } : {}), ...(d.payerReminderDays != null ? { payerReminderDays: Number(d.payerReminderDays) } : {}), ...(d.payerAutoLink != null ? { payerAutoLink: d.payerAutoLink !== false } : {}), ...(d.monthStart != null ? { monthStart: Math.min(28, Math.max(1, Math.round(Number(d.monthStart)) || 1)) } : {}), ...(d.itemCat && typeof d.itemCat === "object" ? { itemCat: d.itemCat } : {}) }, id: r.id };
   const ok = { cycles: n(d.price) && n(d.every) && d.every >= 0 && typeof (d.last || d.first) === "string", goals: n(d.target) && n(d.saved) && n(d.months) && typeof d.start === "string",
     installments: typeof d.name === "string" && n(d.total) && d.total > 0 && n(d.months) && d.months >= 1 && n(d.paid) && /^\d{4}-\d{2}-\d{2}$/.test(d.start),
@@ -207,8 +207,9 @@ function migrate(S) {
   return n;
 }
 const lc = (s) => String(s).toLowerCase().replace(/\s+/g, " ").trim();
-function matchCycle(name, cycles, store = "") {
+function matchCycle(name, cycles, store = "", code = "") {
   const a = lc(name), b = lc(store);
+  if (code) { const byCode = cycles.find((c) => c.status !== "archived" && Array.isArray(c.codes) && c.codes.includes(code)); if (byCode) return byCode; } // штрих-код — ең сенімді сәйкестік
   if (a.length < 3 && b.length < 3) return null;
   const live = cycles.filter((c) => c.status !== "archived").filter((c) => lc(c.name).length >= 3);
   const byName = a.length >= 3 && live.find((c) => {
@@ -225,7 +226,7 @@ function matchCycle(name, cycles, store = "") {
 }
 // Чек позициялары → цикл тауарлары мен санат бойынша жиындар
 function groupReceipt(pos, cycles, fallbackCat = "Басқа", store = "") {
-  const rows = pos.map((p) => { const c = matchCycle(p.name, cycles, store); return { ...p, cycleId: c?.id || "", category: normCat(c ? c.cat : p.category || fallbackCat), sub: c?.sub || p.sub || "" }; });
+  const rows = pos.map((p) => { const c = matchCycle(p.name, cycles, store, p.code); return { ...p, cycleId: c?.id || "", category: normCat(c ? c.cat : p.category || fallbackCat), sub: c?.sub || p.sub || "" }; });
   const byCat = {};
   for (const r of rows) byCat[r.category] = (byCat[r.category] || 0) + r.price;
   return { rows, byCat };

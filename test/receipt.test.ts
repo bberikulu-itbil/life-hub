@@ -21,7 +21,7 @@ test("parseReceipt: сома жоқ/жарамсыз — қате; күн жоқ
 });
 test("parseReceipt: позициялар — жарамсыздары (атауы/бағасы жоқ, теріс) түседі", () => {
   const r = parseReceipt(JSON.stringify({ total: 900, items: [{ name: "Сүт  1л", price: "450", category: "Тамақ" }, { name: "", price: 5 }, { name: "Қате", price: -1 }, { name: "Нан", price: "1 000,5" }, null] }), T) as any;
-  assert.deepEqual(r.items, [{ name: "Сүт 1л", price: 450, category: "Тамақ" }, { name: "Нан", price: 1000.5, category: "Басқа" }]);
+  assert.deepEqual(r.items, [{ name: "Сүт 1л", price: 450, category: "Тамақ", qty: 1, code: "" }, { name: "Нан", price: 1000.5, category: "Басқа", qty: 1, code: "" }]);
 });
 test("okImage: тек JPEG/PNG/WebP data URL, көлемі шектелген", () => {
   assert.ok(okImage("data:image/jpeg;base64,AAAA"));
@@ -31,4 +31,9 @@ test("pickVision: тек тегін және кескінді оқитындар
   const m = (id: string, img = true) => ({ id, architecture: { input_modalities: img ? ["text", "image"] : ["text"] } });
   const got = pickVision([m("x/llama-4-maverick:free"), m("g/gemini-2.0-flash:free"), m("a/text:free", false), m("p/gemini-pro"), m("q/qwen2.5-vl:free")], ["me/own:model", "bad model!"]);
   assert.deepEqual(got, ["me/own:model", "g/gemini-2.0-flash:free", "q/qwen2.5-vl:free", "x/llama-4-maverick:free"]);
+});
+
+test("parseReceipt: штрих-код пен саны сақталады, жарамсыз код тасталады", () => {
+  const r = parseReceipt(JSON.stringify({ total: 900, items: [{ name: "Чипсы", code: "4870254132705", qty: "2", price: 607 }, { name: "Пакет", code: "12ab", price: 45 }] }), "2026-10-20") as any;
+  assert.deepEqual(r.items.map((x: any) => [x.code, x.qty]), [["4870254132705", 2], ["", 1]]);
 });

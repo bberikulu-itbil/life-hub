@@ -250,3 +250,4 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 
 .bigl{display:grid;gap:4px}.bigamt{font-size:2rem!important;font-weight:700;text-align:center;height:64px!important}.catb.on{outline:2.5px solid var(--acc);outline-offset:-2px}.lbl2{font-size:.8rem;color:var(--mute);margin:10px 2px 2px}.sheet .mrow{display:flex;align-items:center;gap:12px;width:100%;padding:10px 4px;text-align:left}.sheet .mrow span:nth-child(2){flex:1}.sheet .mrow .tile{width:40px;height:40px}
 .muted a{color:var(--acc);font-weight:600}
+.plines{list-style:none;margin:-4px 0 6px 52px;padding:0;display:grid;gap:3px;font-size:.85rem;color:var(--mute)}.plines li{display:flex;justify-content:space-between;gap:10px}.plines li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

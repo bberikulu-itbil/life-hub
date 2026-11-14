@@ -281,3 +281,10 @@ test("fromRow: чек белгісі (receipt) және үйренген ата�
   const s = FS.fromRow({ id: "s", app: "fs_settings", data: { itemCat: { "нан": "Тамақ" } } });
   assert.deepEqual(s.item.itemCat, { "нан": "Тамақ" });
 });
+
+test("matchCycle: штрих-код атаудан басым; groupReceipt кодты өткізеді", () => {
+  const cyc = [{ id: "c1", name: "Grizzly", status: "active", codes: ["4870254132705"] }];
+  assert.equal(FS.matchCycle("чипсылар", cyc, "", "4870254132705")?.id, "c1");
+  assert.equal(FS.matchCycle("чипсылар", cyc, "", "999"), null);
+  assert.equal(FS.groupReceipt([{ name: "чипсылар", price: 5, code: "4870254132705" }], cyc).rows[0].cycleId, "c1");
+});
