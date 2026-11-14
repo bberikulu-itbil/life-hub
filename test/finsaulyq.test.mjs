@@ -274,3 +274,10 @@ test("тілек приоритеті: екі бөлек шкала, қажет�
   assert.deepEqual([[5, 0], [3, 3], [2, 5], [1, 5], [0, 5], [0, 2]].map(([n, w]) => FS.wishLevel({ need: n, want: w })), [0, 0, 1, 1, 2, 2]);
   assert.deepEqual(FS.wishScores({ kind: "need" }), { need: 4, want: 0 }); assert.deepEqual(FS.wishScores({}), { need: 0, want: 3 }); assert.deepEqual(FS.wishScores({ need: 0, want: 0 }), { need: 0, want: 0 });
 });
+
+test("fromRow: чек белгісі (receipt) және үйренген атаулар (itemCat) қайта оқығанда жоғалмайды", () => {
+  const t = FS.fromRow({ id: "x", app: "money", created_at: "2026-11-01T10:00:00+05:00", data: { kind: "expense", amount: 5, category: "Тамақ", date: "2026-11-01", receipt: "R1" } });
+  assert.equal(t.receipt, "R1");
+  const s = FS.fromRow({ id: "s", app: "fs_settings", data: { itemCat: { "нан": "Тамақ" } } });
+  assert.deepEqual(s.item.itemCat, { "нан": "Тамақ" });
+});
