@@ -251,3 +251,11 @@ dialog.sheet.pk{padding:0;overflow:hidden}
 .bigl{display:grid;gap:4px}.bigamt{font-size:2rem!important;font-weight:700;text-align:center;height:64px!important}.catb.on{outline:2.5px solid var(--acc);outline-offset:-2px}.lbl2{font-size:.8rem;color:var(--mute);margin:10px 2px 2px}.sheet .mrow{display:flex;align-items:center;gap:12px;width:100%;padding:10px 4px;text-align:left}.sheet .mrow span:nth-child(2){flex:1}.sheet .mrow .tile{width:40px;height:40px}
 .muted a{color:var(--acc);font-weight:600}
 .plines{list-style:none;margin:-4px 0 6px 52px;padding:0;display:grid;gap:3px;font-size:.85rem;color:var(--mute)}.plines li{display:flex;justify-content:space-between;gap:10px}.plines li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.sheet select:not(.inl select){-webkit-appearance:none;appearance:none;padding-right:2.2rem;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238a94a3' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .85rem center;background-size:12px 8px}
+.rhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:4px}.rhead h3{margin:0}.rtot{font-size:1.7rem;letter-spacing:-.02em}
+.rmeta{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.rmeta label{min-width:0}
+.pos{background:var(--glass-2);border:1px solid var(--line);border-radius:18px;padding:10px;display:grid;gap:8px}.pos .prow{display:grid;grid-template-columns:1fr 104px 34px;gap:8px;align-items:center}.pos .prow.rv{grid-template-columns:1fr auto}.pos .pn{min-width:0;overflow:hidden;text-overflow:ellipsis}.pos .pn small{color:var(--mute)}
+.pos input{min-height:42px;background:var(--glass);}.pos .prow input[type=number]{text-align:right}.pos .ghost.round{width:34px;height:34px;min-height:0;padding:0}
+.pcat{display:flex;align-items:center;gap:8px}.pcat small{color:var(--mute);flex:none}.pcat select{min-height:38px;padding-top:.3rem;padding-bottom:.3rem;border-radius:999px;font-size:.92rem;flex:1;min-width:0}
+.mrow2{grid-template-columns:none!important}.sheet .end.sticky{position:sticky;bottom:0;padding:10px 0 4px;background:linear-gradient(transparent,var(--glass-2) 30%)}

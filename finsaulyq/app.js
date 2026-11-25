@@ -866,24 +866,24 @@ function guessChoice(name, store) {
 }
 function manualReceipt(amount = "") {
   const rows = [], cats = catList(), opts = () => [...[...new Set([...cats, "Басқа"])].map((c) => ["k:" + c, c]), ...liveCycles().map((c) => ["c:" + c.id, "Төлемгер: " + c.name])];
-  const list = h("div", { class: "mrows" }), tot = h("b", { class: "num" }), store = h("input", { name: "store", list: "dl-store" });
-  const total = () => rows.reduce((t, r) => t + (num(r.price) > 0 ? num(r.price) : 0), 0), upd = () => { tot.textContent = tg(total()); dlg.querySelector("h3 b").textContent = tg(total()); };
+  const list = h("div", { class: "mrows" }), store = h("input", { name: "store", list: "dl-store" });
+  const total = () => rows.reduce((t, r) => t + (num(r.price) > 0 ? num(r.price) : 0), 0), upd = () => { dlg.querySelector(".rtot").textContent = tg(total()); };
   const addRow = (price = "") => { const r = { name: "", price, choice: "k:Басқа", manual: false }; rows.push(r);
     const selEl = sel("c", opts(), r.choice); selEl.setAttribute("aria-label", "Санат"); selEl.onchange = () => { r.choice = selEl.value; r.manual = true; };
     const nm = h("input", { placeholder: "Атауы", "aria-label": "Позиция атауы", oninput: (e) => { r.name = e.target.value; }, onchange: () => { if (!r.manual) { r.choice = guessChoice(r.name, store.value); selEl.value = r.choice; } } });
     const pr = h("input", { type: "number", min: 0, step: "any", inputmode: "decimal", placeholder: "₸0", "aria-label": "Бағасы", value: price, oninput: (e) => { r.price = e.target.value; upd(); } });
-    const row = h("div", { class: "mrow2" }, nm, pr, h("button", { type: "button", class: "ghost round", "aria-label": "Позицияны өшіру", onclick: () => { rows.splice(rows.indexOf(r), 1); row.remove(); upd(); } }, "×"), selEl);
+    const row = h("div", { class: "pos mrow2" }, h("div", { class: "prow" }, nm, pr, h("button", { type: "button", class: "ghost round", "aria-label": "Позицияны өшіру", onclick: () => { rows.splice(rows.indexOf(r), 1); row.remove(); upd(); } }, "×")), h("div", { class: "pcat" }, h("small", {}, "Санат"), selEl));
     list.append(row); };
   const f = h("form", { method: "dialog", onsubmit: (e) => { e.preventDefault(); const v = new FormData(f), ok = rows.filter((r) => num(r.price) > 0);
     if (!ok.length) return alert("Кемінде бір позицияның бағасын жаз.");
     for (const r of ok) if (r.choice.startsWith("k:") && r.name.trim()) (S.settings.itemCat ??= {})[r.name.trim().toLowerCase()] = r.choice.slice(2);
     commitReceipt(ok.map((r) => ({ price: num(r.price), choice: r.choice, name: r.name.trim() })), v.get("store").trim(), v.get("date"), v.get("account")); dlg.close(); } },
-    h("h3", {}, "Чек · ", h("b", { class: "num" }, tg(0))), h("p", { class: "muted" }, "Позиция атын жазсаң, санат өздігінен таңдалады."),
-    fld("Дүкен", store), h("datalist", { id: "dl-store" }, stores().map((x) => h("option", { value: x }))), fld("Күні", h("input", { type: "date", name: "date", value: today(), required: true })),
-    ...accField().map((a) => fld(a.label, sel("account", a.options, a.value))), list,
+    h("div", { class: "rhead" }, h("h3", {}, "Жаңа чек"), h("b", { class: "num rtot" }, tg(0))),
+    fld("Дүкен", store), h("datalist", { id: "dl-store" }, stores().map((x) => h("option", { value: x }))),
+    h("div", { class: "rmeta" }, fld("Күні", h("input", { type: "date", name: "date", value: today(), required: true })), ...accField().map((a) => fld(a.label, sel("account", a.options, a.value)))),
+    h("div", { class: "lbl2" }, "Позициялар · атын жазсаң, санат өздігінен таңдалады"), list,
     h("button", { type: "button", class: "addpos", onclick: () => addRow() }, "+ Позиция қосу"),
-    h("div", { class: "tot" }, h("span", {}, "Жалпы"), tot),
-    h("div", { class: "end" }, h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"), h("button", { class: "primary" }, "Растау")));
+    h("div", { class: "end sticky" }, h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"), h("button", { class: "primary" }, "Растау")));
   const dlg = h("dialog", { class: "sheet" }, f); dlg.addEventListener("close", () => dlg.remove());
   document.body.append(dlg); addRow(amount); upd(); dlg.showModal();
 }
@@ -898,12 +898,14 @@ function receiptReview(r) {
     e.preventDefault(); const v = new FormData(f);
     commitReceipt(rows.map((x, i) => ({ price: x.price, choice: v.get("r" + i), name: x.name, qty: x.qty, code: x.code })), v.get("store").trim(), v.get("date"), v.get("account"));
     dlg.close();
-  } }, h("h3", {}, `Чек · ${tg(r.total)}`), h("p", { class: "muted" }, "Позициялар өздігінен бөлінді: белгілі тауар — өз Төлемгеріне, жаңасы — жаңа Төлемгер болып ашылады. Қаламасаң, санатқа ауыстыр."),
-    ...rows.map((x, i) => h("label", {}, `${x.name}${x.qty > 1 ? ` ×${x.qty}` : ""} · ${tg(x.price)}`, sel("r" + i, optsFor(x), x.cycleId ? "c:" + x.cycleId : "n:" + x.category))),
-    fld("Дүкен", h("input", { name: "store", value: r.store })), fld("Күні", h("input", { type: "date", name: "date", value: r.date, required: true })),
-    ...accField().map((a) => fld(a.label, sel("account", a.options, a.value))),
-    h("div", { class: "end" }, h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"), h("button", { class: "primary" }, "Растау")));
-  const dlg = h("dialog", {}, f); dlg.addEventListener("close", () => dlg.remove());
+  } }, h("div", { class: "rhead" }, h("h3", {}, "Чек оқылды"), h("b", { class: "num rtot" }, tg(r.total))),
+    fld("Дүкен", h("input", { name: "store", value: r.store })),
+    h("div", { class: "rmeta" }, fld("Күні", h("input", { type: "date", name: "date", value: r.date, required: true })), ...accField().map((a) => fld(a.label, sel("account", a.options, a.value)))),
+    h("div", { class: "lbl2" }, `Позициялар · ${rows.length}. Белгілі тауар өз Төлемгеріне түседі, жаңасы жаңа Төлемгер болады`),
+    h("div", { class: "mrows" }, rows.map((x, i) => h("div", { class: "pos" }, h("div", { class: "prow rv" }, h("span", { class: "pn" }, x.name, x.qty > 1 ? h("small", {}, ` ×${x.qty}`) : null), h("b", { class: "num" }, tg(x.price))),
+      h("div", { class: "pcat" }, h("small", {}, "Санат"), sel("r" + i, optsFor(x), x.cycleId ? "c:" + x.cycleId : "n:" + x.category))))),
+    h("div", { class: "end sticky" }, h("button", { type: "button", class: "ghost", onclick: () => dlg.close() }, "Бас тарту"), h("button", { class: "primary" }, "Растау")));
+  const dlg = h("dialog", { class: "sheet" }, f); dlg.addEventListener("close", () => dlg.remove());
   document.body.append(dlg); dlg.showModal();
 }
 
